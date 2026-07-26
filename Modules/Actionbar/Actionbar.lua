@@ -1020,7 +1020,9 @@ local function GetBarOption(n)
     }
     AddButtonTable(opt, barname)
     DF.Settings:AddPositionTable(Module, opt, barname, 'Action Bar' .. n, getDefaultStr,
-                                 frameTableWithout('DragonflightUIActionbarFrame' .. n))
+                                 frameTableWithout('DragonflightUIActionbarFrame' .. n), function()
+        return Module['bar' .. n]
+    end)
     opt.args.scale = nil;
     if n == 1 then
         -- print('111111')
@@ -1459,7 +1461,13 @@ local xpOptions = {
     }
 }
 
-DF.Settings:AddPositionTable(Module, xpOptions, 'xp', 'XP Bar', getDefaultStr, frameTableWithout('DragonflightUIPetBar'))
+-- The default chain is bar1 -> RepBar -> XPBar, so moving the XP bar takes the
+-- reputation bar and the main action bar with it. These three get a Detach
+-- button so any of them can be stood on its own without jumping.
+DF.Settings:AddPositionTable(Module, xpOptions, 'xp', 'XP Bar', getDefaultStr,
+                             frameTableWithout('DragonflightUIPetBar'), function()
+    return Module.xpbar
+end)
 DragonflightUIStateHandlerMixin:AddStateTable(Module, xpOptions, 'xp', 'XPBar', getDefaultStr)
 local optionsXpEdtimode = {
     name = 'xp',
@@ -1544,7 +1552,9 @@ local repOptions = {
 }
 
 DF.Settings:AddPositionTable(Module, repOptions, 'rep', 'Reputation Bar', getDefaultStr,
-                             frameTableWithout('DragonflightUIRepBar'))
+                             frameTableWithout('DragonflightUIRepBar'), function()
+    return Module.repbar
+end)
 DragonflightUIStateHandlerMixin:AddStateTable(Module, repOptions, 'rep', 'RepBar', getDefaultStr)
 local optionsRepEdtimode = {
     name = 'rep',

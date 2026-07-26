@@ -81,7 +81,55 @@ DF.Settings.ValidateFrame = function(t)
     -- return true, true;
 end
 
-function DF.Settings:AddPositionTable(Module, optionTable, sub, displayName, getDefaultStr, frameTable)
+-- Stand a frame on its own without moving it.
+--
+-- Several elements are anchored to each other by default - the main action bar
+-- sits on the reputation bar, which sits on the XP bar - so dragging one takes
+-- the others with it. The Anchor Frame dropdown could always break that chain,
+-- but switching it to UIParent made the frame jump, because the saved x/y were
+-- measured from the old parent. Nobody wants to detach and then hunt for their
+-- bar.
+--
+-- So let the engine do the conversion. StartMoving followed immediately by
+-- StopMovingOrSizing - with no cursor movement in between - leaves the frame
+-- exactly where it was, re-anchored against the screen with the offsets worked
+-- out for us. Read that back and store it. No scale arithmetic, which is the
+-- part that goes wrong when a frame carries its own scale.
+function DF.Settings:DetachFrame(Module, sub, frameGetter)
+    local frame = frameGetter and frameGetter()
+    if not frame then return end
+
+    local db = Module.db and Module.db.profile and Module.db.profile[sub]
+    if not db then return end
+
+    -- Moving a secure frame is protected work, and these include action bars.
+    if InCombatLockdown() then
+        print('|cffFF0000DragonflightUI:|r cannot detach a frame during combat - try again afterwards.')
+        return
+    end
+
+    local wasMovable = frame:IsMovable()
+    frame:SetMovable(true)
+    frame:StartMoving()
+    frame:StopMovingOrSizing()
+    frame:SetMovable(wasMovable)
+
+    local point, _, relativePoint, x, y = frame:GetPoint(1)
+    if not point then return end
+
+    db.anchorFrame = 'UIParent'
+    db.customAnchorFrame = ''
+    db.anchor = point
+    db.anchorParent = relativePoint or point
+    db.x = x or 0
+    db.y = y or 0
+
+    Module:ApplySettings(sub)
+    -- not every module defines one
+    if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
+end
+
+function DF.Settings:AddPositionTable(Module, optionTable, sub, displayName, getDefaultStr, frameTable, frameGetter)
     local extraOptions = {
         headerPosition = {
             type = 'header',
@@ -184,6 +232,24 @@ function DF.Settings:AddPositionTable(Module, optionTable, sub, displayName, get
             editmode = true
         }
     }
+
+    -- Only offered where the caller can hand us the frame. It is a getter
+    -- rather than the frame itself because these tables are built at file
+    -- scope, long before the frames exist.
+    if frameGetter then
+        extraOptions.detach = {
+            type = 'execute',
+            name = L["PositionTableDetach"],
+            btnName = L["PositionTableDetachButton"],
+            desc = L["PositionTableDetachDesc"],
+            func = function()
+                DF.Settings:DetachFrame(Module, sub, frameGetter)
+            end,
+            order = 4.6,
+            group = 'headerPosition',
+            editmode = true
+        }
+    end
 
     for k, v in pairs(extraOptions) do
         --
