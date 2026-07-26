@@ -351,21 +351,65 @@ function SubModuleMixin:SetupModern()
         self.PartyMoveFrame = moveFrame
     end
 
-    if PartyFrame then
+    -- Put PartyFrame back on our move frame, out of combat only.
+    --
+    -- PartyFrame is protected, and its member frames are pooled: Blizzard's own
+    -- party update acquires them, anchors them and shows them. Re-anchoring the
+    -- container from inside that update - which is what doing this straight from
+    -- a SetPoint hook amounts to - performs a protected call the client refuses
+    -- mid-fight, and the update it interrupted never shows the members. That is
+    -- how a party could lose everyone but one member the moment a boss pull
+    -- started, and get them all back the instant combat ended, when Blizzard ran
+    -- the update again unimpeded.
+    --
+    -- So never during lockdown, and never inside Blizzard's call: re-anchor on
+    -- the next frame instead, and again when combat drops.
+    local function ReanchorPartyFrame()
+        if InCombatLockdown() then return end
+        if not (PartyFrame and self.PartyMoveFrame) then return end
+
+        local _, relativeTo = PartyFrame:GetPoint(1)
+        if relativeTo == self.PartyMoveFrame then return end
+
         PartyFrame:ClearAllPoints()
-        PartyFrame:SetParent(self.PartyMoveFrame)
         PartyFrame:SetPoint('TOPLEFT', self.PartyMoveFrame, 'TOPLEFT', 0, 0)
+    end
+    self.ReanchorPartyFrame = ReanchorPartyFrame
+
+    if PartyFrame then
+        if not InCombatLockdown() then
+            PartyFrame:ClearAllPoints()
+            PartyFrame:SetParent(self.PartyMoveFrame)
+            PartyFrame:SetPoint('TOPLEFT', self.PartyMoveFrame, 'TOPLEFT', 0, 0)
+        end
 
         if not self.PartyFrameAnchorHooked then
             self.PartyFrameAnchorHooked = true
+
             -- Blizzard re-anchors this frame from its own layout code; put it
-            -- back whenever it is anchored anywhere else.
+            -- back afterwards, never during.
             hooksecurefunc(PartyFrame, 'SetPoint', function(frame, _, relativeTo)
-                if relativeTo ~= self.PartyMoveFrame then
-                    frame:ClearAllPoints()
-                    frame:SetPoint('TOPLEFT', self.PartyMoveFrame, 'TOPLEFT', 0, 0)
-                end
+                if relativeTo == self.PartyMoveFrame then return end
+                if self.PartyAnchorPending then return end
+
+                self.PartyAnchorPending = true
+                C_Timer.After(0, function()
+                    self.PartyAnchorPending = nil
+                    ReanchorPartyFrame()
+                end)
             end)
+
+            -- Anything the fight refused is put right here.
+            local regen = CreateFrame('Frame')
+            regen:RegisterEvent('PLAYER_REGEN_ENABLED')
+            regen:SetScript('OnEvent', function()
+                if not (PartyFrame and self.PartyMoveFrame) then return end
+                if PartyFrame:GetParent() ~= self.PartyMoveFrame then
+                    PartyFrame:SetParent(self.PartyMoveFrame)
+                end
+                ReanchorPartyFrame()
+            end)
+            self.PartyAnchorRegenWatcher = regen
         end
     end
 
