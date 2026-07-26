@@ -493,18 +493,53 @@ function Module:InitEditmodeOverride()
     -- end
     LibEditModeOverride:ApplyChanges()
 
+    -- ApplyChanges() show/hides EditModeManagerFrame, which is a FULL
+    -- Blizzard layout application: it re-anchors every managed system,
+    -- fires EditMode enter/exit hooks and resets frames whose positions
+    -- DFUI owns but the layout does not know about. Calling it once per
+    -- re-anchored frame - as this did - meant a burst of full layout
+    -- applications during setup, which is where "frames move after a
+    -- loading screen", the vanishing LFG eye, and the MicroMenuContainer
+    -- anchor-family errors come from. Save every change immediately, and
+    -- collapse the applications into one debounced pass.
+    local applyScheduled = false
+    local combatGate
+
+    local function applyNow()
+        applyScheduled = false
+        if not (LibEditModeOverride and LibEditModeOverride.ApplyChanges) then return end
+        if not (LibEditModeOverride:GetActiveLayout() == DFLayoutName) then return end
+
+        if Helper:IsCombatLocked() then
+            -- Protected work is blocked in combat; retry once it drops.
+            if not combatGate then
+                combatGate = CreateFrame('Frame')
+                combatGate:SetScript('OnEvent', function(g)
+                    g:UnregisterAllEvents()
+                    applyNow()
+                end)
+            end
+            combatGate:RegisterEvent('PLAYER_REGEN_ENABLED')
+            return
+        end
+
+        LibEditModeOverride:ApplyChanges()
+    end
+
+    function addonTable:ScheduleBlizzEditmodeApply()
+        if applyScheduled then return end
+        applyScheduled = true
+        C_Timer.After(0.5, applyNow)
+    end
+
     function addonTable:OverrideBlizzEditmode(f, ...)
         if not (LibEditModeOverride:GetActiveLayout() == DFLayoutName) then
             print('Wrong EditMode layout detected - please use ' .. DFLayoutName .. ' and /reload .')
             return;
         end
         LibEditModeOverride:ReanchorFrame(f, ...)
-
-        if InCombatLockdown() then
-            LibEditModeOverride:SaveOnly()
-        else
-            LibEditModeOverride:ApplyChanges()
-        end
+        LibEditModeOverride:SaveOnly()
+        addonTable:ScheduleBlizzEditmodeApply()
     end
 
     function addonTable:HookBlizzEditmodeAndFunc(fun, both)
@@ -550,12 +585,9 @@ function Module:InitEditmodeOverride()
 
     function addonTable:SetBlizzEditmodeFrameSetting(f, setting, value, saveOnly)
         LibEditModeOverride:SetFrameSetting(f, setting, value)
+        LibEditModeOverride:SaveOnly()
 
-        if InCombatLockdown() or saveOnly then
-            LibEditModeOverride:SaveOnly()
-        else
-            LibEditModeOverride:ApplyChanges()
-        end
+        if not saveOnly then addonTable:ScheduleBlizzEditmodeApply() end
     end
 end
 

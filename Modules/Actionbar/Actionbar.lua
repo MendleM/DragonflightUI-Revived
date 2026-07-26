@@ -3341,9 +3341,12 @@ function Module:ForceMoveBlizzEditModeGhosts()
             v:SetClampedToScreen(false)
             lib:ReanchorFrame(v, 'BOTTOM', UIParent, 'TOP', 0, 0 + 500)
         end
-        if InCombatLockdown() then
-            lib:SaveOnly()
-        else
+        -- Save now, apply once: every ApplyChanges is a full Blizzard layout
+        -- application, and the scheduler collapses the burst into one.
+        lib:SaveOnly()
+        if addonTable.ScheduleBlizzEditmodeApply then
+            addonTable:ScheduleBlizzEditmodeApply()
+        elseif not InCombatLockdown() then
             lib:ApplyChanges()
         end
     else
