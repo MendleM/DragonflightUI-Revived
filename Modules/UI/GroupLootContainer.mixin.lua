@@ -69,7 +69,11 @@ end
 -- shipped art); otherwise we fall back to the sheet we ship, addressed by
 -- the same texel coordinates the atlas uses.
 local ROLL_ART = 'Interface\\Addons\\DragonflightUI\\Textures\\uilootroll'
-local function coords(l, t) return l / 512, (l + 32) / 512, t / 512, (t + 32) / 512 end
+-- one 32px icon on the 512x512 sheet, as a texcoord TABLE: returning four
+-- values here would silently keep only the first, which is exactly how this
+-- read 'attempt to index field up (a number value)' and took the whole
+-- restyle - and with it the rest of the UI module's setup - down with it
+local function coords(l, t) return {l / 512, (l + 32) / 512, t / 512, (t + 32) / 512} end
 local MODERN_ICONS = {
     need = {
         atlas = 'lootroll-toast-icon-need',
@@ -114,6 +118,7 @@ local function ApplyRollButtonArt(btn, key)
     if btn.SetDisabledTexture then btn:SetDisabledTexture(nil) end
 
     local useAtlas = art.atlas and btn.SetNormalAtlas and AtlasExists(art.atlas .. '-up')
+    if DF.Log then DF:Log('lootstyle', 'button %s art via %s', key, useAtlas and 'client atlas' or 'shipped sheet') end
 
     if useAtlas then
         btn:SetNormalAtlas(art.atlas .. '-up')
@@ -765,7 +770,13 @@ function SubModuleMixin:CreateRollPreview()
                                     'DFEditModePreviewGroupLootTemplate')
     fakePreview:SetPoint('CENTER')
     self:PrepPreviewFrame(fakePreview)
-    self:UpdateGroupLootFrameStyle(fakePreview)
+    -- pcall: this call site is inside Setup, which runs from the UI module's
+    -- OnEnable - a throw here used to abort the rest of that setup
+    local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, fakePreview)
+    if not ok then
+        DF:Log('lootstyle', 'edit mode preview style ERROR: %s', tostring(err))
+        geterrorhandler()('DFUI loot roll preview restyle: ' .. tostring(err))
+    end
     SubModuleMixin.SetPreviewItem(fakePreview, PREVIEW_ITEMS[1])
 
     fakeRoll.FakePreview = fakePreview
@@ -780,7 +791,15 @@ function SubModuleMixin:StyleRollFrames()
 
     for i = 1, 4 do
         local f = _G['GroupLootFrame' .. i]
-        self:UpdateGroupLootFrameStyle(f);
+        -- A restyle failure must stay local. When this threw it propagated out
+        -- of Setup, aborted the UI module's OnEnable, and left everything it
+        -- had not reached yet - the character frame among them - on Blizzard's
+        -- default look until a reload.
+        local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, f)
+        if not ok then
+            DF:Log('lootstyle', 'GroupLootFrame%d style ERROR: %s', i, tostring(err))
+            geterrorhandler()('DFUI loot roll restyle: ' .. tostring(err))
+        end
         -- Blizzard's GroupLootFrame_OnShow re-applies the classic dialog
         -- backdrop on every popup; ours must win each time.
         f:HookScript('OnShow', SubModuleMixin.ApplyDFBackdrop)
@@ -1052,7 +1071,9 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
     f:SetSize(RETAIL.width, RETAIL.height)
     if f.SetBackdrop then f:SetBackdrop(nil) end
 
-    -- classic art out of the way
+    -- classic art out of the way. Their anchors stay put: the classic pass
+    -- button hangs off Corner and the classic timer off SlotTexture, so
+    -- clearing their points strands anything still anchored to them.
     do
         local name = f.GetName and f:GetName()
         if name then
@@ -1060,7 +1081,6 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
                 local region = _G[name .. suffix]
                 if region then
                     if region.SetTexture then region:SetTexture('') end
-                    region:ClearAllPoints()
                     region:Hide()
                 end
             end

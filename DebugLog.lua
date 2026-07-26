@@ -19,7 +19,8 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log all          the whole buffer in chat
 --     /df log echo         toggle live echo of every entry to chat
 --     /df log clear        empty the buffer
---     /df log frame <name> dump a frame's whole visibility chain
+--     /df log frame <name>   a frame's whole visibility chain
+--     /df log regions <name> every region and child of a frame
 --     /df log <tag>        only entries carrying that tag
 --
 -- The buffer is per session: it is reset on load, so the file on disk always
@@ -134,6 +135,43 @@ function DF:LogFrame(frameOrName, tag)
     end
 end
 
+-- What is this frame actually made of? Lists every region and child with its
+-- art, geometry and anchors - the fastest way to find the piece that is
+-- stranded, unstyled, or wearing the wrong texture.
+function DF:LogRegions(frameOrName, tag)
+    tag = tag or 'regions'
+
+    local f = frameOrName
+    if type(f) == 'string' then f = _G[f] end
+    if type(f) ~= 'table' or not f.GetObjectType then
+        DF:Log(tag, 'no such frame: %s', tostring(frameOrName))
+        return
+    end
+
+    local function describe(kind, index, obj)
+        local objName = (obj.GetName and obj:GetName()) or '<anonymous>'
+        local art = ''
+        if obj.GetAtlas and obj:GetAtlas() then
+            art = ' atlas=' .. obj:GetAtlas()
+        elseif obj.GetTexture then
+            local tex = obj:GetTexture()
+            if tex then art = ' texture=' .. tostring(tex) end
+        end
+
+        local left, bottom = obj:GetLeft(), obj:GetBottom()
+        DF:Log(tag, '%s %d: %s (%s) shown=%s %.0fx%.0f at %s,%s points=%d%s', kind, index, objName,
+               obj:GetObjectType(), tostring(obj:IsShown()), obj:GetWidth() or -1, obj:GetHeight() or -1,
+               left and string.format('%.0f', left) or 'UNANCHORED', bottom and string.format('%.0f', bottom) or '?',
+               (obj.GetNumPoints and obj:GetNumPoints()) or 0, art)
+    end
+
+    DF:Log(tag, '=== %s: %d regions, %d children ===', (f:GetName() or '<anonymous>'), select('#', f:GetRegions()),
+           select('#', f:GetChildren()))
+
+    for i, region in ipairs({f:GetRegions()}) do describe('region', i, region) end
+    for i, child in ipairs({f:GetChildren()}) do describe('child', i, child) end
+end
+
 function DF:LogDump(filter, limit)
     local matching = {}
     for _, entry in ipairs(log) do
@@ -180,6 +218,13 @@ function DF:HandleLogCommand(rest)
         else
             DF:LogFrame(arg, 'framedump')
             DF:LogDump('framedump', 40)
+        end
+    elseif sub == 'regions' then
+        if arg == '' then
+            print(PREFIX .. 'usage: /df log regions <FrameName>')
+        else
+            DF:LogRegions(arg, 'regiondump')
+            DF:LogDump('regiondump', 60)
         end
     else
         DF:LogDump(rest, 60)
