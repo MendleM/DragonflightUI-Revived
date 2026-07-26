@@ -19,12 +19,6 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log all          the whole buffer in chat
 --     /df log copy [tag]   a window to select all and copy out of, for pasting
 --                          into a bug report; takes the same tag filter
---
--- There is also a keybinding, under DragonflightUI > Debug: hover whatever looks
--- wrong, press the key, and the frame beneath the cursor is dumped and the copy
--- window opens on it. That exists because 'mouse' below resolves when the
--- command runs, and reaching the chat box to type one moves the cursor off the
--- thing being reported.
 --     /df log echo         toggle live echo of every entry to chat
 --     /df log clear        empty the buffer
 --     /df log frame <name>   a frame's whole visibility chain
@@ -37,6 +31,12 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --
 -- frame, regions and bars all take 'mouse' instead of a name, for whatever is
 -- under the cursor - handy when the frame's name is what you want to find out.
+--
+-- There is also a keybinding, under DragonflightUI > Debug: hover whatever looks
+-- wrong, press the key, and the frame beneath the cursor is dumped and the copy
+-- window opens on it. That exists because 'mouse' resolves when the command
+-- runs, and reaching the chat box to type one moves the cursor off the thing
+-- being reported.
 --
 -- The buffer is per session: it is reset on load, so the file on disk always
 -- holds the session that just ended. Copy anything worth keeping before a
@@ -466,31 +466,20 @@ end
 
 -- TEMP: live tuner for the target frame's combat glow.
 --
--- Which texture is actually on screen depends on the flavour. On Wrath DFUI
--- swaps in its own DragonflightUITargetFrameFlash; on TBC the branch is skipped
--- entirely and Blizzard's own flash - an anonymous texture, file id 137016 -
--- stays put, drawn for Blizzard's frame rather than ours. So find whichever one
--- is there and let it be dragged into place by hand instead of guessing offsets
--- one commit at a time.
+-- The glow is built from the frame's own art rather than a supplied picture of
+-- a glow, so what there is to tune is how far it reaches, how strong it is and
+-- where it sits. The shipped in-combat texture is drawn alongside for
+-- comparison, since that is the thing it replaced.
 local tuner
 
-local function FindTargetFlash()
-    local mine = _G['DragonflightUITargetFrameFlash']
-    if mine then return mine, 'DragonflightUITargetFrameFlash' end
+local ART_TEX = 'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe2x\\'
+local ART_L, ART_R, ART_T, ART_B = 0, 384 / 512, 0, 134 / 256
+local ART_W, ART_H = 192, 67
 
-    if not TargetFrame then return nil end
-    for _, region in ipairs({TargetFrame:GetRegions()}) do
-        if region:GetObjectType() == 'Texture' and region:GetTexture() == 137016 then
-            return region, "Blizzard's own flash (137016)"
-        end
-    end
-end
-
-local function TunerSlider(parent, label, low, high, step, y, onChange)
-    local s = CreateFrame('Slider', 'DragonflightUIFlashTune' .. label:gsub('%s', ''), parent,
-                          'OptionsSliderTemplate')
-    s:SetWidth(240)
-    s:SetPoint('TOPLEFT', parent, 'TOPLEFT', 24, y)
+local function TunerSlider(parent, key, label, low, high, step, y, onChange)
+    local s = CreateFrame('Slider', 'DragonflightUIFlashTune' .. key, parent, 'OptionsSliderTemplate')
+    s:SetWidth(250)
+    s:SetPoint('TOPLEFT', parent, 'TOPLEFT', 26, y)
     s:SetMinMaxValues(low, high)
     s:SetValueStep(step)
     s:SetObeyStepOnDrag(true)
@@ -498,10 +487,10 @@ local function TunerSlider(parent, label, low, high, step, y, onChange)
     local name = s:GetName()
     _G[name .. 'Low']:SetText(tostring(low))
     _G[name .. 'High']:SetText(tostring(high))
-    _G[name .. 'Text']:SetText(label)
+    s.Label = _G[name .. 'Text']
 
     s:SetScript('OnValueChanged', function(self, value)
-        _G[name .. 'Text']:SetText(string.format('%s: %.1f', label, value))
+        self.Label:SetText(string.format('%s: %.2f', label, value))
         onChange(value)
     end)
 
@@ -509,16 +498,16 @@ local function TunerSlider(parent, label, low, high, step, y, onChange)
 end
 
 function DF:FlashTune()
-    local flash, which = FindTargetFlash()
-    if not flash then
-        print(PREFIX .. 'no target flash texture found - target something first, then try again.')
+    local glow = _G['DragonflightUITargetFrameFlash']
+    if not (glow and glow.ApplyGlow) then
+        print(PREFIX .. 'no DFUI target glow found - target something first, then try again.')
         return
     end
 
     if not tuner then
         local f = CreateFrame('Frame', 'DragonflightUIFlashTuneFrame', UIParent, 'BackdropTemplate')
-        f:SetSize(300, 420)
-        f:SetPoint('CENTER', UIParent, 'CENTER', 300, 0)
+        f:SetSize(310, 470)
+        f:SetPoint('CENTER', UIParent, 'CENTER', 330, 0)
         f:SetFrameStrata('DIALOG')
         f:EnableMouse(true)
         f:SetMovable(true)
@@ -537,43 +526,59 @@ function DF:FlashTune()
 
         local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormal')
         title:SetPoint('TOP', f, 'TOP', 0, -16)
-        title:SetText('Target flash tuner')
+        title:SetText('Target combat glow')
 
-        f.Which = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
-        f.Which:SetPoint('TOP', title, 'BOTTOM', 0, -4)
-        f.Which:SetWidth(260)
+        TunerSlider(f, 'Spread', 'Spread', 0, 40, 0.5, -44, function(v)
+            if tuner.Glow then tuner.Glow.Spread = v end
+        end)
+        TunerSlider(f, 'Intensity', 'Intensity', 0, 2, 0.05, -92, function(v)
+            if tuner.Glow then tuner.Glow.Intensity = v end
+        end)
+        TunerSlider(f, 'OffsetX', 'X offset', -60, 60, 1, -140, function(v)
+            if tuner.Glow then tuner.Glow.OffsetX = v end
+        end)
+        TunerSlider(f, 'OffsetY', 'Y offset', -60, 60, 1, -188, function(v)
+            if tuner.Glow then tuner.Glow.OffsetY = v end
+        end)
 
-        f.Values = {x = 0, y = 0, w = 0, h = 0, r = 1, b = 1}
+        -- The art that used to be used, for comparison: same cut and size as
+        -- the frame draws it, on a dark swatch so the red reads.
+        local caption = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+        caption:SetPoint('TOPLEFT', f, 'TOPLEFT', 26, -228)
+        caption:SetText('|cff9d9d9dShipped in-combat art, for comparison|r')
 
-        local function apply()
-            local t, v = f.Flash, f.Values
-            if not t then return end
-            t:ClearAllPoints()
-            t:SetPoint('CENTER', TargetFrame, 'CENTER', v.x, v.y)
-            t:SetSize(v.w, v.h)
-            t:SetTexCoord(0, v.r, 0, v.b)
-            t:Show()
-            t:SetAlpha(1)
+        local swatch = f:CreateTexture(nil, 'BACKGROUND')
+        swatch:SetColorTexture(0, 0, 0, 0.85)
+        swatch:SetPoint('TOPLEFT', caption, 'BOTTOMLEFT', -4, -6)
+        swatch:SetSize(ART_W + 8, ART_H + 8)
 
-            f.Out:SetText(string.format(
-                              'SetPoint(CENTER, %.0f, %.0f)  SetSize(%.0f, %.0f)\nSetTexCoord(0, %.4f, 0, %.4f)', v.x,
-                              v.y, v.w, v.h, v.r, v.b))
-        end
-        f.Apply = apply
+        local shipped = f:CreateTexture(nil, 'ARTWORK')
+        shipped:SetTexture(ART_TEX .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
+        shipped:SetTexCoord(ART_L, ART_R, ART_T, ART_B)
+        shipped:SetSize(ART_W, ART_H)
+        shipped:SetPoint('CENTER', swatch, 'CENTER', 0, 0)
 
-        TunerSlider(f, 'X offset', -120, 120, 1, -70, function(v) f.Values.x = v; apply() end)
-        TunerSlider(f, 'Y offset', -120, 120, 1, -120, function(v) f.Values.y = v; apply() end)
-        TunerSlider(f, 'Width', 40, 400, 1, -170, function(v) f.Values.w = v; apply() end)
-        TunerSlider(f, 'Height', 20, 200, 1, -220, function(v) f.Values.h = v; apply() end)
-        TunerSlider(f, 'TexCoord right', 0.2, 1, 0.002, -270, function(v) f.Values.r = v; apply() end)
-        TunerSlider(f, 'TexCoord bottom', 0.2, 1, 0.002, -320, function(v) f.Values.b = v; apply() end)
+        local caption2 = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+        caption2:SetPoint('TOPLEFT', swatch, 'BOTTOMLEFT', 4, -8)
+        caption2:SetText('|cff9d9d9dFrame art the glow is built from|r')
+
+        local swatch2 = f:CreateTexture(nil, 'BACKGROUND')
+        swatch2:SetColorTexture(0, 0, 0, 0.85)
+        swatch2:SetPoint('TOPLEFT', caption2, 'BOTTOMLEFT', -4, -6)
+        swatch2:SetSize(ART_W + 8, ART_H + 8)
+
+        local base = f:CreateTexture(nil, 'ARTWORK')
+        base:SetTexture(ART_TEX .. 'ui-hud-unitframe-target-portraiton-2x')
+        base:SetTexCoord(ART_L, ART_R, ART_T, ART_B)
+        base:SetSize(ART_W, ART_H)
+        base:SetPoint('CENTER', swatch2, 'CENTER', 0, 0)
 
         f.Out = CreateFrame('EditBox', nil, f)
         f.Out:SetMultiLine(true)
         f.Out:SetFontObject(GameFontHighlightSmall)
-        f.Out:SetPoint('BOTTOMLEFT', f, 'BOTTOMLEFT', 20, 46)
-        f.Out:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -20, 46)
-        f.Out:SetHeight(34)
+        f.Out:SetPoint('BOTTOMLEFT', f, 'BOTTOMLEFT', 20, 48)
+        f.Out:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -20, 48)
+        f.Out:SetHeight(30)
         f.Out:SetAutoFocus(false)
 
         local close = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate')
@@ -582,19 +587,23 @@ function DF:FlashTune()
         close:SetText(CLOSE or 'Close')
         close:SetScript('OnClick', function() f:Hide() end)
 
-        -- Hold it on screen while tuning.
-        --
-        -- The flash is shown and hidden by whether the target is in combat, so
-        -- a one-off Show is undone by the next update a moment later - and on
-        -- the Wrath path DFUI hooks Show and Hide on it as well. Rather than
-        -- fight either of them, re-assert everything a few times a second for
-        -- as long as the tuner is open.
+        -- Hold it on screen and keep it current. The glow is shown and hidden
+        -- by whether the target is in combat, so a one-off Show is undone by
+        -- the next update a moment later.
         f.Tick = function(self, elapsed)
             self.since = (self.since or 0) + elapsed
-            if self.since < 0.1 then return end
+            if self.since < 0.05 then return end
             self.since = 0
 
-            if self.Flash then self.Apply() end
+            local g = self.Glow
+            if not g then return end
+
+            g:ApplyGlow()
+            g:Show()
+            g:SetAlpha(1)
+
+            self.Out:SetText(string.format('Spread %.1f   Intensity %.2f   Offset %.0f, %.0f', g.Spread, g.Intensity,
+                                           g.OffsetX, g.OffsetY))
         end
 
         f:SetScript('OnHide', function(self)
@@ -605,52 +614,20 @@ function DF:FlashTune()
         tuner = f
     end
 
-    -- Seed the sliders from wherever the texture currently sits, so tuning
-    -- starts from what is on screen rather than snapping somewhere else.
-    tuner.Flash = flash
-    tuner.Which:SetText('|cff9d9d9d' .. which .. '|r')
+    tuner.Glow = glow
 
-    local w, h = flash:GetWidth(), flash:GetHeight()
-    local _, _, _, x, y = flash:GetPoint(1)
-
-    -- GetTexCoord hands back the four corners: upper-left, lower-left,
-    -- upper-right, lower-right. The right edge and the bottom edge are the two
-    -- worth a slider.
-    local right, bottom = 1, 1
-    if flash.GetTexCoord then
-        local _, _, _, lly, urx = flash:GetTexCoord()
-        right = urx or 1
-        bottom = lly or 1
-    end
-
-    tuner.Values.x = x or 0
-    tuner.Values.y = y or 0
-    tuner.Values.w = (w and w > 0) and w or 192
-    tuner.Values.h = (h and h > 0) and h or 67
-    tuner.Values.r = right
-    tuner.Values.b = bottom
-
-    for _, key in ipairs({'Xoffset', 'Yoffset', 'Width', 'Height', 'TexCoordright', 'TexCoordbottom'}) do
-        local slider = _G['DragonflightUIFlashTune' .. key]
-        if slider then
-            local v = tuner.Values
-            slider:SetValue(({
-                Xoffset = v.x,
-                Yoffset = v.y,
-                Width = v.w,
-                Height = v.h,
-                TexCoordright = v.r,
-                TexCoordbottom = v.b
-            })[key])
-        end
-    end
+    _G['DragonflightUIFlashTuneSpread']:SetValue(glow.Spread or 12)
+    _G['DragonflightUIFlashTuneIntensity']:SetValue(glow.Intensity or 1)
+    _G['DragonflightUIFlashTuneOffsetX']:SetValue(glow.OffsetX or 0)
+    _G['DragonflightUIFlashTuneOffsetY']:SetValue(glow.OffsetY or 0)
 
     tuner:Show()
     -- re-attached on every open, since closing clears it
     tuner:SetScript('OnUpdate', tuner.Tick)
-    tuner.Apply()
-    print(PREFIX .. 'tuning ' .. which .. '. Drag the sliders, then send me the line at the bottom.')
+
+    print(PREFIX .. 'tuning the target glow. Drag the sliders, then send me the line at the bottom.')
 end
+
 
 -- Returns true when the input was a log command and has been handled.
 function DF:HandleLogCommand(rest)

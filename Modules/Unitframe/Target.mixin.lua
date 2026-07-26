@@ -869,7 +869,22 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
         t:SetPoint('LEFT', TargetFramePortrait, 'RIGHT', -22, -18)
     end
 
-    if flash and DF.Wrath then
+    -- Blizzard's own combat flash, however this flavour happens to expose it: a
+    -- named Flash on the frame, or an anonymous texture carrying file id 137016.
+    -- This used to be gated on DF.Wrath, so on TBC nothing here ran and
+    -- Blizzard's flash stayed on screen - drawn for Blizzard's frame, over ours.
+    local blizzFlash = flash
+    if not blizzFlash then
+        for _, region in ipairs({frame:GetRegions()}) do
+            if region:GetObjectType() == 'Texture' and region.GetTexture and region:GetTexture() == 137016 then
+                blizzFlash = region
+                break
+            end
+        end
+    end
+
+    if blizzFlash then
+        local flash = blizzFlash
         flash:SetTexture('')
 
         -- Keyed per frame, the way the background texture right above is.
@@ -884,17 +899,60 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
         local flashKey = frame:GetName() .. 'Flash'
 
         if not self[flashKey] then
-            local newFlash = frame:CreateTexture('DragonflightUI' .. frame:GetName() .. 'Flash')
-            newFlash:SetDrawLayer('ARTWORK', 2)
-            newFlash:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
-            -- exactly the background's cut, size and place: same picture
-            newFlash:SetTexCoord(ART_L, ART_R, ART_T, ART_B)
-            newFlash:SetSize(ART_W, ART_H)
-            newFlash:SetPoint('CENTER', frame, 'CENTER', ART_X, ART_Y)
+            -- The glow is the frame's own art, not a picture of a glow.
+            --
+            -- No supplied texture traces this silhouette, because the silhouette
+            -- is a rounded bar with a circular portrait bulging out of one end,
+            -- and the shipped in-combat art does not line up with what DFUI
+            -- actually draws. There is exactly one shape guaranteed to match the
+            -- frame: the frame.
+            --
+            -- So stack copies of the background art underneath it, each a little
+            -- larger than the last and fainter, tinted red and added rather than
+            -- blended. Everything inside the frame is covered by the frame; what
+            -- is left is a halo following the outline exactly, with a soft
+            -- falloff from the layering. It cannot go out of shape, because it
+            -- is derived from the same art at the same cut.
+            local glow = CreateFrame('Frame', 'DragonflightUI' .. frame:GetName() .. 'Flash', frame)
+            glow:SetAllPoints(frame)
+            glow:Hide()
 
-            newFlash:SetVertexColor(1.0, 0.0, 0.0, 1.0)
-            newFlash:SetBlendMode('ADD')
-            self[flashKey] = newFlash
+            glow.Layers = {}
+            for i = 1, 3 do
+                local tex = glow:CreateTexture(nil, 'BACKGROUND', nil, -(i + 1))
+                tex:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-2x')
+                tex:SetTexCoord(ART_L, ART_R, ART_T, ART_B)
+                tex:SetBlendMode('ADD')
+                glow.Layers[i] = tex
+            end
+
+            -- Driven by these four, so /df flashtune can move them live and the
+            -- values it lands on drop straight back in here.
+            glow.Spread = 12
+            glow.Intensity = 1.0
+            glow.OffsetX = ART_X
+            glow.OffsetY = ART_Y
+            glow.Red, glow.Green, glow.Blue = 1.0, 0.1, 0.1
+
+            function glow:ApplyGlow()
+                local count = #self.Layers
+
+                for i, tex in ipairs(self.Layers) do
+                    -- innermost tightest and brightest, outermost widest and
+                    -- faintest, which is what reads as a falloff rather than
+                    -- three visible outlines
+                    local reach = self.Spread * (i / count)
+                    local alpha = self.Intensity * (0.55 / i)
+
+                    tex:SetSize(ART_W + reach * 2, ART_H + reach * 2)
+                    tex:ClearAllPoints()
+                    tex:SetPoint('CENTER', frame, 'CENTER', self.OffsetX, self.OffsetY)
+                    tex:SetVertexColor(self.Red, self.Green, self.Blue, alpha)
+                end
+            end
+
+            glow:ApplyGlow()
+            self[flashKey] = glow
         end
 
         -- kept for anything still reading the old field
