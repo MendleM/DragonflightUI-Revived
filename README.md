@@ -1,5 +1,14 @@
 # DragonflightUI Classic — Revived
 
+[![Join the Discord](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/yaYHsGhaA)
+[![Download on CurseForge](https://img.shields.io/badge/CurseForge-Download-F16436?style=for-the-badge&logo=curseforge&logoColor=white)](https://www.curseforge.com/wow/addons/dragonflight-ui-classic-revived)
+
+### 💬 Talk to us on Discord: **[discord.gg/yaYHsGhaA](https://discord.gg/yaYHsGhaA)**
+
+Found a bug, got a screenshot of something broken, want a feature, or just want to tell us what you are playing? **[Jump into the Discord](https://discord.gg/yaYHsGhaA)** — it is the fastest way to reach the people working on this addon, and the reports posted there are what drive the fixes. Every bug in the Era 1.15.9 overhaul was found by players who spoke up.
+
+---
+
 World of Warcraft (Classic) addon that brings the modern retail UI to Classic.
 
 **This is the community-maintained continuation of [DragonflightUI Classic](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI).**
