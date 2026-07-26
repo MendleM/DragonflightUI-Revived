@@ -1136,6 +1136,47 @@ local function DFTextStatusBar_UpdateTextString(textStatusBar)
     end
 end
 
+-- TEMP diagnostics: /df partydump - what the party bars actually are at
+-- runtime (colors, textures, alpha chain, desaturation).
+function SubModuleMixin:DumpBars()
+    local log = DragonflightUIPerfLog
+    local function out(fmt, ...)
+        local line = string.format(fmt, ...)
+        print('|cff0070ddDFUI:|r ' .. line)
+        if log and #log < 400 then log[#log + 1] = 'PARTYBAR ' .. line end
+    end
+
+    local function describe(label, bar, pf)
+        if not bar then
+            out('%s: nil', label)
+            return
+        end
+        local r, g, b, a = bar:GetStatusBarColor()
+        local tex = bar:GetStatusBarTexture()
+        local tr, tg, tb, ta = 1, 1, 1, 1
+        if tex and tex.GetVertexColor then tr, tg, tb, ta = tex:GetVertexColor() end
+        out('%s: barColor=%.2f/%.2f/%.2f/%.2f texVertex=%.2f/%.2f/%.2f/%.2f desat=%s alpha=%.2f effAlpha=%.2f lockColor=%s',
+            label, r, g, b, a, tr, tg, tb, ta,
+            tostring(tex and tex.IsDesaturated and tex:IsDesaturated()), bar:GetAlpha(), bar:GetEffectiveAlpha(),
+            tostring(bar.lockColor))
+        out('%s: texture=%s parentAlpha=%.2f frameEffAlpha=%.2f', label,
+            tostring(tex and tex.GetTexture and tex:GetTexture()), pf:GetAlpha(), pf:GetEffectiveAlpha())
+    end
+
+    if PartyFrame and PartyFrame.PartyMemberFramePool then
+        local n = 0
+        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            n = n + 1
+            out('--- member %d (%s) styled=%s ---', n, tostring(pf.unit or pf.unitToken), tostring(pf.DFStyled))
+            describe('health', pf.HealthBar, pf)
+            describe('mana', pf.ManaBar, pf)
+        end
+        if n == 0 then out('no active pooled party frames - are you in a party?') end
+    else
+        out('modern PartyFrame pool not present')
+    end
+end
+
 function SubModuleMixin:UpdatePartyManaBar(i)
     local pf = _G['PartyMemberFrame' .. i]
     local manabar = _G['PartyMemberFrame' .. i .. 'ManaBar']

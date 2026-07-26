@@ -455,6 +455,14 @@ function Module:ToggleConfigFrame()
 end
 
 function Module:SlashCommand(input)
+    local cmd = input and input:gsub('^%s+', ''):lower() or ''
+    if cmd == 'partydump' then
+        -- TEMP: party bar color diagnostics
+        local unitframe = DF:GetModule('Unitframe', true)
+        local party = unitframe and unitframe.SubParty
+        if party and party.DumpBars then party:DumpBars() end
+        return
+    end
     Module:ToggleConfigFrame()
 end
 
