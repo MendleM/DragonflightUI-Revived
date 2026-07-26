@@ -60,7 +60,7 @@ end
 
 local function IsEnabled()
     local db = Module.db and Module.db.profile
-    return (db and db.first and db.first.movableWindows) and true or false
+    return (db and db.movable and db.movable.enabled) and true or false
 end
 
 -- Re-apply a saved position. A window with nothing saved is left exactly where

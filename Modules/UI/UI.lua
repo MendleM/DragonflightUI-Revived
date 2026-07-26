@@ -30,10 +30,12 @@ local defaults = {
             changeTradeskill = true,
             changeTrainer = true,
             changeTalents = true,
-            questLevel = true,
-            movableWindows = true
+            questLevel = true
         },
-        -- one saved anchor per window; absent means "never moved"
+        movable = {enabled = true},
+        -- one saved anchor per window; absent means "never moved". Kept out of
+        -- the 'movable' sub so the page's Defaults button resets the option
+        -- without silently throwing away every position the player set.
         movableWindowPositions = {},
         roll = Module.SubGroupLootContainer.Defaults,
         widgetBelow = {
@@ -122,29 +124,6 @@ local UIOptions = {
             desc = L["UIShowQuestlevelDesc"] .. getDefaultStr('questLevel', 'first'),
             order = 23
         },
-        headerMovable = {
-            type = 'header',
-            name = L["UIMovableWindows"],
-            desc = L["UIMovableWindowsDesc"],
-            order = 50
-        },
-        movableWindows = {
-            type = 'toggle',
-            name = L["UIMovableWindows"],
-            desc = L["UIMovableWindowsDesc"] .. getDefaultStr('movableWindows', 'first'),
-            order = 51,
-            new = true
-        },
-        resetWindowPositions = {
-            type = 'execute',
-            name = L["UIMovableWindowsReset"],
-            btnName = L["UIMovableWindowsResetButton"],
-            desc = L["UIMovableWindowsResetDesc"],
-            func = function()
-                if addonTable.MovableWindows then addonTable.MovableWindows:ResetPositions() end
-            end,
-            order = 52
-        },
         headerFrames = {type = 'header', name = L["UIFrames"], desc = L["UIFramesDesc"], order = 100},
         changeCharacterframe = {
             type = 'toggle',
@@ -202,6 +181,34 @@ if DF.Era or DF.API.Version.IsTBC or (DF.Wrath and not DF.Cata) then
 
     for k, v in pairs(moreOptions) do UIOptions.args[k] = v end
 end
+
+local movableOptions = {
+    name = L["UIMovableWindows"],
+    desc = L["UIMovableWindowsDesc"],
+    sub = 'movable',
+    get = getOption,
+    set = setOption,
+    type = 'group',
+    args = {
+        enabled = {
+            type = 'toggle',
+            name = L["UIMovableWindowsEnable"],
+            desc = L["UIMovableWindowsDesc"] .. getDefaultStr('enabled', 'movable'),
+            order = 1,
+            new = true
+        },
+        resetPosition = {
+            type = 'execute',
+            name = L["UIMovableWindowsReset"],
+            btnName = L["UIMovableWindowsResetButton"],
+            desc = L["UIMovableWindowsResetDesc"],
+            func = function()
+                if addonTable.MovableWindows then addonTable.MovableWindows:ResetPositions() end
+            end,
+            order = 2
+        }
+    }
+}
 
 local widgetBelowOptions = {
     name = L["WidgetBelowName"],
@@ -312,6 +319,9 @@ function Module:RegisterSettings()
     end
 
     register('ui', {order = 0, name = UIOptions.name, descr = 'UIsss', isNew = false})
+    -- its own entry, and near the top: it is a feature of its own, not another
+    -- restyling toggle to be hunted for among twenty of them
+    register('movable', {order = 0.5, name = movableOptions.name, descr = 'desc', isNew = true})
     register('roll', {order = 18, name = self.SubGroupLootContainer.Options.name, descr = 'desc', isNew = true})
     register('widgetBelow', {order = 19, name = widgetBelowOptions.name, descr = 'desc', isNew = false})
 end
@@ -321,6 +331,13 @@ function Module:RegisterOptionScreens()
         options = UIOptions,
         default = function()
             setDefaultSubValues(UIOptions.sub)
+        end
+    })
+
+    DF.ConfigModule:RegisterSettingsData('movable', 'misc', {
+        options = movableOptions,
+        default = function()
+            setDefaultSubValues('movable')
         end
     })
 
@@ -372,6 +389,7 @@ function Module:RefreshOptionScreens()
     end
 
     refreshCat('UI')
+    refreshCat('movable')
     refreshCat('roll')
     refreshCat('widgetBelow')
 
