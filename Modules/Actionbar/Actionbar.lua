@@ -2593,14 +2593,7 @@ function Module:GetSetupActionbarSteps()
     end}
 
     steps[#steps + 1] = {'HookUsable', function() Module.HookUsableRepaints() end}
-    -- NOTE: a previous build intercepted ACTIONBAR_SLOT_CHANGED here to skip
-    -- Blizzard's forced full button update on macro re-resolution (a real
-    -- allocation storm with #showtooltip [@mouseover] macros). It had to be
-    -- reverted: dispatching Blizzard's UpdateAction from addon context wrote
-    -- the button's pressAndHoldAction attribute tainted, so the secure click
-    -- handler was then refused UseAction outright - ADDON_ACTION_FORBIDDEN,
-    -- and the item or spell simply did not fire. Any future attempt must
-    -- never route through Blizzard's update path.
+    steps[#steps + 1] = {'SlotChangedFilter', function() Module.InstallSlotChangedFilter() end}
 
     return steps
 end
@@ -2631,6 +2624,168 @@ function Module.HookUsableRepaints()
     end
 end
 
+
+-- #showtooltip [@mouseover] macros make the client fire one
+-- ACTIONBAR_SLOT_CHANGED per placed macro slot on every mouseover change, and
+-- Blizzard answers each one with a FORCED full UpdateAction() even though only
+-- the resolved icon changed: the range and usable watchers unregistered and
+-- re-registered, the button re-registered with the C side, the owning bar's
+-- UpdateShownButtons, an EventRegistry broadcast, and UpdatePressAndHoldAction
+-- - whose SetAttribute fires OnAttributeChanged and so a NESTED UpdateAction on
+-- top of all that. In a raid it happens thousands of times a minute, which is
+-- the hover stutter.
+--
+-- This is the second attempt at the same filter. The first one handed real slot
+-- changes back to Blizzard by calling btn:OnEvent(...), which runs
+-- UpdateAction(true) inside OUR stack - so its
+-- SetAttribute('pressAndHoldAction') stored a tainted value, the secure click
+-- handler read that attribute to decide whether a press-and-hold applies, and
+-- UseAction was refused outright. The spell or drink did not fire at all
+-- (ADDON_ACTION_FORBIDDEN), so it was reverted.
+--
+-- What makes this version safe is a narrow, checkable rule. pressAndHoldAction
+-- is the ONLY secure attribute written anywhere on the update path
+-- (Blizzard_ActionBar/Shared/ActionButton.lua: OnLoad writes type,
+-- checkselfcast and friends once at load, and the show-grid bitmask is the only
+-- other SetAttribute in the file), and it is reached exclusively through
+-- Update(). So:
+--
+--     never call Update() or UpdateAction() from here.
+--
+-- Everything else a button does for this event - icon, count, usable, state,
+-- cooldown, flash, flyout, equipped border, macro name, tooltip - writes no
+-- attributes and is safe to call from our stack. Refresh below runs those
+-- directly, which is Update() minus the one call that taints. Nothing
+-- protected happens either way, so unlike the first attempt none of this has
+-- to be deferred out of combat.
+function Module.InstallSlotChangedFilter()
+    local bef = _G['ActionBarButtonEventsFrame']
+    -- only the modern dispatcher (1.15.9+) works this way; older flavours have
+    -- each button registered for the event itself
+    if not bef or not bef.frames or Module.SlotFilterInstalled then return end
+    Module.SlotFilterInstalled = true
+
+    bef:UnregisterEvent('ACTIONBAR_SLOT_CHANGED')
+
+    local function actionTexture(slot)
+        if C_ActionBar and C_ActionBar.GetActionTexture then return C_ActionBar.GetActionTexture(slot) end
+        return GetActionTexture(slot)
+    end
+
+    local function hasAction(slot)
+        if C_ActionBar and C_ActionBar.HasAction then return C_ActionBar.HasAction(slot) end
+        return HasAction(slot)
+    end
+
+    local function isEquipped(slot)
+        if C_ActionBar and C_ActionBar.IsEquippedAction then return C_ActionBar.IsEquippedAction(slot) end
+        return IsEquippedAction(slot)
+    end
+
+    local function actionText(slot)
+        if C_ActionBar and C_ActionBar.UsesActionText then
+            return C_ActionBar.UsesActionText(slot) and C_ActionBar.GetActionText(slot) or ''
+        end
+        return GetActionText(slot) or ''
+    end
+
+    local function signature(slot)
+        local actionType, id, subType = GetActionInfo(slot)
+        return (actionType or '') .. ':' .. tostring(id or 0) .. ':' .. tostring(subType or '')
+    end
+
+    -- deep = the slot really holds something else now (dragged, macro edited,
+    -- item consumed to nothing). Otherwise a macro simply re-resolved and only
+    -- the icon and usability can have moved.
+    local function refresh(btn, deep)
+        local action = btn.action
+        if not action then return end
+
+        local icon = btn.icon
+        local texture = actionTexture(action)
+        if icon then
+            if texture then
+                icon:SetTexture(texture)
+                icon:Show()
+            else
+                icon:Hide()
+            end
+        end
+
+        if btn.UpdateCount then btn:UpdateCount() end
+        -- A macro keeps its slot while resolving to a different spell, so
+        -- usability can change under an unchanged signature. Skipping this is
+        -- what left buttons grey until the cursor touched them.
+        if btn.UpdateUsable then btn:UpdateUsable() end
+
+        if deep then
+            -- going empty <-> filled changes which events the button needs
+            local aef = _G['ActionBarActionEventsFrame']
+            if aef then
+                if hasAction(action) and not btn.eventsRegistered then
+                    aef:RegisterFrame(btn)
+                    btn.eventsRegistered = true
+                elseif not hasAction(action) and btn.eventsRegistered then
+                    aef:UnregisterFrame(btn)
+                    btn.eventsRegistered = nil
+                end
+            end
+
+            if btn.UpdateState then btn:UpdateState() end
+            if btn.UpdateFlash then btn:UpdateFlash() end
+            if btn.UpdateProfessionQuality then btn:UpdateProfessionQuality() end
+            if btn.UpdateTypeOverlay then btn:UpdateTypeOverlay() end
+            if btn.UpdateFlyout then btn:UpdateFlyout() end
+            if ActionButton_UpdateCooldown then ActionButton_UpdateCooldown(btn) end
+
+            local border = btn.Border
+            if border then
+                if isEquipped(action) then
+                    border:SetVertexColor(0, 1.0, 0, 0.5)
+                    border:Show()
+                else
+                    border:Hide()
+                end
+            end
+
+            if btn.Name then btn.Name:SetText(actionText(action)) end
+        end
+
+        if GameTooltip:GetOwner() == btn and btn.SetTooltip then btn:SetTooltip() end
+    end
+
+    local function dispatch(slot, deep)
+        for _, btn in pairs(bef.frames) do
+            -- Hidden buttons are skipped: Blizzard's OnShow runs Update() in
+            -- its own clean context, so they arrive up to date.
+            if (slot == 0 or btn.action == slot) and btn.IsVisible and btn:IsVisible() then
+                local ok, err = pcall(refresh, btn, deep)
+                if not ok and not Module.SlotFilterErrorReported then
+                    Module.SlotFilterErrorReported = true
+                    geterrorhandler()('DFUI slot filter: ' .. tostring(err))
+                end
+            end
+        end
+    end
+
+    local lastSignature = {}
+
+    local filter = CreateFrame('Frame')
+    filter:RegisterEvent('ACTIONBAR_SLOT_CHANGED')
+    filter:SetScript('OnEvent', function(_, _, slot)
+        if not slot or slot == 0 then
+            -- 0 means every slot; treat it as a real change everywhere
+            wipe(lastSignature)
+            dispatch(0, true)
+            return
+        end
+
+        local sig = signature(slot)
+        local deep = lastSignature[slot] ~= sig
+        lastSignature[slot] = sig
+        dispatch(slot, deep)
+    end)
+end
 
 function Module.AddStateUpdater()
     local DFBagBar = _G['DragonflightUIBagBar']
