@@ -211,6 +211,16 @@ function DragonflightUIMicroMenuMixin:Update()
         local point, relativeTo, relativePoint, xOfs, yOfs = f:GetPoint(1)
 
         if not (relativeTo == self) then addonTable:OverrideBlizzEditmode(f, 'TOPLEFT', self, 'TOPLEFT', 0, 0) end
+    end
+
+    -- Our frame is the draggable/clamped one, but it was a fixed 100x100
+    -- box that has nothing to do with the buttons: the extra width and
+    -- height showed up as dead space, and screen clamping stopped at the
+    -- box edge rather than the visible menu. Track the container's size.
+    local container = _G['MicroMenuContainer']
+    if container then
+        local w, h = container:GetSize()
+        if w and w > 1 and h and h > 1 then self:SetSize(w, h) end
 
         -- if not self.FirstMoved then
         --     self.FirstMoved = true;

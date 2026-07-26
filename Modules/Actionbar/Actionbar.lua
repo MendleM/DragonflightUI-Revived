@@ -2753,6 +2753,18 @@ function Module.AddStateUpdater()
         Mixin(microFrame, DragonflightUIStateHandlerMixin)
         microFrame:InitStateHandler()
     end
+
+    -- Blizzard's containers are only ANCHORED to our frames, never
+    -- parented, so hiding or fading our frame did nothing to the buttons
+    -- people actually see - which is why alpha, always-hide and mouseover
+    -- appeared dead for the micro menu, and worked for the backpack (it IS
+    -- reparented) but not the rest of the bag bar. Register them as extra
+    -- managed frames; the handler show/hides and fades HideFrame1..13, and
+    -- index 1 is the DFUI frame itself.
+    if MicroMenuContainer and microFrame.SetHideFrame then
+        microFrame:SetHideFrame(MicroMenuContainer, 2)
+    end
+    if _G['BagsBar'] and DFBagBar.SetHideFrame then DFBagBar:SetHideFrame(_G['BagsBar'], 2) end
 end
 
 function Module:AddEditMode()
