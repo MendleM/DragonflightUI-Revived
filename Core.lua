@@ -11,6 +11,31 @@ addonTable.SubModuleMixins = {}
 
 local defaults = {profile = {bestnumber = 42}}
 
+-- TEMP diagnostics: record Lua errors AND taint blocks to the perf log so
+-- they can be read from disk after a reload. Taint blocks never reach the
+-- error handler, which is why an in-combat failure left no trace.
+do
+    local function record(kind, text, stack)
+        local log = DragonflightUIPerfLog
+        if not log or #log >= 500 then return end
+        log[#log + 1] = kind .. ' ' .. tostring(text)
+        if stack then log[#log + 1] = 'STACK ' .. tostring(stack):gsub('\n', ' | '):sub(1, 900) end
+    end
+
+    local origHandler = geterrorhandler()
+    seterrorhandler(function(err)
+        record('LUAERR', err, debugstack(2, 12, 0))
+        return origHandler(err)
+    end)
+
+    local watcher = CreateFrame('Frame')
+    watcher:RegisterEvent('ADDON_ACTION_BLOCKED')
+    watcher:RegisterEvent('ADDON_ACTION_FORBIDDEN')
+    watcher:SetScript('OnEvent', function(_, event, addon, func)
+        record(event, tostring(addon) .. ' -> ' .. tostring(func), debugstack(2, 12, 0))
+    end)
+end
+
 ---@type API
 local t = DF.API;
 
