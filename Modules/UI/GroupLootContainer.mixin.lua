@@ -477,52 +477,64 @@ function SubModuleMixin:Update()
     if not state.showWinnerToast and self.WinnerToast then self.WinnerToast:Hide() end
 end
 
--- Pops the same dummy roll frame edit mode uses, so the settings page can
--- show what the rolls will look like without entering edit mode.
-function SubModuleMixin:ShowPreview(seconds)
-    local holder = self.PreviewRoll
-    local fake = holder and holder.FakePreview
-    if not fake then return end
+-- The settings-page preview owns its own frame instead of borrowing the
+-- edit-mode one. PreviewRoll belongs to the edit-mode selection: it is
+-- anchored only by Update() (which returns early while the feature is off),
+-- and the selection's OnEditMode handler hides it on every broadcast. Sharing
+-- it made a button press depend on state the button does not control.
+function SubModuleMixin:GetSettingsPreview()
+    if self.SettingsPreview then return self.SettingsPreview end
 
+    local holder = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreview', UIParent)
+    holder:SetSize(272, 50)
+    -- the settings window is HIGH + toplevel, so anything below TOOLTIP can
+    -- end up behind it depending on where the rolls are configured to sit
+    holder:SetFrameStrata('TOOLTIP')
+    holder:Hide()
+
+    local fake = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreviewRoll', holder,
+                             'DFEditModePreviewGroupLootTemplate')
+    fake:SetPoint('CENTER')
     self:UpdateGroupLootFrameStyle(fake)
 
-    -- The settings window sits at HIGH strata, so a preview at the default
-    -- strata simply rendered behind it and looked like nothing happened.
-    -- Lift it while previewing, and put it back afterwards.
-    if not holder.DFBaseStrata then holder.DFBaseStrata = holder:GetFrameStrata() end
-    holder:SetFrameStrata('FULLSCREEN_DIALOG')
+    holder.FakePreview = fake
+    self.SettingsPreview = holder
+    return holder
+end
 
-    -- The holder is only anchored by Update(), which returns early while the
-    -- feature is disabled - an unanchored frame renders nothing at all. Give
-    -- it a position, and the preview a size, before showing.
-    if holder:GetNumPoints() == 0 or not holder:GetLeft() then
-        local state = self.state
-        local parent = (state and DF.Settings.ValidateFrame(state.customAnchorFrame) and
-                           _G[state.customAnchorFrame]) or (state and _G[state.anchorFrame]) or UIParent
-        holder:ClearAllPoints()
-        if state then
-            holder:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
-        else
-            holder:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, 200)
-        end
+-- Shows a sample roll where the real ones will appear, so the settings page
+-- can be judged without waiting for a group loot roll.
+function SubModuleMixin:ShowPreview(seconds)
+    local holder = self:GetSettingsPreview()
+    local fake = holder.FakePreview
+    local state = self.state or self.Defaults
+
+    local parent
+    if DF.Settings.ValidateFrame(state.customAnchorFrame) then
+        parent = _G[state.customAnchorFrame]
+    else
+        parent = _G[state.anchorFrame]
     end
-    if (fake:GetWidth() or 0) < 2 then fake:SetSize(256, 50) end
+    if not parent then parent = UIParent end
 
+    holder:ClearAllPoints()
+    holder:SetPoint(state.anchor or 'BOTTOM', parent, state.anchorParent or 'BOTTOM', state.x or 0, state.y or 200)
+    holder:SetScale(state.scale or 1)
+    holder:SetAlpha(1)
     holder:Show()
+
+    fake:SetAlpha(1)
     fake:Show()
 
-    DF:Print(('loot roll preview at %d,%d (%dx%d)'):format((holder:GetLeft() or 0), (holder:GetBottom() or 0),
-                                                           (fake:GetWidth() or 0), (fake:GetHeight() or 0)))
+    -- Say where it went. A preview that lands off-screen or behind another
+    -- frame is indistinguishable from a button that does nothing, and this
+    -- line tells the two apart.
+    DF:Print(('loot roll preview: %s at %d,%d (%dx%d)'):format(fake:IsVisible() and 'shown' or 'NOT VISIBLE',
+                                                               (holder:GetLeft() or -1), (holder:GetBottom() or -1),
+                                                               (fake:GetWidth() or 0), (fake:GetHeight() or 0)))
 
     if self.PreviewTimer then self.PreviewTimer:Cancel() end
-    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function()
-        holder:SetFrameStrata(holder.DFBaseStrata or 'MEDIUM')
-
-        -- edit mode owns the preview while it is open; do not yank it away
-        local editmode = DF:GetModule('Editmode', true)
-        if editmode and editmode.IsEditMode then return end
-        fake:Hide()
-    end)
+    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function() holder:Hide() end)
 end
 
 function SubModuleMixin:CreateRollPreview()

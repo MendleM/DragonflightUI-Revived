@@ -200,6 +200,21 @@ function Module:OnEnable()
         Module:ApplySettings()
         Module:RefreshOptionScreens()
     end)
+
+    -- Selecting another tab re-runs the dock layout, which is where a broken
+    -- mirror shows up. FCF_SelectDockFrame calls FCF_DockUpdate itself, so
+    -- hooking the one entry point is enough; coalesce to one pass per frame.
+    local dockFixPending
+    if FCF_DockUpdate then
+        self:SecureHook('FCF_DockUpdate', function()
+            if dockFixPending then return end
+            dockFixPending = true
+            C_Timer.After(0, function()
+                dockFixPending = false
+                Module.FixDockedFrames()
+            end)
+        end)
+    end
 end
 
 function Module:OnDisable()
@@ -246,12 +261,52 @@ function Module:ApplySettingsInternal(sub, key)
     else
         parent = _G[db.anchorFrame]
     end
+    if not parent then parent = UIParent end
 
+    -- ChatFrame1 is a Blizzard edit-mode system on 1.15.9+ (it inherits
+    -- EditModeChatFrameSystemTemplate), so every layout application runs
+    -- ApplySystemAnchor on it: ClearAllPoints followed by the layout's own
+    -- anchor. Without clearing first we simply ADD a point to whatever
+    -- Blizzard left behind, and a chat frame held by two anchors ignores
+    -- SetSize on that axis - which is how it ends up stretched and offset
+    -- instead of moved.
+    ChatFrame1:ClearAllPoints()
     ChatFrame1:SetPoint(db.anchor, parent, db.anchorParent, db.x, db.y)
     ChatFrame1:SetSize(db.sizeX, db.sizeY)
     ChatFrame1:SetUserPlaced(true)
 
+    Module.FixDockedFrames()
+
     -- ChatFrame1:UpdateStateHandler(db)
+end
+
+-- Docked chat windows are not positioned individually: FCFDock_AddChatFrame
+-- anchors them with SetAllPoints(dock.primary) once, when they dock, and
+-- Blizzard never re-establishes that (FCFDock_AddChatFrame returns early for
+-- an already-docked frame). Two things then go wrong once the chat is not in
+-- its stock place:
+--   * anything that clears a docked frame's points - an undock/redock, a
+--     FCF_RestorePositionAndDimensions while the saved dock info is stale -
+--     leaves that tab stranded at its own saved position for the session.
+--   * only ChatFrame1 gets edit-mode clamp insets. Its siblings keep the
+--     stock ones from FloatingChatFrame_UpdateBackgroundAnchors, whose
+--     bottom inset of -50 forces them to stay 50px above the screen edge.
+--     Mirroring a primary placed lower than that, they clamp themselves
+--     upwards, so every tab past the first renders shifted up - the chat
+--     background and edit box included.
+-- The mirror makes their own clamping pointless anyway (the primary is
+-- clamped for them), so drop it and re-assert the mirror.
+function Module.FixDockedFrames()
+    local dock = GENERAL_CHAT_DOCK
+    if not (dock and dock.primary and FCFDock_GetChatFrames) then return end
+
+    for _, chatFrame in ipairs(FCFDock_GetChatFrames(dock)) do
+        if chatFrame ~= dock.primary and chatFrame.SetClampedToScreen then
+            chatFrame:SetClampedToScreen(false)
+        end
+    end
+
+    if FCFDock_ForceReanchoring then FCFDock_ForceReanchoring(dock) end
 end
 
 local frame = CreateFrame('FRAME', 'DragonflightUIChatFrame', UIParent)
@@ -288,6 +343,10 @@ function frame:OnEvent(event, arg1)
     if event == 'PLAYER_ENTERING_WORLD' then
         -- Module.ChangeSizeAndPosition()
         Module:ApplySettings()
+    elseif event == 'UPDATE_FLOATING_CHAT_WINDOWS' or event == 'UPDATE_CHAT_WINDOWS' then
+        -- Blizzard rebuilds every window from its saved settings here, size
+        -- and dock included; our position has to be the last word.
+        Module:ApplySettings()
     end
 end
 frame:SetScript('OnEvent', frame.OnEvent)
@@ -301,6 +360,8 @@ end
 
 function Module:Wrath()
     frame:RegisterEvent('PLAYER_ENTERING_WORLD')
+    frame:RegisterEvent('UPDATE_FLOATING_CHAT_WINDOWS')
+    frame:RegisterEvent('UPDATE_CHAT_WINDOWS')
 end
 
 function Module:Cata()

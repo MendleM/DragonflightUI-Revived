@@ -530,10 +530,19 @@ function Module:InitEditmodeOverride()
         -- Without this the frames sit correctly for a moment after login and
         -- then jump to the layout's spots, and only opening edit mode (which
         -- re-applies our settings) puts them back.
-        local uf = DF:GetModule('Unitframe', true)
-        if uf and uf.GetWasEnabled and uf:GetWasEnabled() then
-            local ok, err = pcall(function() uf:ApplySettings() end)
-            if not ok then geterrorhandler()('DFUI Editmode reapply: ' .. tostring(err)) end
+        --
+        -- Chat belongs on this list for the same reason: ChatFrame1 is a
+        -- Blizzard edit-mode system on 1.15.9+, so an application re-anchors
+        -- and re-sizes it from the layout. That is why toggling a frame's
+        -- edit-mode visibility - which broadcasts OnEditMode, which makes a
+        -- module re-anchor, which schedules an application - dragged the chat
+        -- window off its configured spot.
+        for _, name in ipairs({'Unitframe', 'Chat'}) do
+            local m = DF:GetModule(name, true)
+            if m and m.GetWasEnabled and m:GetWasEnabled() then
+                local ok, err = pcall(function() m:ApplySettings() end)
+                if not ok then geterrorhandler()('DFUI Editmode reapply ' .. name .. ': ' .. tostring(err)) end
+            end
         end
     end
 
