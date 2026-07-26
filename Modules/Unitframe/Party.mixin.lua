@@ -309,7 +309,15 @@ end
 function SubModuleMixin:SetupModern()
     local ATLAS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\uipartyframe'
     local BARS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\'
-    local UpdateRoleIcon
+    local UpdateRoleIcon, UpdateBars
+
+    local POWER_BAR_ART = {
+        MANA = 'Mana',
+        RAGE = 'Rage',
+        FOCUS = 'Focus',
+        ENERGY = 'Energy',
+        RUNIC_POWER = 'RunicPower'
+    }
 
     local function styleMember(pf)
         if pf.DFStyled then return end
@@ -389,6 +397,10 @@ function SubModuleMixin:SetupModern()
             healthbar:SetPoint('TOPLEFT', 44, -19)
             healthbar:SetStatusBarTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
             healthbar:SetStatusBarColor(1, 1, 1, 1)
+            -- UnitFrameHealthBar_Update re-tints this green on every health
+            -- event, and that green multiplied into the DF art is what made
+            -- the bars look dark. lockColor is Blizzard's own opt-out.
+            healthbar.lockColor = true
 
             local hpMask = healthbar:CreateMaskTexture()
             hpMask:SetPoint('CENTER', healthbar, 'CENTER', 0, 0)
@@ -405,6 +417,9 @@ function SubModuleMixin:SetupModern()
             manabar:SetPoint('TOPLEFT', 41, -30)
             manabar:SetStatusBarTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Mana')
             manabar:SetStatusBarColor(1, 1, 1, 1)
+            -- Without this, UnitFrameManaBar_UpdateType swaps our art out
+            -- for the plain UI-StatusBar and tints it by power color.
+            manabar.lockColor = true
 
             local manaMask = manabar:CreateMaskTexture()
             manaMask:SetPoint('CENTER', manabar, 'CENTER', 0, 0)
@@ -443,6 +458,28 @@ function SubModuleMixin:SetupModern()
         end
     end
 
+    -- With lockColor set, Blizzard no longer swaps the power art per power
+    -- type or greys out offline members, so we own both. Uses
+    -- GetStatusBarTexture():SetTexture so the bar's mask survives.
+    function UpdateBars(pf)
+        local unit = pf.unit or pf.unitToken
+        if not (unit and UnitExists(unit)) then return end
+
+        local shade = UnitIsConnected(unit) and 1 or 0.5
+
+        local healthbar = pf.HealthBar
+        if healthbar then healthbar:SetStatusBarColor(shade, shade, shade, 1) end
+
+        local manabar = pf.ManaBar
+        if manabar then
+            local _, powerToken = UnitPowerType(unit)
+            local art = POWER_BAR_ART[powerToken] or 'Mana'
+            local tex = manabar:GetStatusBarTexture()
+            if tex then tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-' .. art) end
+            manabar:SetStatusBarColor(shade, shade, shade, 1)
+        end
+    end
+
     local function styleAll()
         if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
         local count = 0
@@ -450,6 +487,7 @@ function SubModuleMixin:SetupModern()
             count = count + 1
             local ok, err = pcall(styleMember, pf)
             if not ok then geterrorhandler()('DFPartyModern: ' .. tostring(err)) end
+            pcall(UpdateBars, pf)
         end
         if DragonflightUIPerfLog and #DragonflightUIPerfLog < 400 then
             DragonflightUIPerfLog[#DragonflightUIPerfLog + 1] =
@@ -467,10 +505,20 @@ function SubModuleMixin:SetupModern()
     if C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid('PLAYER_ROLES_ASSIGNED') then
         roleWatcher:RegisterEvent('PLAYER_ROLES_ASSIGNED')
     end
-    roleWatcher:SetScript('OnEvent', function()
+    -- Power type changes (shapeshift, vehicle) and members going offline.
+    -- Both are rare, so unfiltered is fine here - unlike the high-frequency
+    -- UNIT_* events, which must always be unit-filtered on this client.
+    roleWatcher:RegisterEvent('UNIT_DISPLAYPOWER')
+    roleWatcher:RegisterEvent('UNIT_CONNECTION')
+    roleWatcher:SetScript('OnEvent', function(_, event, unit)
         if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
+        local barsOnly = (event == 'UNIT_DISPLAYPOWER' or event == 'UNIT_CONNECTION')
+        if barsOnly and not (unit and unit:find('party', 1, true)) then return end
         for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
-            if pf.DFStyled then UpdateRoleIcon(pf) end
+            if pf.DFStyled then
+                if not barsOnly then UpdateRoleIcon(pf) end
+                UpdateBars(pf)
+            end
         end
     end)
 end
