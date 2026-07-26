@@ -715,11 +715,13 @@ function DFSettingsListButtonMixin:Init(node)
     self.Button:SetText(args.btnName);
     self.Button:SetScript('OnClick', function(button, buttonName)
         -- print('OnClick')
+        if DF.Log then DF:Log('settings', 'button pressed: %s', tostring(elementData.key)) end
         self:TriggerEvent(DFSettingsListElementBaseMixin.Event.OnClick, true)
     end)
 
     self:UnregisterCallback('OnClick', self)
     self:RegisterCallback('OnClick', function(self, ...)
+        if DF.Log then DF:Log('settings', 'button handler running: %s', tostring(elementData.key)) end
         args.func()
     end, self)
 end

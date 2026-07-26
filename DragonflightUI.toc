@@ -25,7 +25,7 @@
 ## Category-ruRU: Переработка интерфейса
 ## Category-zhCN: UI重构
 ## Category-zhTW: UI重構
-## SavedVariables: DragonflightUIDB, DragonflightUIPerfLog
+## SavedVariables: DragonflightUIDB, DragonflightUIPerfLog, DragonflightUIDebugLog
 ## OptionalDeps: Ace3, Blizzard_Minimap, Blizzard_TimeManager, Leatrix_Plus, NovaWorldBuffs
 
 # Libs
@@ -59,6 +59,7 @@ Mixin\DFColor.mixin.lua
 
 Core.lua
 Helper.lua
+DebugLog.lua
 SharedMedia.lua
 API.xml
 Config.lua

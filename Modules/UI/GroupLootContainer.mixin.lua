@@ -95,7 +95,13 @@ function SubModuleMixin:SetupOptions()
         name = 'Preview',
         btnName = 'Show',
         desc = 'Show a sample loot roll where yours will appear, for a few seconds.',
-        func = function() self:ShowPreview() end,
+        func = function()
+            -- logged on the button side as well as inside ShowPreview: a
+            -- missing entry here means the click never reached the option
+            DF:Log('rollpreview', 'Show button clicked')
+            local ok, err = pcall(function() self:ShowPreview() end)
+            if not ok then DF:Log('rollpreview', 'ShowPreview ERROR: %s', tostring(err)) end
+        end,
         order = 0.6
     }
     rollOptions.args.scale = {
@@ -495,7 +501,10 @@ function SubModuleMixin:GetSettingsPreview()
     local fake = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreviewRoll', holder,
                              'DFEditModePreviewGroupLootTemplate')
     fake:SetPoint('CENTER')
-    self:UpdateGroupLootFrameStyle(fake)
+    DF:Log('rollpreview', 'created preview frames, template applied=%s', tostring(fake.IconFrame ~= nil))
+
+    local ok, err = pcall(function() self:UpdateGroupLootFrameStyle(fake) end)
+    if not ok then DF:Log('rollpreview', 'style ERROR: %s', tostring(err)) end
 
     holder.FakePreview = fake
     self.SettingsPreview = holder
@@ -505,9 +514,14 @@ end
 -- Shows a sample roll where the real ones will appear, so the settings page
 -- can be judged without waiting for a group loot roll.
 function SubModuleMixin:ShowPreview(seconds)
+    DF:Log('rollpreview', 'ShowPreview() entered')
+
     local holder = self:GetSettingsPreview()
     local fake = holder.FakePreview
     local state = self.state or self.Defaults
+    DF:Log('rollpreview', 'state source=%s anchor=%s/%s frame=%s x=%s y=%s scale=%s',
+           self.state and 'profile' or 'defaults', tostring(state.anchor), tostring(state.anchorParent),
+           tostring(state.anchorFrame), tostring(state.x), tostring(state.y), tostring(state.scale))
 
     local parent
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
@@ -527,14 +541,19 @@ function SubModuleMixin:ShowPreview(seconds)
     fake:Show()
 
     -- Say where it went. A preview that lands off-screen or behind another
-    -- frame is indistinguishable from a button that does nothing, and this
-    -- line tells the two apart.
-    DF:Print(('loot roll preview: %s at %d,%d (%dx%d)'):format(fake:IsVisible() and 'shown' or 'NOT VISIBLE',
-                                                               (holder:GetLeft() or -1), (holder:GetBottom() or -1),
-                                                               (fake:GetWidth() or 0), (fake:GetHeight() or 0)))
+    -- frame is indistinguishable from a button that does nothing.
+    DF:Print(('loot roll preview: %s at %d,%d (%dx%d) - /df log rollpreview for details'):format(
+                 fake:IsVisible() and 'shown' or 'NOT VISIBLE', (holder:GetLeft() or -1), (holder:GetBottom() or -1),
+                 (fake:GetWidth() or 0), (fake:GetHeight() or 0)))
+
+    DF:LogFrame(holder, 'rollpreview')
+    DF:LogFrame(fake, 'rollpreview')
 
     if self.PreviewTimer then self.PreviewTimer:Cancel() end
-    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function() holder:Hide() end)
+    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function()
+        DF:Log('rollpreview', 'preview timer expired, hiding (still visible=%s)', tostring(fake:IsVisible()))
+        holder:Hide()
+    end)
 end
 
 function SubModuleMixin:CreateRollPreview()

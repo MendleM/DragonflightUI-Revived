@@ -455,7 +455,29 @@ function Module:ToggleConfigFrame()
 end
 
 function Module:SlashCommand(input)
-    local cmd = input and input:gsub('^%s+', ''):lower() or ''
+    local raw = input and input:gsub('^%s+', '') or ''
+    local cmd = raw:lower()
+
+    -- /df log ... - see DebugLog.lua for the full command list. Arguments keep
+    -- their case: frame names are case sensitive globals.
+    if (cmd == 'log' or cmd:match('^log%s')) and DF.HandleLogCommand then
+        DF:HandleLogCommand(raw:match('^%S+%s*(.-)%s*$') or '')
+        return
+    end
+
+    -- Runs the loot roll preview without going through the settings UI, so a
+    -- dead button can be told apart from a preview that never renders.
+    if cmd == 'lootpreview' then
+        local ui = DF:GetModule('UI', true)
+        local roll = ui and ui.SubGroupLootContainer
+        if roll and roll.ShowPreview then
+            roll:ShowPreview()
+        else
+            print('|cff0070ddDragonflightUI:|r loot roll submodule not set up (UI module enabled?)')
+        end
+        return
+    end
+
     if cmd == 'partydump' then
         -- TEMP: party bar color diagnostics
         local unitframe = DF:GetModule('Unitframe', true)
