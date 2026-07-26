@@ -1499,9 +1499,31 @@ function DragonflightUIMixin:ChangeCharacterFrameEra()
     frame.DFInset = inset
 
     -- The inset itself is the recessed background for EVERY tab - Pet,
-    -- Reputation, Skills and Honor all sit in it - so it stays put. Only the
-    -- paperdoll art drawn on it is character-specific; see DFPanelBackground
-    -- below.
+    -- Reputation, Skills and Honor all sit in it - so it stays put. What does
+    -- NOT belong to the other tabs is the paperdoll art drawn on it: the pane
+    -- background and the inner border framing the model area. Those pieces are
+    -- collected here and shown only while the Character tab is up.
+    frame.DFPaperDollArt = {}
+
+    if PaperDollFrame then
+        local function setPaperDollArtShown(shown)
+            for _, piece in ipairs(frame.DFPaperDollArt) do piece:SetShown(shown) end
+        end
+
+        PaperDollFrame:HookScript('OnShow', function()
+            setPaperDollArtShown(true)
+            -- the pane is only wide on the Character tab
+            if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(frame.Expanded) end
+        end)
+
+        PaperDollFrame:HookScript('OnHide', function()
+            setPaperDollArtShown(false)
+            if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(false) end
+        end)
+
+        -- catch up with whatever tab is up right now
+        C_Timer.After(0, function() setPaperDollArtShown(PaperDollFrame:IsShown()) end)
+    end
     -- _G['DragonflightUICharacterFrameInsetBg']:SetAlpha(0.25)
 
     -- Item Slots
@@ -1524,25 +1546,8 @@ function DragonflightUIMixin:ChangeCharacterFrameEra()
         bg:SetTexCoord(1 / 1024, 451 / 1024, 1 / 512, 421 / 512)
         bg:SetAllPoints(inset)
         frame.DFPanelBackground = bg
-
-        -- This art has the gear-slot pillars baked in, so it belongs to the
-        -- Character tab alone; on Pet, Reputation and Skills it was drawn
-        -- behind their content. The inset it sits on is shared, which is why
-        -- only the art is toggled here.
-        if PaperDollFrame then
-            bg:SetShown(PaperDollFrame:IsShown())
-
-            PaperDollFrame:HookScript('OnShow', function()
-                bg:Show()
-                -- the pane is only wide on the Character tab
-                if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(frame.Expanded) end
-            end)
-
-            PaperDollFrame:HookScript('OnHide', function()
-                bg:Hide()
-                if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(false) end
-            end)
-        end
+        -- gear-slot pillars are baked into this art: Character tab only
+        table.insert(frame.DFPaperDollArt, bg)
     end
 
     -- Retail slot frames, 1:1: each paperdoll button carries a piece of
@@ -1705,6 +1710,13 @@ function DragonflightUIMixin:ChangeCharacterFrameEra()
         bottom2:SetTexCoord(0, 1, 0.0625, 0.375)
         bottom2:SetPoint('BOTTOMLEFT', inset, 'BOTTOMLEFT', 0, 27)
         bottom2:SetPoint('BOTTOMRIGHT', inset, 'BOTTOMRIGHT', 0, 27)
+
+        -- The inset is shared with the other tabs, so this border frames
+        -- nothing once the paperdoll is gone - it was the rectangle floating
+        -- behind the skill list.
+        for _, piece in ipairs({tl, tr, bl, br, left, right, top, bottom, bottom2}) do
+            table.insert(frame.DFPaperDollArt, piece)
+        end
     end
 
     if DF.API.Version.IsWotlk then
