@@ -2646,6 +2646,23 @@ function Module.InstallSlotChangedFilter()
     end
 
     local function lightweightUpdate(slot)
+        -- Our dispatch is addon code, so everything it calls runs tainted.
+        -- During combat lockdown, reaching into Blizzard's button methods
+        -- from a tainted path can trip blocked-action errors (reported as
+        -- an error when using a consumable in combat), so in combat we
+        -- touch nothing but our own textures and queue the real refresh
+        -- for when combat drops.
+        if InCombatLockdown() then
+            for _, btn in pairs(bef.frames) do
+                if btn.action == slot and btn:IsVisible() then
+                    local tex = C_ActionBar.GetActionTexture(slot)
+                    if btn.icon and tex then btn.icon:SetTexture(tex) end
+                end
+            end
+            pendingFull[slot] = true
+            return
+        end
+
         for _, btn in pairs(bef.frames) do
             if btn.action == slot and btn:IsVisible() then
                 local tex = C_ActionBar.GetActionTexture(slot)
