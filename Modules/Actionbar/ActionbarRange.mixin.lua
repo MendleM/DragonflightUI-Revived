@@ -303,6 +303,7 @@ do
 end
 
 local function CustomIsUsableAction(action)
+    if not action then return true, false end
     local actionType, id = GetActionInfo(action)
 
     if actionType == 'macro' then
@@ -349,11 +350,15 @@ end
 
 function SubModuleMixin:UpdateRangeAndUsable(btn, checksRange, inRange)
     if btn.ignoreRange then return end
+    -- Pet, stance and possess buttons carry no action slot; the usable
+    -- APIs error outright on a nil one.
+    if not btn.action then return end
     -- hidden buttons refresh via ActionButton_OnShow when they appear
     if not btn:IsVisible() then return end
     local icon = btn.Icon
     if not icon then return end
     local state = self.state;
+    if not state then return end
 
     local isUsable, notEnoughMana = CustomIsUsableAction(btn.action);
     -- print('UpdateRangeAndUsable', btn:GetName(), checksRange, inRange)  

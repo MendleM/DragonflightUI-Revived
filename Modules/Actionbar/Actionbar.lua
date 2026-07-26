@@ -2611,7 +2611,9 @@ function Module.HookUsableRepaints()
         for _, btn in pairs(bef.frames) do range:HookButtonUsable(btn) end
     end
 
-    for _, key in ipairs({'bar1', 'bar2', 'bar3', 'bar4', 'bar5', 'bar6', 'bar7', 'bar8', 'petbar'}) do
+    -- Action bars only: pet/stance/possess buttons have no action slot, so
+    -- the usable coloring does not apply to them.
+    for _, key in ipairs({'bar1', 'bar2', 'bar3', 'bar4', 'bar5', 'bar6', 'bar7', 'bar8'}) do
         local bar = Module[key]
         if bar and bar.buttonTable then
             for _, btn in ipairs(bar.buttonTable) do range:HookButtonUsable(btn) end
