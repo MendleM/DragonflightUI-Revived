@@ -37,10 +37,15 @@ local WINDOWS = {
     {key = 'talents', frame = 'PlayerTalentFrame', addon = 'Blizzard_TalentUI'}
 }
 
--- Height of the title strip a drag may start from. Everything below it belongs
--- to the window: gear slots, trade slots, quest rows, spell buttons, the
--- character model. Same rule the DFUI settings window uses.
+-- Height of the title strip a drag starts from. Everything below it belongs to
+-- the window: gear slots, trade slots, quest rows, spell buttons, the character
+-- model.
 local DRAG_STRIP_HEIGHT = 28
+
+-- Width left alone at the right end of the strip, so the close button stays
+-- clickable. CharacterFrame's own HitRectInsets reserve 30px there for the same
+-- reason; a few more is cheap.
+local GRIP_RIGHT_INSET = 34
 
 -- Per-frame bookkeeping, outside the frames themselves. `showHooked` is
 -- separate from `detached` because HookScript cannot be undone: the hook goes on
@@ -48,6 +53,7 @@ local DRAG_STRIP_HEIGHT = 28
 -- toggling the option off and on again does not stack duplicates.
 local detached = {}
 local dragInstalled = {}
+local grips = {}
 local showHooked = {}
 local waiting = {}
 
@@ -105,6 +111,16 @@ end
 
 local Detach
 
+-- A grip of our own over the title strip, rather than dragging the window
+-- itself.
+--
+-- The window is not a usable drag surface. CharacterFrame declares no
+-- enableMouse at all, so it never receives OnDragStart; and even with mouse
+-- enabled it would not help, because PaperDollFrame is parented to it with
+-- setAllPoints and enableMouse and therefore covers the whole window and takes
+-- the input. Reputation and Skills do the same on their tabs. A small frame of
+-- our own, above them and mouse-enabled, is the one thing that works the same
+-- way for all six windows whatever they happen to be covered by.
 local function InstallDrag(entry, frame)
     -- remember what the window shipped as, so Restore can put it back
     if not dragInstalled[entry.key] then
@@ -113,37 +129,44 @@ local function InstallDrag(entry, frame)
 
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
-    frame:RegisterForDrag('LeftButton')
 
-    frame:SetScript('OnDragStart', function(self)
-        if not IsEnabled() then return end
+    local grip = grips[entry.key]
+    if not grip then
+        grip = CreateFrame('Frame', nil, frame)
+        grip:SetPoint('TOPLEFT', frame, 'TOPLEFT', 0, 0)
+        grip:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -GRIP_RIGHT_INSET, 0)
+        grip:SetHeight(DRAG_STRIP_HEIGHT)
+        -- above whatever covers the window (PaperDollFrame and friends share the
+        -- parent's level), while the right inset keeps the close button clear
+        grip:SetFrameLevel(frame:GetFrameLevel() + 4)
+        grip:EnableMouse(true)
+        grip:RegisterForDrag('LeftButton')
+        grips[entry.key] = grip
 
-        -- title strip only
-        local _, cursorY = GetCursorPosition()
-        local scale = self:GetEffectiveScale()
-        local top = self:GetTop()
-        if not (top and scale and scale > 0) then return end
-        if (top - (cursorY / scale)) > DRAG_STRIP_HEIGHT then return end
+        grip:SetScript('OnDragStart', function()
+            if not IsEnabled() then return end
+            frame:StartMoving()
+            grip.moving = true
+        end)
 
-        self:StartMoving()
-        self.DFWindowMoving = true
-    end)
+        grip:SetScript('OnDragStop', function()
+            if not grip.moving then return end
+            grip.moving = nil
+            frame:StopMovingOrSizing()
 
-    frame:SetScript('OnDragStop', function(self)
-        if not self.DFWindowMoving then return end
-        self.DFWindowMoving = nil
-        self:StopMovingOrSizing()
+            -- The window leaves the panel layout here, at the first drag, and
+            -- not before. Detaching up front looked equivalent and is not: a
+            -- window that has never been moved has no position of its own to
+            -- fall back on, and lands on its raw XML anchor - CharacterFrame's
+            -- is TOPLEFT 0,-104, flush against the left edge of the screen. The
+            -- panel manager is what normally places it, so leave it in charge
+            -- until the player expresses an opinion.
+            Detach(entry)
+            SavePosition(entry, frame)
+        end)
+    end
 
-        -- The window leaves the panel layout here, at the first drag, and not
-        -- before. Detaching up front looked equivalent and is not: a window
-        -- that has never been moved has no position of its own to fall back
-        -- on, and lands on its raw XML anchor - CharacterFrame's is
-        -- TOPLEFT 0,-104, flush against the left edge of the screen. The panel
-        -- manager is what normally places it, so leave it in charge until the
-        -- player expresses an opinion.
-        Detach(entry)
-        SavePosition(entry, self)
-    end)
+    grip:Show()
 end
 
 -- Take one window out of the panel layout. Called at the first drag, or at
@@ -234,13 +257,17 @@ local function Restore(entry)
     if dragState then
         dragInstalled[entry.key] = nil
 
-        local frame = dragState.frame
-        frame:RegisterForDrag()
-        frame:SetScript('OnDragStart', nil)
-        frame:SetScript('OnDragStop', nil)
+        -- The grip is kept, just hidden: it is ours, nothing else looks at it,
+        -- and rebuilding one per toggle would leak a frame each time.
+        local grip = grips[entry.key]
+        if grip then
+            grip.moving = nil
+            grip:Hide()
+        end
+
         -- back to whatever the window shipped as: CharacterFrame's own XML
         -- declares movable="true", so do not flatly clear it
-        frame:SetMovable(dragState.movable)
+        dragState.frame:SetMovable(dragState.movable)
     end
 end
 
