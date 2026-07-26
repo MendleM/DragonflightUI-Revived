@@ -209,8 +209,12 @@ function SubModuleMixin:Setup()
             setDefaultSubValues('roll')
         end,
         moduleRef = self.ModuleRef,
+        -- fakeRoll only holds the dummy roll shown while positioning; the real
+        -- rolls live on GroupLootContainer, which is anchored to it but not
+        -- parented to it.
+        previewOnly = true,
         showFunction = function()
-            --         
+            --
             fakeRoll.FakePreview:Show()
         end,
         hideFunction = function()

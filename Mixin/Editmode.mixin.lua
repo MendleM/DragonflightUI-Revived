@@ -401,13 +401,17 @@ function DFEditModeSystemSelectionBaseMixin:OnLoad()
             self.parent.DFEditMode = false;
             if self.parent.SetEditMode then
                 self.parent:SetEditMode(false)
-            elseif self.HideFunction then
-                -- Only preview/placeholder registrations own their own
-                -- visibility (they always come with a HideFunction). Real
-                -- frames - the LFG eye, the chat window - were being hidden
-                -- here on every edit-mode exit and stayed gone until a
-                -- reload; their visibility belongs to the module's
-                -- ApplySettings below.
+            elseif self.PreviewOnly then
+                -- Leaving edit mode may only hide frames that exist solely as
+                -- edit-mode handles. Registrations are a mix: some are dummy
+                -- previews, but most are live containers - the pet frame's
+                -- holder (which the real PetFrame is parented to), the target
+                -- and focus holders, the durability frame, the LFG eye, the
+                -- chat window. Hiding those here is how they "disappeared
+                -- until a reload": nothing re-shows them, because a
+                -- registration carrying a HideFunction never reaches the
+                -- module's ApplySettings below. Their visibility belongs to
+                -- their module and to the state handler, not to edit mode.
                 self.parent:Hide()
             end
             if self.ModuleRef then
@@ -795,6 +799,10 @@ function DFEditModeSystemSelectionBaseMixin:RegisterOptions(data)
 
     self.ShowFunction = data.showFunction;
     self.HideFunction = data.hideFunction;
+    -- Set this only when the registered frame exists PURELY to be dragged
+    -- around in edit mode. It decides whether leaving edit mode hides the
+    -- frame - see the OnEditMode handler.
+    self.PreviewOnly = data.previewOnly;
     self.DragStopFunc = data.dragStopFunction;
     self.DragStartFunc = data.dragStartFunction;
 

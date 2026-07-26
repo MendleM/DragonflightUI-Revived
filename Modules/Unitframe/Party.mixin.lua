@@ -653,7 +653,11 @@ function SubModuleMixin:Setup()
         default = function()
             setDefaultSubValues('party')
         end,
-        moduleRef = self.ModuleRef
+        moduleRef = self.ModuleRef,
+        -- fakeParty is a dummy party used to drag the real one into place; it
+        -- must not survive edit mode, or it lingers as a second, made-up
+        -- party next to the real frames.
+        previewOnly = true
         -- showFunction = function()
         --     --           
         --     for k = 1, 4 do
