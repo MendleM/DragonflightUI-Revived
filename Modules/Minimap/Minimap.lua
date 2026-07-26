@@ -16,6 +16,7 @@ local defaults = {
         scale = 1,
         minimap = Module.SubMinimap.Defaults,
         tracker = {
+            enabled = true,
             scale = 1,
             anchorFrame = 'UIParent',
             customAnchorFrame = '',
@@ -95,6 +96,15 @@ local trackerOptions = {
     args = {}
 }
 DF.Settings:AddPositionTable(Module, trackerOptions, 'tracker', 'Tracker', getDefaultStr, frameTableTracker)
+trackerOptions.args.enabled = {
+    type = 'toggle',
+    name = 'Manage the quest tracker',
+    desc = 'Let DragonflightUI position and scale the quest tracker.'
+        .. ' Turn this OFF to leave the tracker completely alone - useful when another'
+        .. ' quest tracker addon wants to own it. Needs a /reload to hand it back fully.'
+        .. getDefaultStr('enabled', 'tracker'),
+    order = 0.5
+}
 
 local optionsTrackerEditmode = {
     name = 'Tracker',
@@ -507,6 +517,9 @@ end
 
 function Module.UpdateTrackerState(state)
     if not state then return end
+    -- Opted out: never touch the tracker, so third-party quest trackers can
+    -- own the frame without us yanking it back on every SetPoint.
+    if state.enabled == false then return end
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -674,6 +687,8 @@ function Module.MoveTracker()
 end
 
 function Module.MoveTrackerFunc()
+    local trackerState = Module.db and Module.db.profile and Module.db.profile.tracker
+    if trackerState and trackerState.enabled == false then return end
     if WatchFrame then
         WatchFrame:ClearAllPoints()
         local ActionbarModule = DF:GetModule('Actionbar')
