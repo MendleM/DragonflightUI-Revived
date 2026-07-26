@@ -81,20 +81,12 @@ DF.Settings.ValidateFrame = function(t)
     -- return true, true;
 end
 
--- Stand a frame on its own without moving it.
+-- Standing a frame on its own.
 --
 -- Several elements are anchored to each other by default - the main action bar
 -- sits on the reputation bar, which sits on the XP bar - so dragging one takes
--- the others with it. The Anchor Frame dropdown could always break that chain,
--- but switching it to UIParent made the frame jump, because the saved x/y were
--- measured from the old parent. Nobody wants to detach and then hunt for their
--- bar.
+-- the others with it.
 --
--- So let the engine do the conversion. StartMoving followed immediately by
--- StopMovingOrSizing - with no cursor movement in between - leaves the frame
--- exactly where it was, re-anchored against the screen with the offsets worked
--- out for us. Read that back and store it. No scale arithmetic, which is the
--- part that goes wrong when a frame carries its own scale.
 -- Which frame belongs to which (module, sub), so the Stand On Its Own checkbox
 -- can find it. Registered by AddPositionTable, and only where the caller can
 -- supply one.
@@ -105,18 +97,71 @@ function DF.Settings:RegisterStandaloneFrame(Module, sub, frameGetter)
     self.StandaloneFrames[Module][sub] = frameGetter
 end
 
--- The checkbox was set. On means stand alone, off means go back to what it was
--- attached to.
+-- Run fn for every registered element except the one named.
+local function ForEachRegistered(self, skipModule, skipSub, fn)
+    for module, subs in pairs(self.StandaloneFrames) do
+        for sub, getter in pairs(subs) do
+            if not (module == skipModule and sub == skipSub) then
+                local db = module.db and module.db.profile and module.db.profile[sub]
+                if db then fn(module, sub, getter, db) end
+            end
+        end
+    end
+end
+
+-- The checkbox was set. On means stand alone, off means go back.
+--
+-- "On its own" has to mean both directions, which the first version of this
+-- missed. Detaching a frame from its parent does nothing for the XP bar,
+-- because the XP bar never followed anything - it is anchored to the screen
+-- already. What moves with it is everything anchored TO it: the reputation bar,
+-- and the main action bar behind that. So the box was a no-op on exactly the
+-- frame most people would tick it on.
+--
+-- So detach the followers as well. Breaking the direct link is enough to stop
+-- the whole chain: with the reputation bar standing on its own, the main action
+-- bar anchored to the reputation bar no longer goes anywhere either.
 function DF.Settings:OnStandaloneChanged(Module, sub, value)
     local byModule = self.StandaloneFrames[Module]
     local frameGetter = byModule and byModule[sub]
     if not frameGetter then return end
 
+    local frame = frameGetter()
+    local frameName = frame and frame.GetName and frame:GetName()
+
     if value then
         self:DetachFrame(Module, sub, frameGetter)
+        if frameName then self:DetachFollowers(Module, sub, frameName) end
     else
+        if frameName then self:ReattachFollowers(frameName) end
         self:ReattachFrame(Module, sub, frameGetter)
     end
+end
+
+-- Everything anchored to this frame stands on its own too, so dragging it takes
+-- nothing with it. Marked as ours, so unticking can tell them apart from
+-- elements the player detached deliberately and put only these back.
+function DF.Settings:DetachFollowers(Module, sub, frameName)
+    ForEachRegistered(self, Module, sub, function(module, followerSub, getter, db)
+        if db.anchorFrame ~= frameName and db.customAnchorFrame ~= frameName then return end
+
+        self:DetachFrame(module, followerSub, getter)
+        db.DFDetachedBy = frameName
+        -- their own box now reads true, which is what they are
+        db.standalone = true
+        if module.RefreshOptionScreens then module:RefreshOptionScreens() end
+    end)
+end
+
+function DF.Settings:ReattachFollowers(frameName)
+    ForEachRegistered(self, nil, nil, function(module, followerSub, getter, db)
+        if db.DFDetachedBy ~= frameName then return end
+
+        db.DFDetachedBy = nil
+        db.standalone = false
+        self:ReattachFrame(module, followerSub, getter)
+        if module.RefreshOptionScreens then module:RefreshOptionScreens() end
+    end)
 end
 
 -- Put it back on whatever it was attached to before it was detached, at the
@@ -143,6 +188,15 @@ function DF.Settings:ReattachFrame(Module, sub, frameGetter)
     if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
 end
 
+-- Anchor one frame to the screen without moving it.
+--
+-- Switching the Anchor Frame dropdown to UIParent by hand makes the frame jump,
+-- because the saved x/y were measured from the old parent. So let the engine do
+-- the conversion: StartMoving followed immediately by StopMovingOrSizing, with
+-- no cursor movement in between, leaves the frame exactly where it was and
+-- re-anchors it against the screen with the offsets worked out for us. Read
+-- that back and store it. No scale arithmetic, which is the part that goes
+-- wrong when a frame carries a scale of its own.
 function DF.Settings:DetachFrame(Module, sub, frameGetter)
     local frame = frameGetter and frameGetter()
     if not frame then return end
