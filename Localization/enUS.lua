@@ -53,6 +53,9 @@ end
 -- config 
 do
     L["ConfigGeneralWhatsNew"] = "What's New"
+    L["WhatsNewOpen"] = "Release Notes"
+    L["WhatsNewOpenButton"] = "What's New"
+    L["WhatsNewOpenDesc"] = "Everything that changed in this version and the one before it.\n\nThis opens by itself once after an update, and not again until the next one."
     L["ConfigGeneralModules"] = "Modules"
     L["ConfigGeneralInfo"] = "Info"
     L["MainMenuDragonflightUI"] = "DragonflightUI"

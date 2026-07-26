@@ -237,6 +237,32 @@ function Module:RegisterSettings()
             setDefaultSubValues('modules')
         end
     })
+
+    -- The What's New entry existed but had no page behind it, so selecting it
+    -- did nothing. The notes themselves are far too long to render through the
+    -- options list, so the page is a button that opens the window.
+    DF.ConfigModule:RegisterSettingsData('whatsnew', 'general', {
+        name = L["ConfigGeneralWhatsNew"],
+        options = {
+            type = 'group',
+            name = L["ConfigGeneralWhatsNew"],
+            hideDefault = true,
+            get = function() return false end,
+            set = function() end,
+            args = {
+                openWhatsNew = {
+                    type = 'execute',
+                    name = L["WhatsNewOpen"],
+                    btnName = L["WhatsNewOpenButton"],
+                    desc = L["WhatsNewOpenDesc"],
+                    func = function()
+                        if DF.Changelog then DF.Changelog:Show() end
+                    end,
+                    order = 1
+                }
+            }
+        }
+    })
 end
 
 function Module:ApplySettings(sub, key)
@@ -510,7 +536,16 @@ local frame = CreateFrame('FRAME', 'DragonflightUIConfigFrame', UIParent)
 
 function frame:OnEvent(event, arg1)
     -- print('event', event)
-    if event == 'PLAYER_ENTERING_WORLD' then end
+    if event == 'PLAYER_ENTERING_WORLD' then
+        -- Once, after the UI has settled - opening a window over a loading
+        -- screen puts it behind everything still being built.
+        if not Module.WhatsNewChecked then
+            Module.WhatsNewChecked = true
+            C_Timer.After(3, function()
+                if DF.Changelog then DF.Changelog:ShowIfUnseen() end
+            end)
+        end
+    end
 end
 frame:SetScript('OnEvent', frame.OnEvent)
 

@@ -9,6 +9,25 @@ Everything before v0.40.3 is in
 
 ## Revived (26 July 2026)
 
+### Undo and redo in edit mode (new)
+
+- Ctrl+Z (Cmd+Z on a Mac) undoes, Ctrl+Y or Ctrl+Shift+Z redoes, while the edit
+  mode panel is open
+- Covers everything you change there — dragging a frame, a slider, a dropdown —
+  and a small note on screen names what it just put back
+- History lasts for as long as edit mode is open
+
+### Bars that stand on their own (new)
+
+- New **Stand On Its Own** checkbox at the top of each bar's Position settings.
+  On, it moves alone; off, it goes back to moving with the frames it was
+  attached to
+- Neither switch moves anything on screen — things stay exactly where they are,
+  they just stop travelling together
+- By default the main action bar is stuck to the reputation bar, which is stuck
+  to the XP bar, so dragging the XP bar dragged all three. Tick it on the XP bar
+  and it moves alone
+
 ### Movable windows (new)
 
 - The character pane, trade window, inspect, quest log, spellbook and talent
@@ -22,12 +41,28 @@ Everything before v0.40.3 is in
 
 ### Errors and combat blocks
 
+- Fixed the "Invalid frame handle" error thrown every time you entered combat.
+  It also meant frames that were meant to fade in combat silently never did
 - Fixed the error when casting certain spells
 - Fixed the error when using a consumable in combat
 - Fixed "action blocked" spam when hovering or clicking your action bars mid-fight
 - Fixed the stutter caused by `#showtooltip [@mouseover]` macros. An earlier
   attempt at this broke casting and was pulled; it is back now without that
   side effect
+
+### Action bars vanishing
+
+- Fixed every bar disappearing after anchoring the XP bar to an action bar.
+  Anchoring one to the other closed a loop, and the error took the rest of the
+  setup with it
+- An anchor choice that would form a loop is now refused politely: the frame
+  anchors to the screen and says so once, instead of erroring on every settings
+  change
+- **MoP:** fixed having no action bars at all, while the options still showed
+  them as on
+- **MoP:** fixed an error on every drag in edit mode
+- **MoP:** fixed the focus target frame being resized unexpectedly, and the
+  warning it logged on every layout update
 
 ### Action bars
 
@@ -62,6 +97,8 @@ Everything before v0.40.3 is in
 
 ### Edit mode
 
+- Fixed the unit frames being shoved around when you open Blizzard's own Edit
+  Mode. They stayed wrong until you next left combat
 - Fixed frames disappearing when you left edit mode and only returning after
   a reload
 - Fixed frames resetting to the wrong position after login or a loading screen

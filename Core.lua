@@ -9,7 +9,9 @@ addonTable.DF = DF;
 addonTable.L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI");
 addonTable.SubModuleMixins = {}
 
-local defaults = {profile = {bestnumber = 42}}
+-- global, not profile: "have I already seen the notes for this version" is a
+-- fact about the installation, not about a layout the player can switch between
+local defaults = {profile = {bestnumber = 42}, global = {lastSeenVersion = ''}}
 
 -- Lua errors and taint blocks are captured into the debug log; see DebugLog.lua.
 
@@ -77,8 +79,7 @@ function DF:GetVersion()
     local version = C_AddOns.GetAddOnMetadata('DragonflightUI', 'Version')
 
     if not version or version == '' or version:find('@', 1, true) then
-        local fallback = C_AddOns.GetAddOnMetadata('DragonflightUI', 'X-DFUI-Version')
-        version = (fallback and (fallback .. '-dev')) or 'unknown'
+        version = C_AddOns.GetAddOnMetadata('DragonflightUI', 'X-DFUI-Version') or 'unknown'
     end
 
     return version
