@@ -95,6 +95,54 @@ end
 -- exactly where it was, re-anchored against the screen with the offsets worked
 -- out for us. Read that back and store it. No scale arithmetic, which is the
 -- part that goes wrong when a frame carries its own scale.
+-- Which frame belongs to which (module, sub), so the Stand On Its Own checkbox
+-- can find it. Registered by AddPositionTable, and only where the caller can
+-- supply one.
+DF.Settings.StandaloneFrames = DF.Settings.StandaloneFrames or {}
+
+function DF.Settings:RegisterStandaloneFrame(Module, sub, frameGetter)
+    self.StandaloneFrames[Module] = self.StandaloneFrames[Module] or {}
+    self.StandaloneFrames[Module][sub] = frameGetter
+end
+
+-- The checkbox was set. On means stand alone, off means go back to what it was
+-- attached to.
+function DF.Settings:OnStandaloneChanged(Module, sub, value)
+    local byModule = self.StandaloneFrames[Module]
+    local frameGetter = byModule and byModule[sub]
+    if not frameGetter then return end
+
+    if value then
+        self:DetachFrame(Module, sub, frameGetter)
+    else
+        self:ReattachFrame(Module, sub, frameGetter)
+    end
+end
+
+-- Put it back on whatever it was attached to before it was detached, at the
+-- offsets it had then, so ticking and unticking round-trips exactly. With
+-- nothing remembered - a fresh profile, or something detached in an older
+-- session - fall back to how the element shipped.
+function DF.Settings:ReattachFrame(Module, sub, frameGetter)
+    local db = Module.db and Module.db.profile and Module.db.profile[sub]
+    if not db then return end
+
+    local saved = db.DFAttachedTo
+    local source = saved or (Module.defaults and Module.defaults.profile and Module.defaults.profile[sub])
+    if not source then return end
+
+    db.anchorFrame = source.anchorFrame
+    db.customAnchorFrame = source.customAnchorFrame or ''
+    db.anchor = source.anchor
+    db.anchorParent = source.anchorParent
+    db.x = source.x
+    db.y = source.y
+    db.DFAttachedTo = nil
+
+    Module:ApplySettings(sub)
+    if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
+end
+
 function DF.Settings:DetachFrame(Module, sub, frameGetter)
     local frame = frameGetter and frameGetter()
     if not frame then return end
@@ -116,6 +164,16 @@ function DF.Settings:DetachFrame(Module, sub, frameGetter)
 
     local point, _, relativePoint, x, y = frame:GetPoint(1)
     if not point then return end
+
+    -- Remember what it was on, so unticking can put it back exactly.
+    db.DFAttachedTo = {
+        anchorFrame = db.anchorFrame,
+        customAnchorFrame = db.customAnchorFrame,
+        anchor = db.anchor,
+        anchorParent = db.anchorParent,
+        x = db.x,
+        y = db.y
+    }
 
     db.anchorFrame = 'UIParent'
     db.customAnchorFrame = ''
@@ -237,15 +295,23 @@ function DF.Settings:AddPositionTable(Module, optionTable, sub, displayName, get
     -- rather than the frame itself because these tables are built at file
     -- scope, long before the frames exist.
     if frameGetter then
-        extraOptions.detach = {
-            type = 'execute',
-            name = L["PositionTableDetach"],
-            btnName = L["PositionTableDetachButton"],
-            desc = L["PositionTableDetachDesc"],
-            func = function()
-                DF.Settings:DetachFrame(Module, sub, frameGetter)
-            end,
-            order = 4.6,
+        DF.Settings:RegisterStandaloneFrame(Module, sub, frameGetter)
+
+        -- Seed the default so the page's Defaults button clears the tick along
+        -- with the anchor it resets. SetDefaultSubValues copies the defaults
+        -- over the profile, so without an entry here the box would stay ticked
+        -- while the anchor underneath it went back to attached. Every caller
+        -- runs SetDefaults before building its option tables.
+        local moduleDefaults = Module.defaults and Module.defaults.profile and Module.defaults.profile[sub]
+        if moduleDefaults and moduleDefaults.standalone == nil then moduleDefaults.standalone = false end
+
+        -- First thing in the Position group, because it decides whether any of
+        -- the settings under it are about another frame or about the screen.
+        extraOptions.standalone = {
+            type = 'toggle',
+            name = L["PositionTableStandalone"],
+            desc = L["PositionTableStandaloneDesc"] .. getDefaultStr('standalone', sub),
+            order = 0.5,
             group = 'headerPosition',
             editmode = true
         }

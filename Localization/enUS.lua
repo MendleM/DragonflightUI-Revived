@@ -194,10 +194,9 @@ do
     L["PositionTableAnchorDesc"] = "Anchor"
     L["PositionTableAnchorParent"] = "Anchor Parent"
     L["PositionTableAnchorParentDesc"] = ""
-    L["PositionTableDetach"] = "Stand On Its Own"
-    L["PositionTableDetachButton"] = "Detach"
-    L["PositionTableDetachDesc"] =
-        "Anchor this to the screen instead of to another frame, without moving it.\n\nUse this when you want it to stay put while the frame it is currently attached to moves. By default the main action bar is attached to the reputation bar, which is attached to the XP bar, so moving one moves all three."
+    L["PositionTableStandalone"] = "Stand On Its Own"
+    L["PositionTableStandaloneDesc"] =
+        "|cffffd100On:|r this sits on the screen by itself and stays where you put it, whatever else moves. Turning it on does not move it - it stays exactly where it is now.\n\n|cffffd100Off:|r it goes back to being attached to another frame, at the spot it had before.\n\nBy default the main action bar is attached to the reputation bar, which is attached to the XP bar - so moving the XP bar moves all three. Turn this on for any of them to break it out of that."
 
     L["PositionTableAnchorFrame"] = "Anchor Frame"
     L["PositionTableAnchorFrameDesc"] = ""

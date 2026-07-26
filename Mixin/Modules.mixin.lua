@@ -96,6 +96,14 @@ function DragonflightUIModulesMixin:SetOption(info, value)
     else
         apply()
     end
+
+    -- The Stand On Its Own checkbox from the shared position table. The settings
+    -- list gives every option in a group the same get/set, so the box has to be
+    -- a real profile field and the work it triggers has to happen here, at the
+    -- one point every option write passes through.
+    if sub == 'standalone' and DF.Settings and DF.Settings.OnStandaloneChanged then
+        DF.Settings:OnStandaloneChanged(self, key, value)
+    end
 end
 
 function DragonflightUIModulesMixin:SetWasEnabled(state)
