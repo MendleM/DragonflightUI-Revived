@@ -480,14 +480,24 @@ end
 -- Pops the same dummy roll frame edit mode uses, so the settings page can
 -- show what the rolls will look like without entering edit mode.
 function SubModuleMixin:ShowPreview(seconds)
-    local fake = self.PreviewRoll and self.PreviewRoll.FakePreview
+    local holder = self.PreviewRoll
+    local fake = holder and holder.FakePreview
     if not fake then return end
 
     self:UpdateGroupLootFrameStyle(fake)
+
+    -- The settings window sits at HIGH strata, so a preview at the default
+    -- strata simply rendered behind it and looked like nothing happened.
+    -- Lift it while previewing, and put it back afterwards.
+    if not holder.DFBaseStrata then holder.DFBaseStrata = holder:GetFrameStrata() end
+    holder:SetFrameStrata('FULLSCREEN_DIALOG')
+    holder:Show()
     fake:Show()
 
     if self.PreviewTimer then self.PreviewTimer:Cancel() end
     self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function()
+        holder:SetFrameStrata(holder.DFBaseStrata or 'MEDIUM')
+
         -- edit mode owns the preview while it is open; do not yank it away
         local editmode = DF:GetModule('Editmode', true)
         if editmode and editmode.IsEditMode then return end

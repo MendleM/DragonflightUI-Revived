@@ -309,7 +309,14 @@ function DFSettingsCategoryElementMixin:Init(node)
     self.ElementData = elementData;
     -- print('DFSettingsCategoryElementMixin:Init()', elementData.elementInfo.name)
 
-    self.Label:SetText(elementData.elementInfo.name)
+    -- Entries whose module is switched off are not dead ends any more (you
+    -- can open them and enable the module from their own page), so do not
+    -- dim them into looking broken. Mark them instead.
+    local label = elementData.elementInfo.name
+    if elementData.isEnabled == false and elementData.DFCanEnableModule then
+        label = label .. ' |cff808080(off)|r'
+    end
+    self.Label:SetText(label)
     self.NewFeature:SetShown(elementData.elementInfo.isNew)
     self.Description = elementData.elementInfo.descr
     self:SetEnabled(elementData.isEnabled)
@@ -318,7 +325,11 @@ function DFSettingsCategoryElementMixin:Init(node)
 end
 
 function DFSettingsCategoryElementMixin:UpdateState()
-    if not self:IsEnabled() then
+    local data = self.ElementData
+    local canEnableModule = data and data.DFCanEnableModule
+
+    if not self:IsEnabled() and not canEnableModule then
+        -- genuinely unreachable (no page registered at all)
         self.Label:SetFontObject("GameFontHighlight");
         self.Label:SetAlpha(0.5)
 

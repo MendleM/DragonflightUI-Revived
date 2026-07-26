@@ -9,9 +9,33 @@ local QUICK_KEYBIND_MODE = QUICK_KEYBIND_MODE or L["ConfigMixinQuickKeybindMode"
 function DragonFlightUIConfigMixin:OnLoad()
     -- print('DragonFlightUIConfigMixin:OnLoad')
 
-    local version = C_AddOns.GetAddOnMetadata('DragonflightUI', 'Version')
+    local version = (DF.GetVersion and DF:GetVersion()) or
+                        C_AddOns.GetAddOnMetadata('DragonflightUI', 'Version')
     local headerTextStr = 'DragonflightUI' .. ' |cff8080ff' .. version .. '|r'
     self.NineSlice.Text:SetText(headerTextStr)
+
+    -- The template is movable but nothing ever started a drag. Drag by the
+    -- header only: child buttons (close, minimize) consume their own clicks,
+    -- and starting a drag from the body would fight the scroll lists.
+    local HEADER_HEIGHT = 32
+    self:SetMovable(true)
+    self:EnableMouse(true)
+    self:RegisterForDrag('LeftButton')
+    self:SetScript('OnDragStart', function(frame)
+        local _, cursorY = GetCursorPosition()
+        local scale = frame:GetEffectiveScale()
+        local top = frame:GetTop()
+        if top and scale and scale > 0 and (top - (cursorY / scale)) <= HEADER_HEIGHT then
+            frame:StartMoving()
+            frame.DFIsMoving = true
+        end
+    end)
+    self:SetScript('OnDragStop', function(frame)
+        if frame.DFIsMoving then
+            frame.DFIsMoving = nil
+            frame:StopMovingOrSizing()
+        end
+    end)
 
     local function closePanel()
         self:Close();
