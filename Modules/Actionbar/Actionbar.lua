@@ -4089,9 +4089,14 @@ function Module.CreateBagExpandButton()
     f:GetHighlightTexture():SetTexCoord(0.951171875, 0.982421875, 0.015625, 0.25)
     f:GetPushedTexture():SetTexCoord(0.951171875, 0.982421875, 0.015625, 0.25)
 
+    -- The handler here was commented out, so the arrow did nothing at all.
+    -- Flip the saved setting and re-apply, so the state survives a reload
+    -- and the options screen stays in sync with the arrow.
     f:SetScript('OnClick', function()
-        -- setOption({'bags', 'expanded'}, not Module.db.profile.bags.expanded)
-        -- Module.BagBarExpandToggled(Module.db.profile.bagsExpanded)
+        local bags = Module.db.profile.bags
+        bags.expanded = not bags.expanded
+        Module.BagBarExpandToggled(bags.expanded)
+        Module:RefreshOptionScreens()
     end)
     f:RegisterEvent('BAG_UPDATE_DELAYED')
     f:RegisterEvent('PLAYER_ENTERING_WORLD')
