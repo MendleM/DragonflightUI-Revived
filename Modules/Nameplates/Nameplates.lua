@@ -245,6 +245,27 @@ end
 local BAR_TEXTURE =
     'Interface\\Addons\\DragonflightUI\\Textures\\UI-HUD-UnitFrame-Player-PortraitOff-Bar-Health-Status32'
 
+-- Does the plate style in force draw a level of its own? Blizzard's rule is
+-- exactly one line - ShouldShowLevel(style) is ShouldUseClassicHealthBar(style),
+-- "Classic health bar border has a space for level" - so only the classic style
+-- does, and only there is our own level text a duplicate.
+--
+-- This asks the STYLE, not the plate. Reading the plate's LevelFrame was the
+-- first attempt and it suppressed our level everywhere: that frame's shown
+-- state is not a reliable answer at the moment we run, and one stale plate is
+-- enough to get it wrong.
+local function StyleDrawsOwnLevel()
+    local classic = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.Classic
+    if classic == nil then return false end
+
+    local style = Module.db and Module.db.profile and Module.db.profile.style
+
+    -- on "don't manage" the answer lives in the CVar, not in our profile
+    if style == nil or style == 'BLIZZARD' then return tonumber(GetCVar('nameplateStyle')) == classic end
+
+    return style == 'CLASSIC'
+end
+
 -- force: re-apply even where our own marker says the plate was already done.
 -- Blizzard rebuilds plate contents on style and size changes, which throws our
 -- texture and font away while the marker stays behind - so a style change used
@@ -302,18 +323,10 @@ local function StylePlate(unit, force)
     end
 
     -- Enemy level, top-right in line with the name - but only on the styles
-    -- that have no level of their own. The classic plate already draws a level
-    -- box at the end of the health bar (CompactUnitFrame_UpdateLevel, gated on
-    -- optionTable.showLevel), so ours was a second copy of the same number
-    -- sitting on top of the unit's name.
-    --
-    -- Read it off the plate rather than off our style setting: the style can
-    -- also be changed in Blizzard's own options, and on 'Don't manage' we have
-    -- no idea which one is in force.
-    local plateShowsLevel = (uf.LevelFrame and uf.LevelFrame.IsShown and uf.LevelFrame:IsShown()) or
-                                (uf.optionTable and uf.optionTable.showLevel) or false
-
-    if uf.name and not plateShowsLevel then
+    -- that have no level of their own. The classic plate draws a level box at
+    -- the end of its health bar, and ours came out as a second copy of the same
+    -- number sitting on top of the unit's name.
+    if uf.name and not StyleDrawsOwnLevel() then
         local levelText = uf.DFLevelText
         if not levelText then
             levelText = uf:CreateFontString(nil, 'OVERLAY')
