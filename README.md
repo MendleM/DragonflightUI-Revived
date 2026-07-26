@@ -52,7 +52,7 @@ A good report includes:
 2. Make your change (match the surrounding code style — the repo ships a `LuaFormatter.config`)
 3. Open a PR against `main` describing what it fixes and how you tested it
 
-`main` is protected: every change lands through a pull request, reviewed and merged by [@MendleM](https://github.com/MendleM). Direct pushes are disabled, including for maintainers, so nothing skips review.
+`main` is protected: contributions land through pull requests, and only [@MendleM](https://github.com/MendleM) can merge them. Force-pushes and branch deletion are blocked. No approval count is enforced, so small fixes do not get stuck waiting on a second reviewer.
 
 Useful to know when working on Era 1.15.9:
 
