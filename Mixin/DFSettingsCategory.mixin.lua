@@ -61,7 +61,10 @@ function DFSettingsCategoryListMixin:OnLoad()
 
                 button:SetScript("OnClick", function(button, buttonName, down)
                     -- print('onclick', elementData.elementInfo.name)
-                    if not elementData.isEnabled then return end
+                    -- Entries for disabled modules stay clickable: selecting
+                    -- one serves a page with just that module's enable
+                    -- toggle, instead of being a dead grey line.
+                    if not elementData.isEnabled and not elementData.DFCanEnableModule then return end
                     self.selectionBehavior:Select(button);
                     -- PlaySound(SOUNDKIT.UI_90_BLACKSMITHING_TREEITEMCLICK);
                     PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON);
@@ -178,11 +181,21 @@ end
 function DFSettingsCategoryListMixin:RegisterElement(id, categoryID, info)
     -- local dataProvider = self.DataProvider;
 
+    -- Entries owned by a real module can offer an enable toggle even while
+    -- that module is off (see Config.mixin GetDisabledModuleData). This
+    -- file has no addon upvalue, so resolve it on demand.
+    local addon = LibStub and LibStub('AceAddon-3.0', true)
+    local DF = addon and addon:GetAddon('DragonflightUI', true)
+    local configModule = DF and DF.ConfigModule
+    local modules = configModule and configModule.db and configModule.db.profile.modules
+    local canEnableModule = (info.module ~= nil) and (modules ~= nil) and (modules[info.module] ~= nil)
+
     local data = {
         id = id,
         categoryID = categoryID,
         key = categoryID .. '_' .. id,
         isEnabled = info.isEnabled,
+        DFCanEnableModule = canEnableModule,
         order = info.order or 99999,
         elementInfo = {
             name = info.name,

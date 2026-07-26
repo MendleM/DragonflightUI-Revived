@@ -134,7 +134,7 @@ function DragonFlightUIConfigMixin:SetupSettingsCategorys()
     EventRegistry:RegisterCallback("DFSettingsCategoryListMixin.Event.OnSelectionChanged", function(_, newSelected, _)
         --
         -- print('~~OnSelectionChanged', newSelected);
-        local displayData = self.SettingsDataTable[newSelected];
+        local displayData = self.SettingsDataTable[newSelected] or self:GetDisabledModuleData(newSelected);
         if displayData then
             -- update display
             self.Container.DFSettingsList:Display(displayData)
@@ -144,6 +144,47 @@ function DragonFlightUIConfigMixin:SetupSettingsCategorys()
         end
     end, self);
 
+end
+
+-- A module only registers its settings page while it is enabled, so a
+-- disabled feature used to be an unreachable grey line in the list - you
+-- had to know to go to General > Modules to switch it back on. Serve those
+-- entries a minimal page carrying just that module's enable toggle.
+function DragonFlightUIConfigMixin:GetDisabledModuleData(key)
+    local list = self.DFSettingsCategoryList
+    local node = list and list.ElementCache and list.ElementCache[key]
+    local elementData = node and node:GetData()
+    local moduleName = elementData and elementData.elementInfo and elementData.elementInfo.module
+    if not moduleName then return nil end
+
+    local configModule = DF.ConfigModule
+    local modules = configModule and configModule.db and configModule.db.profile.modules
+    if not (modules and modules[moduleName] ~= nil) then return nil end
+
+    self.DisabledModuleData = self.DisabledModuleData or {}
+    if not self.DisabledModuleData[key] then
+        self.DisabledModuleData[key] = {
+            name = elementData.elementInfo.name,
+            sub = 'modules',
+            options = {
+                type = 'group',
+                name = elementData.elementInfo.name,
+                get = function(info) return configModule:GetOption(info) end,
+                set = function(info, value) configModule:SetOption(info, value) end,
+                args = {
+                    [moduleName] = {
+                        type = 'toggle',
+                        name = 'Enable the ' .. moduleName .. ' module',
+                        desc = 'This module is turned off, so its options are hidden.'
+                            .. ' Enable it here, then /reload to configure it.',
+                        order = 1
+                    }
+                }
+            }
+        }
+    end
+
+    return self.DisabledModuleData[key]
 end
 
 function DragonFlightUIConfigMixin:RegisterSettingsElement(id, categoryID, data, firstTime)
