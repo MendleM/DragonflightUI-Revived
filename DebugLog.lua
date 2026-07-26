@@ -546,7 +546,7 @@ function DF:FlashTune()
         TunerSlider(f, 'CoordBottom', 'Atlas bottom edge', 0.3, 1, 0.002, -264, function(v)
             if tuner.Glow then tuner.Glow.CoordBottom = v end
         end)
-        TunerSlider(f, 'Intensity', 'Intensity', 0, 2, 0.05, -308, function(v)
+        TunerSlider(f, 'Intensity', 'Intensity', 0, 3, 0.05, -308, function(v)
             if tuner.Glow then tuner.Glow.Intensity = v end
         end)
 
@@ -555,12 +555,12 @@ function DF:FlashTune()
         local blend = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate')
         blend:SetSize(250, 22)
         blend:SetPoint('TOPLEFT', f, 'TOPLEFT', 26, -352)
-        blend:SetText('Blend mode: ADD')
+        blend:SetText('Base pass: BLEND')
         blend:SetScript('OnClick', function(self)
             local g = tuner.Glow
             if not g then return end
             g.Blend = (g.Blend == 'ADD') and 'BLEND' or 'ADD'
-            self:SetText('Blend mode: ' .. g.Blend)
+            self:SetText('Base pass: ' .. g.Blend)
         end)
         f.BlendButton = blend
 
@@ -648,7 +648,7 @@ function DF:FlashTune()
     _G['DragonflightUIFlashTuneCoordBottom']:SetValue(glow.CoordBottom or 0.523)
     _G['DragonflightUIFlashTuneIntensity']:SetValue(glow.Intensity or 1)
 
-    if tuner.BlendButton then tuner.BlendButton:SetText('Blend mode: ' .. (glow.Blend or 'ADD')) end
+    if tuner.BlendButton then tuner.BlendButton:SetText('Base pass: ' .. (glow.Blend or 'BLEND')) end
 
     tuner:Show()
     -- re-attached on every open, since closing clears it

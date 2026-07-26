@@ -938,33 +938,62 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
             -- the gold one. Put behind, the opaque ring hides exactly the part
             -- that matters, which is what made the last attempt look like
             -- ghosting rather than a lit-up border.
+            -- Two passes: one to replace the ring, more to make it burn.
+            --
+            -- BLEND paints over, so the base pass puts solid red where the gold
+            -- was rather than tinting it. Brightness beyond that cannot come
+            -- from alpha - vertex alpha clamps at 1, which is why the intensity
+            -- slider did nothing past its halfway point - so extra punch comes
+            -- from drawing the same art again additively on top. Each pass adds
+            -- light, and that stacks.
             local tex = glow:CreateTexture(nil, 'ARTWORK', nil, 3)
             tex:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
             glow.Tex = tex
 
-            -- ADD brightens what is under it; BLEND paints over it. Which one
-            -- reads as "the ring is now solid red" depends on the art, so it is
-            -- switchable from the tuner.
-            glow.Blend = 'ADD'
+            glow.Adds = {}
+            for i = 1, 2 do
+                local add = glow:CreateTexture(nil, 'ARTWORK', nil, 3 + i)
+                add:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
+                add:SetBlendMode('ADD')
+                glow.Adds[i] = add
+            end
 
+            glow.Blend = 'BLEND'
+
+            -- Geometry dialled in against a live frame: the art's own size and
+            -- cut, nudged two pixels right and one up from where the background
+            -- sits.
             glow.Width = ART_W
             glow.Height = ART_H
-            glow.OffsetX = ART_X
-            glow.OffsetY = ART_Y
+            glow.OffsetX = -18
+            glow.OffsetY = 7
             glow.CoordRight = ART_R
             glow.CoordBottom = ART_B
-            glow.Intensity = 1.0
-            glow.Red, glow.Green, glow.Blue = 1.0, 0.15, 0.15
+            glow.Intensity = 1.8
+            glow.Red, glow.Green, glow.Blue = 1.0, 0.0, 0.0
 
             function glow:ApplyGlow()
-                local t = self.Tex
+                local function place(t)
+                    t:SetTexCoord(ART_L, self.CoordRight, ART_T, self.CoordBottom)
+                    t:SetSize(self.Width, self.Height)
+                    t:ClearAllPoints()
+                    t:SetPoint('CENTER', frame, 'CENTER', self.OffsetX, self.OffsetY)
+                end
 
-                t:SetBlendMode(self.Blend or 'ADD')
-                t:SetTexCoord(ART_L, self.CoordRight, ART_T, self.CoordBottom)
-                t:SetSize(self.Width, self.Height)
-                t:ClearAllPoints()
-                t:SetPoint('CENTER', frame, 'CENTER', self.OffsetX, self.OffsetY)
-                t:SetVertexColor(self.Red, self.Green, self.Blue, self.Intensity)
+                -- up to 1, the replacing pass fades in; past 1, the additive
+                -- passes take over and keep going
+                local base = math.min(self.Intensity, 1)
+                local extra = math.max(0, self.Intensity - 1)
+
+                self.Tex:SetBlendMode(self.Blend or 'BLEND')
+                place(self.Tex)
+                self.Tex:SetVertexColor(self.Red, self.Green, self.Blue, base)
+
+                for _, add in ipairs(self.Adds) do
+                    place(add)
+                    add:SetVertexColor(self.Red, self.Green, self.Blue, extra * 0.5)
+                    add:SetShown(extra > 0)
+                end
             end
 
             glow:ApplyGlow()
