@@ -169,7 +169,8 @@ function SubModuleMixin:SetDefaults()
         showWinnerToast = true,
         showItemName = true,
         previewCount = 3,
-        rollSpacing = 33, -- retail: reservedSize 100 on a 67px frame
+        -- tighter than retail's 33 (its reservedSize of 100 on a 67px frame)
+        rollSpacing = 15,
         anchorFrame = 'UIParent',
         customAnchorFrame = '',
         anchor = 'BOTTOM',
@@ -611,12 +612,12 @@ function SubModuleMixin:UpdateState(state)
 end
 
 -- Vertical space one roll occupies in the stack: its own height plus the
--- configured gap. Retail's reservedSize of 100 on a 67px frame is a 33px gap,
--- which is the default here.
+-- configured gap. Retail's reservedSize of 100 on a 67px frame works out to a
+-- 33px gap; the default here is tighter at 15.
 function SubModuleMixin:GetReservedSize()
     local state = self.state or self.Defaults
     local gap = state.rollSpacing
-    if type(gap) ~= 'number' then gap = RETAIL.reservedSize - RETAIL.height end
+    if type(gap) ~= 'number' then gap = self.Defaults.rollSpacing end
     return RETAIL.height + math.max(0, math.min(150, gap))
 end
 
