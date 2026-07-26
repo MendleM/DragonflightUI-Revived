@@ -2593,7 +2593,14 @@ function Module:GetSetupActionbarSteps()
     end}
 
     steps[#steps + 1] = {'HookUsable', function() Module.HookUsableRepaints() end}
-    steps[#steps + 1] = {'SlotChangedFilter', function() Module.InstallSlotChangedFilter() end}
+    -- NOTE: a previous build intercepted ACTIONBAR_SLOT_CHANGED here to skip
+    -- Blizzard's forced full button update on macro re-resolution (a real
+    -- allocation storm with #showtooltip [@mouseover] macros). It had to be
+    -- reverted: dispatching Blizzard's UpdateAction from addon context wrote
+    -- the button's pressAndHoldAction attribute tainted, so the secure click
+    -- handler was then refused UseAction outright - ADDON_ACTION_FORBIDDEN,
+    -- and the item or spell simply did not fire. Any future attempt must
+    -- never route through Blizzard's update path.
 
     return steps
 end
@@ -2624,107 +2631,6 @@ function Module.HookUsableRepaints()
     end
 end
 
--- #showtooltip [@mouseover] macros make the client fire one
--- ACTIONBAR_SLOT_CHANGED per placed macro slot on every mouseover change,
--- and Blizzard answers each with a forced full UpdateAction() even though
--- only the resolved icon changed - the GC pressure behind the raid hover
--- stutter. Take over the event: real slot changes (action signature
--- differs) keep Blizzard's full pipeline, deferred past combat if needed;
--- re-resolutions get only what visibly changed (icon, count,
--- tooltip-if-hovered) on visible buttons. Hidden buttons self-heal via
--- OnShow -> Update(); cooldown swipes are pushed C-side and usable/range
--- coloring has its own events, so neither needs the full update.
-function Module.InstallSlotChangedFilter()
-    local bef = _G['ActionBarButtonEventsFrame']
-    if not bef or not bef.frames or Module.SlotFilterInstalled then return end
-    Module.SlotFilterInstalled = true
-
-    bef:UnregisterEvent('ACTIONBAR_SLOT_CHANGED')
-
-    local lastSig = {} -- slot -> "type:id:subType" signature
-    local pendingFull = {} -- slots (or 0 = all) awaiting full dispatch post-combat
-
-    local function fullDispatch(slot)
-        for _, btn in pairs(bef.frames) do if btn.OnEvent then btn:OnEvent('ACTIONBAR_SLOT_CHANGED', slot) end end
-    end
-
-    local function lightweightUpdate(slot)
-        -- Our dispatch is addon code, so everything it calls runs tainted.
-        -- During combat lockdown, reaching into Blizzard's button methods
-        -- from a tainted path can trip blocked-action errors (reported as
-        -- an error when using a consumable in combat), so in combat we
-        -- touch nothing but our own textures and queue the real refresh
-        -- for when combat drops.
-        if InCombatLockdown() then
-            for _, btn in pairs(bef.frames) do
-                if btn.action == slot and btn:IsVisible() then
-                    local tex = C_ActionBar.GetActionTexture(slot)
-                    if btn.icon and tex then btn.icon:SetTexture(tex) end
-                end
-            end
-            pendingFull[slot] = true
-            return
-        end
-
-        for _, btn in pairs(bef.frames) do
-            if btn.action == slot and btn:IsVisible() then
-                local tex = C_ActionBar.GetActionTexture(slot)
-                if btn.icon and tex then btn.icon:SetTexture(tex) end
-                if btn.UpdateCount then btn:UpdateCount() end
-                -- A macro keeps the same action signature while resolving
-                -- to a different spell, so usability can change under an
-                -- unchanged slot. Blizzard's full path repainted on every
-                -- one of these events; skipping it left icons stuck in the
-                -- previous spell's colors (the grey-until-mouseover bug).
-                -- IsUsableAction is a plain query - no table churn.
-                if btn.UpdateUsable then btn:UpdateUsable() end
-                if GameTooltip:GetOwner() == btn and btn.SetTooltip then btn:SetTooltip() end
-            end
-        end
-    end
-
-    local filter = CreateFrame('Frame')
-    filter:RegisterEvent('ACTIONBAR_SLOT_CHANGED')
-    filter:RegisterEvent('PLAYER_REGEN_ENABLED')
-    filter:SetScript('OnEvent', function(_, event, slot)
-        if event == 'PLAYER_REGEN_ENABLED' then
-            if pendingFull[0] then
-                fullDispatch(0)
-            else
-                for s in pairs(pendingFull) do fullDispatch(s) end
-            end
-            wipe(pendingFull)
-            return
-        end
-
-        if slot == 0 then
-            -- full-bar refresh broadcast
-            if InCombatLockdown() then
-                pendingFull[0] = true
-            else
-                fullDispatch(0)
-            end
-            return
-        end
-
-        local actionType, id, subType = GetActionInfo(slot)
-        local sig = (actionType or '') .. ':' .. (id or 0) .. ':' .. (subType or '')
-        if lastSig[slot] == sig then
-            -- same action in the slot -> macro-conditional re-resolution
-            lightweightUpdate(slot)
-        else
-            lastSig[slot] = sig
-            if InCombatLockdown() then
-                -- keep the visuals current now, run the full (protected-
-                -- touching) pipeline once combat drops
-                lightweightUpdate(slot)
-                pendingFull[slot] = true
-            else
-                fullDispatch(slot)
-            end
-        end
-    end)
-end
 
 function Module.AddStateUpdater()
     local DFBagBar = _G['DragonflightUIBagBar']
