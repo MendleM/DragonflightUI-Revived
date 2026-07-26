@@ -1813,15 +1813,18 @@ function Module:FindLine(self, searching)
     end
 end
 
+-- Grow the tooltip until the wanted line exists, then hand it back.
+--
+-- The recursion used to ask for num + 1 rather than index, so it only ever
+-- worked when the tooltip was exactly one line short: asked for line 4 with two
+-- lines present it added one line and then returned line 3. Which line that
+-- lands on depends on how many lines Blizzard built, and that differs with
+-- whether the unit's guild resolved - the guild path writes the location to
+-- index 4, the guildless path to index 3.
 function Module:GetLine(self, index)
-    local num = self:NumLines()
-    if index > self:NumLines() then
-        --
-        self:AddLine(' ');
-        return Module:GetLine(self, num + 1)
-    end
-    return _G[self:GetName() .. 'TextLeft' .. index], _G[self:GetName() .. 'TextRight' .. index]
+    while index > self:NumLines() do self:AddLine(' ') end
 
+    return _G[self:GetName() .. 'TextLeft' .. index], _G[self:GetName() .. 'TextRight' .. index]
 end
 
 function Module:HideLine(self, searching)
