@@ -17,6 +17,32 @@ local function TextStatusBar_UpdateTextString(f)
     end
 end
 
+-- The health and mana readouts that sit INSIDE the bars (Interface -> Status
+-- Text, off by default). Both Blizzard's own strings on the pooled frames and
+-- the ones the classic reskin creates inherit TextStatusBarText, which is sized
+-- for Blizzard's bars - ours are 10 and 7 pixels tall, so the numbers spilled
+-- out of them. Nothing else is needed: the pooled bars inherit TextStatusBar
+-- and call InitializeTextStatusBar with cvar = 'statusText', so the client
+-- already fills them in and shows them on mouseover.
+local STATUS_TEXT_KEYS = {'TextString', 'LeftText', 'RightText', 'DFTextString', 'DFLeftText', 'DFRightText'}
+
+local function FitBarStatusText(bar)
+    if not bar or not bar.GetHeight then return end
+
+    local size = ((bar:GetHeight() or 10) >= 12) and 10 or 9
+
+    for _, key in ipairs(STATUS_TEXT_KEYS) do
+        local text = bar[key]
+        if text and text.SetFont then
+            -- GetFont returns nil when the string draws from a font OBJECT
+            -- rather than a file, so fall back rather than passing nil on
+            local file, _, flags = text:GetFont()
+            file = file or STANDARD_TEXT_FONT or 'Fonts\\FRIZQT__.ttf'
+            text:SetFont(file, size, (flags and flags ~= '') and flags or 'OUTLINE')
+        end
+    end
+end
+
 function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
@@ -476,6 +502,9 @@ function SubModuleMixin:SetupModern()
             manaMask:SetSize(74, 7)
             manabar:GetStatusBarTexture():AddMaskTexture(manaMask)
         end
+
+        FitBarStatusText(pf.HealthBar)
+        FitBarStatusText(pf.ManaBar)
 
         -- NOTE: lifting the bars above PartyMemberOverlay was tried here to
         -- test whether the overlay art was dimming them. It made the bars
@@ -976,6 +1005,8 @@ function SubModuleMixin:ChangePartyFrame()
         healthbar.DFHealthBarTextRight:SetPoint('RIGHT', healthbar, 'RIGHT', 0, 0)
         healthbar.DFRightText = healthbar.DFHealthBarTextRight
 
+        FitBarStatusText(healthbar)
+
         healthbar:HookScript('OnEnter', function(self)
             if healthbar.DFHealthBarTextRight:IsVisible() or healthbar.DFTextString:IsVisible() then
             else
@@ -1031,6 +1062,8 @@ function SubModuleMixin:ChangePartyFrame()
                                                               'TextStatusBarText')
         manabar.DFManaBarTextRight:SetPoint('RIGHT', manabar, 'RIGHT', 0, 0)
         manabar.DFRightText = manabar.DFManaBarTextRight
+
+        FitBarStatusText(manabar)
 
         manabar:HookScript('OnEnter', function(self)
             if manabar.DFManaBarTextRight:IsVisible() or manabar.DFTextString:IsVisible() then
