@@ -17,6 +17,8 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- Slash commands:
 --     /df log              last 30 entries in chat
 --     /df log all          the whole buffer in chat
+--     /df log copy [tag]   a window to select all and copy out of, for pasting
+--                          into a bug report; takes the same tag filter
 --     /df log echo         toggle live echo of every entry to chat
 --     /df log clear        empty the buffer
 --     /df log frame <name>   a frame's whole visibility chain
@@ -290,11 +292,112 @@ function DF:LogBars(frameOrName, tag, maxDepth)
     end
 end
 
-function DF:LogDump(filter, limit)
+local function Matching(filter)
     local matching = {}
     for _, entry in ipairs(log) do
         if not filter or entry:lower():find(filter:lower(), 1, true) then matching[#matching + 1] = entry end
     end
+    return matching
+end
+
+-- A window to copy the log out of, because the alternative is talking someone
+-- through finding a file inside their WoW install. Select all, copy, paste it
+-- into a bug report.
+local copyFrame
+
+local function CreateCopyWindow()
+    if copyFrame then return copyFrame end
+
+    local f = CreateFrame('Frame', 'DragonflightUILogCopyFrame', UIParent, 'BackdropTemplate')
+    f:SetSize(700, 500)
+    f:SetPoint('CENTER')
+    f:SetFrameStrata('DIALOG')
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:RegisterForDrag('LeftButton')
+    f:SetScript('OnDragStart', f.StartMoving)
+    f:SetScript('OnDragStop', f.StopMovingOrSizing)
+    f:SetClampedToScreen(true)
+    f:Hide()
+
+    f:SetBackdrop({
+        bgFile = 'Interface\\DialogFrame\\UI-DialogBox-Background-Dark',
+        edgeFile = 'Interface\\DialogFrame\\UI-DialogBox-Border',
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = {left = 11, right = 12, top = 12, bottom = 11}
+    })
+
+    local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormalLarge')
+    title:SetPoint('TOP', f, 'TOP', 0, -18)
+    title:SetText('DragonflightUI debug log')
+
+    local hint = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+    hint:SetPoint('TOP', title, 'BOTTOM', 0, -4)
+    hint:SetText('|cffffd100Ctrl+A|r to select all, |cffffd100Ctrl+C|r to copy, then paste it into your bug report.')
+
+    local close = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate')
+    close:SetSize(140, 24)
+    close:SetPoint('BOTTOM', f, 'BOTTOM', 0, 16)
+    close:SetText(CLOSE or 'Close')
+    close:SetScript('OnClick', function() f:Hide() end)
+
+    local scroll = CreateFrame('ScrollFrame', 'DragonflightUILogCopyScroll', f, 'UIPanelScrollFrameTemplate')
+    scroll:SetPoint('TOPLEFT', f, 'TOPLEFT', 20, -60)
+    scroll:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -34, 48)
+
+    -- A multiline EditBox as the scroll child sizes its own height to the text,
+    -- which is what makes this scroll without measuring anything.
+    local edit = CreateFrame('EditBox', nil, scroll)
+    edit:SetMultiLine(true)
+    edit:SetFontObject(ChatFontNormal)
+    edit:SetWidth(640)
+    edit:SetAutoFocus(false)
+    edit:SetMaxLetters(0)
+    edit:SetScript('OnEscapePressed', function() f:Hide() end)
+    scroll:SetScrollChild(edit)
+    f.EditBox = edit
+
+    if UISpecialFrames then table.insert(UISpecialFrames, 'DragonflightUILogCopyFrame') end
+
+    copyFrame = f
+    return f
+end
+
+-- Hard cap on what goes in the box. The buffer holds up to a thousand entries
+-- with stack traces attached, and handing all of that to an EditBox at once can
+-- lock the client up for a while. The tail is the interesting end.
+local COPY_CHAR_LIMIT = 60000
+
+function DF:LogCopy(filter)
+    if filter == '' then filter = nil end
+
+    local matching = Matching(filter)
+    if #matching == 0 then
+        print(PREFIX .. 'no entries' .. (filter and (' matching "' .. filter .. '"') or '') .. ' to copy.')
+        return
+    end
+
+    local header = string.format('DragonflightUI %s | %s | %d entries%s', DF:GetVersion(),
+                                 (GetBuildInfo and select(1, GetBuildInfo())) or '?', #matching,
+                                 filter and (' matching "' .. filter .. '"') or '')
+
+    local text = header .. '\n\n' .. table.concat(matching, '\n')
+    if #text > COPY_CHAR_LIMIT then
+        text = '... earlier entries dropped, log too long to copy in one go ...\n\n' ..
+                   text:sub(#text - COPY_CHAR_LIMIT)
+    end
+
+    local f = CreateCopyWindow()
+    f.EditBox:SetText(text)
+    f.EditBox:HighlightText()
+    f.EditBox:SetFocus()
+    f:Show()
+end
+
+function DF:LogDump(filter, limit)
+    local matching = Matching(filter)
 
     if #matching == 0 then
         print(PREFIX .. 'no entries' .. (filter and (' matching "' .. filter .. '"') or ''))
@@ -330,6 +433,8 @@ function DF:HandleLogCommand(rest)
         DF:LogClear()
     elseif sub == 'echo' then
         DF:LogEcho(not DF:LogIsEchoing())
+    elseif sub == 'copy' then
+        DF:LogCopy(arg)
     elseif sub == 'frame' then
         if arg == '' then
             print(PREFIX .. 'usage: /df log frame <FrameName|mouse>')
