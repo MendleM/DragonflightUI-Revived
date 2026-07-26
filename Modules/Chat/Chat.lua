@@ -215,6 +215,17 @@ function Module:OnEnable()
             end)
         end)
     end
+
+    -- Leaving the dock does NOT go through FCF_DockUpdate (FCF_UnDockFrame
+    -- calls FCFDock_RemoveChatFrame and stops), and undocking happens by
+    -- dragging the tab - so the window is already under the cursor and on its
+    -- way somewhere by the time any later pass would run. Restore its clamping
+    -- at the one choke point every frame leaves the dock through.
+    if FCFDock_RemoveChatFrame then
+        self:SecureHook('FCFDock_RemoveChatFrame', function(_, chatFrame)
+            Module.SetDockClamping(chatFrame, false)
+        end)
+    end
 end
 
 function Module:OnDisable()
@@ -296,13 +307,50 @@ end
 --     background and edit box included.
 -- The mirror makes their own clamping pointless anyway (the primary is
 -- clamped for them), so drop it and re-assert the mirror.
+
+-- Which frames we switched clamping off for, and what it was set to before.
+--
+-- Dropping it is only right for as long as the frame is docked: a docked tab
+-- is positioned entirely by the primary, but an undocked one moves on its own
+-- again and without clamping it can be dragged past the screen edge and lost
+-- for the session. Blizzard does not put it back - FCF_UnDockFrame never
+-- touches clampedToScreen - so that is ours to undo. Remember the previous
+-- value rather than assuming the XML default of true: another addon may have
+-- had its own opinion about a frame first, and restoring is not the same as
+-- overruling.
+local priorClamp = setmetatable({}, {__mode = 'k'})
+
+function Module.SetDockClamping(chatFrame, docked)
+    if not (chatFrame and chatFrame.SetClampedToScreen) then return end
+
+    if docked then
+        if priorClamp[chatFrame] == nil then
+            -- IsClampedToScreen is not exercised anywhere in the 1.15.9 UI
+            -- source; if it is missing, the template default (true) stands.
+            priorClamp[chatFrame] = (chatFrame.IsClampedToScreen == nil) or chatFrame:IsClampedToScreen()
+            chatFrame:SetClampedToScreen(false)
+        end
+    elseif priorClamp[chatFrame] ~= nil then
+        chatFrame:SetClampedToScreen(priorClamp[chatFrame])
+        priorClamp[chatFrame] = nil
+    end
+end
+
 function Module.FixDockedFrames()
     local dock = GENERAL_CHAT_DOCK
     if not (dock and dock.primary and FCFDock_GetChatFrames) then return end
 
     for _, chatFrame in ipairs(FCFDock_GetChatFrames(dock)) do
-        if chatFrame ~= dock.primary and chatFrame.SetClampedToScreen then
-            chatFrame:SetClampedToScreen(false)
+        Module.SetDockClamping(chatFrame, chatFrame ~= dock.primary)
+    end
+
+    -- Anything that left the dock without passing through the
+    -- FCFDock_RemoveChatFrame hook in OnEnable - a frame docked at login and
+    -- undocked from saved settings, or one promoted to primary - is caught
+    -- here on the next pass.
+    for chatFrame in pairs(priorClamp) do
+        if chatFrame == dock.primary or not chatFrame.isDocked then
+            Module.SetDockClamping(chatFrame, false)
         end
     end
 
