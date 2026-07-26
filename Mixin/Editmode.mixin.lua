@@ -363,7 +363,16 @@ function DFEditModeSystemSelectionBaseMixin:OnLoad()
         local db = EditModeModule.db.profile
         local state = db.advanced
 
-        local value = editValue and state[self.AdvancedName]
+        -- A missing advanced entry must not read as "disabled": frames
+        -- registered without an advancedName used to evaluate falsy even
+        -- while ENTERING edit mode, and the branch below then hid them.
+        local advancedEnabled = true
+        if self.AdvancedName ~= nil then
+            local flag = state[self.AdvancedName]
+            if flag ~= nil then advancedEnabled = flag end
+        end
+
+        local value = editValue and advancedEnabled
 
         self:ShowHighlighted()
         self:SetShown(value)
@@ -392,7 +401,13 @@ function DFEditModeSystemSelectionBaseMixin:OnLoad()
             self.parent.DFEditMode = false;
             if self.parent.SetEditMode then
                 self.parent:SetEditMode(false)
-            else
+            elseif self.HideFunction then
+                -- Only preview/placeholder registrations own their own
+                -- visibility (they always come with a HideFunction). Real
+                -- frames - the LFG eye, the chat window - were being hidden
+                -- here on every edit-mode exit and stayed gone until a
+                -- reload; their visibility belongs to the module's
+                -- ApplySettings below.
                 self.parent:Hide()
             end
             if self.ModuleRef then

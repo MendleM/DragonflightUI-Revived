@@ -524,6 +524,17 @@ function Module:InitEditmodeOverride()
         end
 
         LibEditModeOverride:ApplyChanges()
+
+        -- An application resets every frame whose position DFUI owns but the
+        -- Blizzard layout has no record of - player and target above all.
+        -- Without this the frames sit correctly for a moment after login and
+        -- then jump to the layout's spots, and only opening edit mode (which
+        -- re-applies our settings) puts them back.
+        local uf = DF:GetModule('Unitframe', true)
+        if uf and uf.GetWasEnabled and uf:GetWasEnabled() then
+            local ok, err = pcall(function() uf:ApplySettings() end)
+            if not ok then geterrorhandler()('DFUI Editmode reapply: ' .. tostring(err)) end
+        end
     end
 
     function addonTable:ScheduleBlizzEditmodeApply()
