@@ -7,6 +7,27 @@ local channelRef = 'Interface\\Addons\\DragonflightUI\\Textures\\Castbar\\Castin
 
 local CASTING_BAR_ALPHA_STEP = CASTING_BAR_ALPHA_STEP or 0.05
 
+-- Shots the client does not always report through UnitCastingInfo, so no cast
+-- bar appears for them even though they have a cast time. Aimed Shot is the one
+-- players notice; the list is here so others can be added by id.
+--
+-- Seeded with rank 1 and matched by NAME, so every rank and every locale is
+-- covered without listing each rank's id.
+local SHOT_SEED_IDS = {19434} -- Aimed Shot
+
+local shotNames
+local function GetShotSpellNames()
+    if shotNames then return shotNames end
+
+    shotNames = {}
+    for _, id in ipairs(SHOT_SEED_IDS) do
+        local name = GetSpellInfo(id)
+        if name then shotNames[name] = true end
+    end
+
+    return shotNames
+end
+
 local fishingTable = {
     [7620] = APPRENTICE,
     [7731] = JOURNEYMAN,
@@ -131,6 +152,11 @@ function DragonFlightUICastbarMixin:OnEvent(event, ...)
     end
 
     if (arg1 ~= unit) then return; end
+
+    if (event == "UNIT_SPELLCAST_SENT") then
+        self:TryShotCastFallback(...);
+        return;
+    end
 
     if (event == "UNIT_SPELLCAST_START") then
         local name, text, texture, startTime, endTime, isTradeSkill, castID, notInterruptible, spellId =
@@ -447,6 +473,9 @@ function DragonFlightUICastbarMixin:SetUnit(unit)
             self:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTIBLE", unit);
             self:RegisterUnitEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE", unit);
             self:RegisterUnitEvent("UNIT_SPELLCAST_START", unit);
+            -- only the player bar needs the shot fallback; nothing else can see
+            -- another unit's sent casts anyway
+            if unit == 'player' then self:RegisterUnitEvent("UNIT_SPELLCAST_SENT", unit); end
             self:RegisterUnitEvent("UNIT_SPELLCAST_STOP", unit);
             self:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", unit);
             self:RegisterEvent("PLAYER_ENTERING_WORLD");
@@ -807,6 +836,68 @@ function DragonFlightUICastbarMixin:UpdateCastTimeTextShown()
     end
 
     if showCastTime and self.DFEditMode and not self.CastTimeText.text then self:UpdateCastTimeText(); end
+end
+
+-- Show a cast bar for a shot the client did not report as a cast.
+--
+-- Only ever runs when the client has NOT started a real cast: checked a frame
+-- later, because UNIT_SPELLCAST_SENT arrives before UNIT_SPELLCAST_START. If a
+-- real cast did start, it owns the bar and this does nothing, so the fallback
+-- cannot produce a second bar on a client that reports these normally.
+--
+-- castID is seeded from the sent cast's GUID, so the existing STOP, FAILED and
+-- INTERRUPTED handling - which matches on that GUID - ends this bar the same
+-- way it ends any other.
+function DragonFlightUICastbarMixin:TryShotCastFallback(unitToken, target, castGUID, spellID)
+    if self.unit ~= 'player' or not spellID then return end
+
+    local name, _, texture, castTime = GetSpellInfo(spellID)
+    if not name or not GetShotSpellNames()[name] then return end
+    if not castTime or castTime <= 0 then return end
+
+    C_Timer.After(0, function()
+        if UnitCastingInfo('player') or UnitChannelInfo('player') then return end
+        if self.casting or self.channeling then return end
+        if self.DFEditMode then return end
+        if self.state and not self.state.activate then return end
+
+        self:StartShotCast(name, texture, castTime / 1000, castGUID)
+    end)
+end
+
+function DragonFlightUICastbarMixin:StartShotCast(name, texture, duration, castGUID)
+    self:SetStatusBarTexture(standardRef)
+    self:SetStatusBarDesaturated(false)
+
+    self:ShowSpark()
+    self:HideAllTicks()
+
+    self.value = 0
+    self.maxValue = duration
+    self:SetMinMaxValues(0, duration)
+    self:SetValue(0)
+
+    if self.Text then
+        self.Text:SetText(name)
+        if self.TextCompact then self.TextCompact:SetText(name) end
+    end
+    if self.Icon then self.Icon:SetTexture(texture) end
+
+    self.casting = true
+    self.castID = castGUID
+    self.channeling = nil
+    self.reverseChanneling = nil
+
+    self.holdTime = 0
+    self:SetAlpha(1.0)
+    self.fadeOut = nil
+
+    if self.BorderShield then
+        self.BorderShield:Hide()
+        if self.BarBorder then self.BarBorder:Show() end
+    end
+
+    self:UpdateShownState(true)
 end
 
 function DragonFlightUICastbarMixin:FinishSpell()
