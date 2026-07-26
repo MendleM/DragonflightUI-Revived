@@ -332,9 +332,29 @@ function SubModuleMixin:Update()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     -- f:SetUserPlaced(true)
 
+    -- Reparent, not just re-anchor, the way the player frame does.
+    --
+    -- Anchoring this to our holder while leaving FocusFrame as its parent puts
+    -- the frame in one anchor family and its parent in another. Blizzard then
+    -- anchors it parent-relative - FocusFrameMixin:SetSmallSize does
+    -- FocusFrameToT:SetPoint("BOTTOMRIGHT", -13, -17) with no relativeTo, which
+    -- means FocusFrame - and the client refuses the call for crossing families.
+    -- That is the "anchor family connection" warning on every layout update.
+    --
+    -- With the holder as the parent, Blizzard's parent-relative call lands
+    -- inside our own family and is allowed; our point below still decides where
+    -- it actually sits.
+    if f_orig:GetParent() ~= f and not InCombatLockdown() then f_orig:SetParent(f) end
+
     f_orig:ClearAllPoints()
     f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
-    f_orig:SetScale(state.scale)
+
+    -- Scale comes from the holder alone now. Setting it here as well would
+    -- square it, since a child inherits its parent's scale - the player frame
+    -- scales the holder only, for the same reason. Pinned to 1 rather than left
+    -- alone so Blizzard's own writes here, SMALL_FOCUS_UPSCALE and friends from
+    -- SetSmallSize, do not multiply into it either.
+    f_orig:SetScale(1)
 
     if DF.API.Version.IsTBC then
     else
