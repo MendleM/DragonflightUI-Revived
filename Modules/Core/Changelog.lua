@@ -5,7 +5,7 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --
 -- Opens by itself once after an update and stays until dismissed, then never
 -- again for that version. Openable any time from Settings > General > What's
--- New.
+-- New, or /df whatsnew.
 --
 -- "Seen" is stored globally rather than per profile: it is a fact about the
 -- installation, not about a layout the player can switch between, and switching
@@ -18,61 +18,97 @@ DF.Changelog = Changelog
 -- "once per version, until dismissed".
 local ALWAYS_SHOW = true
 
-local WIDTH, HEIGHT = 760, 640
-local GOLD = '|cffffd100'
-local WHITE = '|cffffffff'
-local GREY = '|cff9d9d9d'
-local BLUE = '|cff3fc7ff'
-local GREEN = '|cff40dd60'
+local WIDTH, HEIGHT = 780, 660
+local PAD = 26
+local ICON = 'Interface\\Icons\\INV_Misc_Head_Dragon_01'
+
+local COL_GOLD = {1, 0.82, 0}
+local COL_WHITE = {0.95, 0.95, 0.95}
+local COL_GREY = {0.62, 0.62, 0.62}
+local COL_BLUE = {0.35, 0.80, 1}
+local COL_GREEN = {0.30, 0.88, 0.45}
 
 -- Plain ASCII, deliberately. This started as Interface\Scenarios\ScenarioIcon-
 -- Dash, which draws nothing on Classic Era: Scenarios are a later asset folder
--- and nothing in the classic UI references it, so the bullets were invisible. A
--- dash renders in every font on every flavour.
-local BULLET = GOLD .. '-|r  '
+-- and nothing in the classic UI references it, so the bullets were invisible.
+local BULLET = '|cffffd100-|r  '
 
--- A rule drawn with the tooltip border texture, which exists everywhere.
-local function AddRule(parent, anchorTo, offsetY)
-    local rule = parent:CreateTexture(nil, 'ARTWORK')
-    rule:SetColorTexture(1, 0.82, 0, 0.5)
-    rule:SetHeight(1)
-    rule:SetPoint('TOPLEFT', anchorTo, 'BOTTOMLEFT', 0, offsetY)
-    rule:SetPoint('TOPRIGHT', anchorTo, 'BOTTOMRIGHT', 0, offsetY)
-    return rule
+-- ---------------------------------------------------------------------------
+-- Layout helpers. The body is built from real widgets rather than one long
+-- string, so sections can carry rules, badges and hanging indents instead of
+-- arriving as a wall of text.
+-- ---------------------------------------------------------------------------
+
+local function AddText(content, y, text, font, indent, colour, width)
+    local fs = content:CreateFontString(nil, 'ARTWORK', font)
+    fs:SetPoint('TOPLEFT', content, 'TOPLEFT', indent, -y)
+    fs:SetWidth(width - indent)
+    fs:SetJustifyH('LEFT')
+    fs:SetJustifyV('TOP')
+    fs:SetSpacing(2)
+    -- wrapped bullet text lines up under itself, not under the dash
+    if fs.SetIndentedWordWrap then fs:SetIndentedWordWrap(true) end
+    if colour then fs:SetTextColor(colour[1], colour[2], colour[3]) end
+    fs:SetText(text)
+
+    return y + fs:GetStringHeight() + 4, fs
 end
 
-local function BuildText()
-    local out = {}
+local function AddRule(content, y, indent, width, alpha)
+    local tex = content:CreateTexture(nil, 'ARTWORK')
+    tex:SetColorTexture(1, 0.82, 0, alpha or 0.35)
+    tex:SetHeight(1)
+    tex:SetPoint('TOPLEFT', content, 'TOPLEFT', indent, -y)
+    tex:SetWidth(width - indent)
+
+    return y + 1
+end
+
+local function BuildBody(content, width)
+    local y = 0
 
     for index, release in ipairs(DF.ChangelogData or {}) do
-        if index > 1 then out[#out + 1] = ' ' end
+        if index > 1 then y = y + 18 end
 
-        -- Release banner: title big and gold, version and date beneath it.
-        out[#out + 1] = GOLD .. string.upper(release.title) .. '|r'
-        out[#out + 1] = GREY .. release.version .. (release.date and ('   |   ' .. release.date) or '') .. '|r'
+        -- Release banner
+        y = AddText(content, y, string.upper(release.title), 'GameFontNormalHuge', 0, COL_GOLD, width)
+
+        local meta = release.version
+        if release.date then meta = meta .. '   |   ' .. release.date end
+        y = AddText(content, y, meta, 'GameFontHighlightSmall', 0, COL_GREY, width)
+
+        y = y + 6
+        y = AddRule(content, y, 0, width, 0.5)
+        y = y + 10
 
         if release.intro then
-            out[#out + 1] = ' '
-            out[#out + 1] = WHITE .. release.intro .. '|r'
+            y = AddText(content, y, release.intro, 'GameFontHighlight', 0, COL_WHITE, width)
+            y = y + 6
         end
 
         for _, section in ipairs(release.sections or {}) do
-            out[#out + 1] = ' '
+            y = y + 10
 
-            local heading = BLUE .. section.title .. '|r'
-            if section.new then heading = heading .. '   ' .. GREEN .. '[NEW]|r' end
-            out[#out + 1] = heading
+            local heading = section.title
+            if section.new then heading = heading .. '   |cff4ce066[NEW]|r' end
+            y = AddText(content, y, heading, 'GameFontNormalLarge', 0, COL_BLUE, width)
+
+            y = y + 2
+            y = AddRule(content, y, 0, width, 0.18)
+            y = y + 6
 
             for _, item in ipairs(section.items or {}) do
-                out[#out + 1] = BULLET .. WHITE .. item .. '|r'
+                y = AddText(content, y, BULLET .. item, 'GameFontHighlight', 12, COL_WHITE, width)
             end
         end
 
-        out[#out + 1] = ' '
+        y = y + 8
     end
 
-    return table.concat(out, '\n')
+    return y
 end
+
+-- ---------------------------------------------------------------------------
 
 local function CreateWindow()
     if Changelog.Frame then return Changelog.Frame end
@@ -98,56 +134,66 @@ local function CreateWindow()
         insets = {left = 11, right = 12, top = 12, bottom = 11}
     })
 
-    -- A dark band behind the header, so the title reads as a banner rather than
-    -- text floating at the top of a box.
+    -- Header band, so the title reads as a banner rather than text floating at
+    -- the top of a box.
     local band = f:CreateTexture(nil, 'BORDER')
-    band:SetColorTexture(0, 0, 0, 0.45)
+    band:SetColorTexture(0, 0, 0, 0.55)
     band:SetPoint('TOPLEFT', f, 'TOPLEFT', 14, -14)
     band:SetPoint('TOPRIGHT', f, 'TOPRIGHT', -14, -14)
-    band:SetHeight(92)
+    band:SetHeight(96)
+
+    local icon = f:CreateTexture(nil, 'ARTWORK')
+    icon:SetSize(64, 64)
+    icon:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -30)
+    icon:SetTexture(ICON)
+    -- trim the icon's built-in border so it sits flush
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local iconRing = f:CreateTexture(nil, 'OVERLAY')
+    iconRing:SetPoint('TOPLEFT', icon, 'TOPLEFT', -3, 3)
+    iconRing:SetPoint('BOTTOMRIGHT', icon, 'BOTTOMRIGHT', 3, -3)
+    iconRing:SetColorTexture(1, 0.82, 0, 0.25)
 
     local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormalHuge')
-    title:SetPoint('TOP', f, 'TOP', 0, -28)
-    title:SetText(GOLD .. "What's New|r")
+    title:SetPoint('TOPLEFT', icon, 'TOPRIGHT', 16, -2)
+    title:SetTextColor(1, 0.82, 0)
+    title:SetText("What's New")
 
     local product = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormalLarge')
-    product:SetPoint('TOP', title, 'BOTTOM', 0, -6)
-    product:SetText('DragonflightUI ' .. GREY .. DF:GetVersion() .. '|r')
+    product:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -4)
+    product:SetText('DragonflightUI |cff9d9d9d' .. DF:GetVersion() .. '|r')
 
-    local subtitle = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
-    subtitle:SetPoint('TOP', product, 'BOTTOM', 0, -6)
-    subtitle:SetText(GREY .. 'Maintained by MendleM  -  originally by Karl-Heinz Schneider|r')
+    local credits = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+    credits:SetPoint('TOPLEFT', product, 'BOTTOMLEFT', 0, -4)
+    credits:SetTextColor(0.62, 0.62, 0.62)
+    credits:SetText('Maintained by MendleM  -  originally by Karl-Heinz Schneider')
 
-    AddRule(f, band, -2)
+    local headRule = f:CreateTexture(nil, 'OVERLAY')
+    headRule:SetColorTexture(1, 0.82, 0, 0.6)
+    headRule:SetHeight(2)
+    headRule:SetPoint('TOPLEFT', band, 'BOTTOMLEFT', 0, -1)
+    headRule:SetPoint('TOPRIGHT', band, 'BOTTOMRIGHT', 0, -1)
 
     local close = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate')
-    close:SetSize(160, 26)
-    close:SetPoint('BOTTOM', f, 'BOTTOM', 0, 18)
+    close:SetSize(170, 28)
+    close:SetPoint('BOTTOM', f, 'BOTTOM', 0, 20)
     close:SetText(CLOSE or 'Close')
     close:SetScript('OnClick', function() Changelog:Hide() end)
 
     local footer = f:CreateFontString(nil, 'OVERLAY', 'GameFontDisableSmall')
     footer:SetPoint('BOTTOM', close, 'TOP', 0, 8)
-    footer:SetText('Reopen any time from Settings > General > What\'s New')
+    footer:SetText("Reopen any time from Settings > General > What's New, or /df whatsnew")
 
     local scroll = CreateFrame('ScrollFrame', 'DragonflightUIWhatsNewScroll', f, 'UIPanelScrollFrameTemplate')
-    scroll:SetPoint('TOPLEFT', f, 'TOPLEFT', 24, -118)
-    scroll:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -38, 74)
+    scroll:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -124)
+    scroll:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -(PAD + 16), 78)
 
     local content = CreateFrame('Frame', nil, scroll)
-    content:SetSize(WIDTH - 80, 1)
+    content:SetSize(WIDTH - (PAD * 2) - 20, 1)
     scroll:SetScrollChild(content)
 
-    local body = content:CreateFontString(nil, 'ARTWORK', 'GameFontHighlight')
-    body:SetPoint('TOPLEFT', content, 'TOPLEFT', 0, 0)
-    body:SetWidth(WIDTH - 80)
-    body:SetJustifyH('LEFT')
-    body:SetJustifyV('TOP')
-    body:SetSpacing(3)
-    -- wrapped bullet text lines up under itself rather than under the dash
-    if body.SetIndentedWordWrap then body:SetIndentedWordWrap(true) end
-    f.Body = body
     f.Content = content
+    f.ContentWidth = WIDTH - (PAD * 2) - 20
 
     -- Escape closes it, like any other dialog.
     if UISpecialFrames then table.insert(UISpecialFrames, 'DragonflightUIWhatsNewFrame') end
@@ -164,10 +210,13 @@ end
 function Changelog:Show()
     local f = CreateWindow()
 
-    f.Body:SetText(BuildText())
-    -- the scroll child has to be as tall as the text, or there is nothing to
-    -- scroll through
-    f.Content:SetHeight(math.max(f.Body:GetStringHeight() + 8, 1))
+    -- Built once. The notes do not change within a session, and rebuilding
+    -- would mean tearing down every FontString first.
+    if not f.Built then
+        f.Built = true
+        local height = BuildBody(f.Content, f.ContentWidth)
+        f.Content:SetHeight(math.max(height, 1))
+    end
 
     f:Show()
 end
