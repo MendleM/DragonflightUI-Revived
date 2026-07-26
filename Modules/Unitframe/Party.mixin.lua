@@ -430,17 +430,11 @@ function SubModuleMixin:SetupModern()
             manabar:GetStatusBarTexture():AddMaskTexture(manaMask)
         end
 
-        -- The DF border sits on the overlay, i.e. above the bar child
-        -- frames, and its inner region is not fully transparent - measured
-        -- against the source art, the bars were rendering at ~50% of the
-        -- texture's brightness, uniformly across the whole gradient, which
-        -- is the signature of a translucent dark layer on top. Lift the
-        -- bars above the overlay so nothing paints over them.
-        if overlay then
-            local lvl = overlay:GetFrameLevel() + 1
-            if pf.HealthBar then pf.HealthBar:SetFrameLevel(lvl) end
-            if pf.ManaBar then pf.ManaBar:SetFrameLevel(lvl) end
-        end
+        -- NOTE: lifting the bars above PartyMemberOverlay was tried here to
+        -- test whether the overlay art was dimming them. It made the bars
+        -- outlive the frame art in transitional states (a disconnected
+        -- member rendered as a bar floating over nothing), so the bars stay
+        -- in Blizzard's layering.
 
         -- Blizzard flips health-bar desaturation in UpdateOnlineStatus and
         -- the flag could stay stuck on a pooled frame reused for a
