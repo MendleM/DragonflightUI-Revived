@@ -9,7 +9,7 @@
 ## Notes-esES: La interfaz moderna para la versión clásica.|n|cffbbbbbbPor Karl-Heinz Schneider|r|n|n|TInterface/Addons/DragonflightUI/Textures/Art/coffee:12:12|t |cff82c5ffbuymeacoffee.com/karlheinzschneider|r
 ## Notes-esMX: La interfaz moderna para la versión clásica.|n|cffbbbbbbPor Karl-Heinz Schneider|r|n|n|TInterface/Addons/DragonflightUI/Textures/Art/coffee:12:12|t |cff82c5ffbuymeacoffee.com/karlheinzschneider|r
 ## Author: Karl-Heinz Schneider
-## X-Website: https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI
+## X-Website: https://github.com/MendleM/DragonflightUI-Revived
 ## X-Curse-Project-ID: 819757
 ## Version: @project-version@
 ## X-Date: @project-date-integer@
