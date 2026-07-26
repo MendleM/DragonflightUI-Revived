@@ -685,7 +685,7 @@ do
     L["UIShowQuestlevelDesc"] = "Display the quest level next to the quest name."
     L["UIMovableWindows"] = "Movable Windows"
     L["UIMovableWindowsDesc"] =
-        "Drag the character, trade, inspect, quest log, spellbook and talent windows by their title bar, and remember where you put them.\n\nThese windows then stop rearranging each other, so more than one can be open at a time."
+        "Drag the character, trade, inspect, quest log, spellbook and talent windows by their title bar, and remember where you put them.\n\nA window you have moved stops taking part in the game's own window arranging, so it stays put and can be open alongside the others. Windows you never move are left exactly as they are."
     L["UIMovableWindowsReset"] = "Reset Window Positions"
     L["UIMovableWindowsResetButton"] = "Reset"
     L["UIMovableWindowsResetDesc"] =

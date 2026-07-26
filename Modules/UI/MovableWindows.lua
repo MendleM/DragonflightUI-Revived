@@ -47,6 +47,7 @@ local DRAG_STRIP_HEIGHT = 28
 -- once per frame for the session and stands down on the detached[] check, so
 -- toggling the option off and on again does not stack duplicates.
 local detached = {}
+local dragInstalled = {}
 local showHooked = {}
 local waiting = {}
 
@@ -102,7 +103,14 @@ local function SavePosition(entry, frame)
     }
 end
 
+local Detach
+
 local function InstallDrag(entry, frame)
+    -- remember what the window shipped as, so Restore can put it back
+    if not dragInstalled[entry.key] then
+        dragInstalled[entry.key] = {frame = frame, movable = frame:IsMovable() and true or false}
+    end
+
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:RegisterForDrag('LeftButton')
@@ -126,13 +134,22 @@ local function InstallDrag(entry, frame)
         self.DFWindowMoving = nil
         self:StopMovingOrSizing()
 
+        -- The window leaves the panel layout here, at the first drag, and not
+        -- before. Detaching up front looked equivalent and is not: a window
+        -- that has never been moved has no position of its own to fall back
+        -- on, and lands on its raw XML anchor - CharacterFrame's is
+        -- TOPLEFT 0,-104, flush against the left edge of the screen. The panel
+        -- manager is what normally places it, so leave it in charge until the
+        -- player expresses an opinion.
+        Detach(entry)
         SavePosition(entry, self)
     end)
 end
 
--- Take one window out of the panel layout. Runs once per window; the original
--- area is kept so Restore can hand the window back.
-local function Detach(entry)
+-- Take one window out of the panel layout. Called at the first drag, or at
+-- setup for a window that already carries a saved position. The original area
+-- is kept so Restore can hand the window back.
+function Detach(entry)
     if detached[entry.key] then return end
 
     local frame = _G[entry.frame]
@@ -164,6 +181,14 @@ local function Detach(entry)
             if not present then table.insert(UISpecialFrames, entry.frame) end
         end
     end
+end
+
+-- Make a window draggable without changing where it opens. Nothing here takes
+-- it out of the panel layout: a window the player has never moved keeps
+-- Blizzard's placement, which is the only sensible default it has.
+local function Setup(entry)
+    local frame = _G[entry.frame]
+    if not frame or not frame.SetMovable then return end
 
     InstallDrag(entry, frame)
 
@@ -174,34 +199,49 @@ local function Detach(entry)
         end)
     end
 
-    ApplySaved(entry, frame)
+    -- Already moved in an earlier session: free it before its first show, or
+    -- the panel manager places it and our OnShow then yanks it across.
+    local positions = GetPositions()
+    if positions and positions[entry.key] then
+        Detach(entry)
+        ApplySaved(entry, frame)
+    end
 end
 
--- Hand a window back to Blizzard's panel manager.
+-- Undo both halves: the drag, and the detach if it happened. Setup and Detach
+-- are separate states now - a window can be draggable without having been
+-- moved - so this has to unwind whichever of them are in effect, not just the
+-- detach.
 local function Restore(entry)
     local record = detached[entry.key]
-    if not record then return end
-    detached[entry.key] = nil
+    if record then
+        detached[entry.key] = nil
 
-    local frame = record.frame
+        if record.panel then
+            if SetUIPanelAttribute then SetUIPanelAttribute(record.frame, 'area', record.area) end
 
-    if record.panel then
-        if SetUIPanelAttribute then SetUIPanelAttribute(frame, 'area', record.area) end
-
-        if UISpecialFrames then
-            for i = #UISpecialFrames, 1, -1 do
-                if UISpecialFrames[i] == entry.frame then table.remove(UISpecialFrames, i) end
+            if UISpecialFrames then
+                for i = #UISpecialFrames, 1, -1 do
+                    if UISpecialFrames[i] == entry.frame then table.remove(UISpecialFrames, i) end
+                end
             end
         end
+        -- The panel manager re-places it on the next show, so nothing to
+        -- reposition here.
     end
 
-    frame:SetMovable(false)
-    frame:RegisterForDrag()
-    frame:SetScript('OnDragStart', nil)
-    frame:SetScript('OnDragStop', nil)
+    local dragState = dragInstalled[entry.key]
+    if dragState then
+        dragInstalled[entry.key] = nil
 
-    -- The panel manager re-places it on the next show, so nothing to reposition
-    -- here.
+        local frame = dragState.frame
+        frame:RegisterForDrag()
+        frame:SetScript('OnDragStart', nil)
+        frame:SetScript('OnDragStop', nil)
+        -- back to whatever the window shipped as: CharacterFrame's own XML
+        -- declares movable="true", so do not flatly clear it
+        frame:SetMovable(dragState.movable)
+    end
 end
 
 -- Called on every ApplySettings, so the option toggles live in both directions.
@@ -209,7 +249,7 @@ function MovableWindows:Update()
     local enabled = IsEnabled()
 
     for _, entry in ipairs(WINDOWS) do
-        local run = enabled and Detach or Restore
+        local run = enabled and Setup or Restore
 
         if enabled and entry.addon and not DF:IsAddOnLoaded(entry.addon) then
             -- Load-on-demand: the frame does not exist until its addon loads.
@@ -220,7 +260,7 @@ function MovableWindows:Update()
                 waiting[entry.key] = true
                 Module:FuncOrWaitframe(entry.addon, function()
                     waiting[entry.key] = nil
-                    if IsEnabled() then Detach(entry) end
+                    if IsEnabled() then Setup(entry) end
                 end)
             end
         else
@@ -239,8 +279,12 @@ function MovableWindows:ResetPositions()
 
     for _, entry in ipairs(WINDOWS) do
         local record = detached[entry.key]
+        Restore(entry)
+
+        -- A window that was detached is holding a point we set. Drop it and let
+        -- the panel manager place it again; re-showing an open one is what makes
+        -- the reset visible immediately rather than on its next open.
         if record then
-            Restore(entry)
             local frame = record.frame
             frame:ClearAllPoints()
             if frame:IsShown() and ShowUIPanel then
@@ -250,6 +294,6 @@ function MovableWindows:ResetPositions()
         end
     end
 
-    -- re-detach if the option is still on, so dragging keeps working
+    -- re-arm dragging if the option is still on
     MovableWindows:Update()
 end
