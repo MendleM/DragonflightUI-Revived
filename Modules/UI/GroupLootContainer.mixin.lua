@@ -174,11 +174,38 @@ function SubModuleMixin:Setup()
     });
 end
 
+-- Roll-type icons for the leading-roll line and the winner toast. Retail's
+-- lootroll atlas (shipped as uilootroll) instead of the classic dice/coin.
+local ROLL_ART_PATH = 'Interface\\Addons\\DragonflightUI\\Textures\\uilootroll'
 local ROLL_TYPE_ICON = {
-    [1] = 'Interface\\Buttons\\UI-GroupLoot-Dice-Up', -- need
-    [2] = 'Interface\\Buttons\\UI-GroupLoot-Coin-Up', -- greed
-    [3] = 'Interface\\Buttons\\UI-GroupLoot-DE-Up' -- disenchant
+    [1] = ROLL_ART_PATH, -- need
+    [2] = ROLL_ART_PATH, -- greed
+    [3] = ROLL_ART_PATH -- disenchant
 }
+-- 32px 'up' state per roll type, as texcoords on the 512x512 sheet
+local ROLL_TYPE_COORDS = {
+    [1] = {65 / 512, 97 / 512, 237 / 512, 269 / 512}, -- need
+    [2] = {1 / 512, 33 / 512, 431 / 512, 463 / 512}, -- greed
+    [3] = {1 / 512, 33 / 512, 329 / 512, 361 / 512} -- disenchant
+}
+
+-- Inline form for chat-style strings: an atlas sheet needs explicit texel
+-- coords (|Tpath:h:w:xOff:yOff:sheetW:sheetH:l:r:t:b|t) or the whole
+-- 512x512 sheet gets squashed into the icon.
+local ROLL_TYPE_INLINE = {
+    [1] = '|T' .. ROLL_ART_PATH .. ':11:11:0:0:512:512:65:97:237:269|t',
+    [2] = '|T' .. ROLL_ART_PATH .. ':11:11:0:0:512:512:1:33:431:463|t',
+    [3] = '|T' .. ROLL_ART_PATH .. ':11:11:0:0:512:512:1:33:329:361|t'
+}
+
+local function ApplyRollTypeIcon(texture, rollType)
+    local path = ROLL_TYPE_ICON[rollType]
+    if not (texture and path) then return false end
+    texture:SetTexture(path)
+    local c = ROLL_TYPE_COORDS[rollType]
+    if c then texture:SetTexCoord(c[1], c[2], c[3], c[4]) end
+    return true
+end
 
 local function FindItemIdxForRoll(rollID)
     if not (rollID and C_LootHistory and C_LootHistory.GetNumItems) then return nil end
@@ -209,9 +236,7 @@ function SubModuleMixin:UpdateTopRoll(f)
                 else
                     topRoll:SetText(name)
                 end
-                local tex = ROLL_TYPE_ICON[rollType]
-                if tex then
-                    rollIcon:SetTexture(tex)
+                if ApplyRollTypeIcon(rollIcon, rollType) then
                     rollIcon:Show()
                 else
                     rollIcon:Hide()
@@ -285,8 +310,7 @@ function SubModuleMixin:ShowWinnerToast(itemIdx)
 
     local color = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
     local coloredName = (color and color.colorStr) and ('|c' .. color.colorStr .. name .. '|r') or name
-    local typeIcon = ROLL_TYPE_ICON[rollType]
-    local typeTag = typeIcon and (' |T' .. typeIcon .. ':11:11|t') or ''
+    local typeTag = ROLL_TYPE_INLINE[rollType] and (' ' .. ROLL_TYPE_INLINE[rollType]) or ''
     local rollTag = roll and (' (' .. roll .. ')') or ''
     toast.Text:SetFormattedText('%s%s%s  %s', coloredName, typeTag, rollTag, itemLink or '')
     toast:SetAlpha(1)
@@ -805,26 +829,65 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
             btn:GetPushedTexture():SetTexCoord(left, right, top, bottom)
         end
 
+        -- Retail's roll icons, from the lootroll atlas we ship
+        -- (uilootroll, 512x512): the 32px toast icons come with up, down
+        -- and highlight states, unlike the classic dice/coin art.
+        local ROLL_ART = 'Interface\\Addons\\DragonflightUI\\Textures\\uilootroll'
+        local function coords(l, t) return l / 512, (l + 32) / 512, t / 512, (t + 32) / 512 end
+        local MODERN_ICONS = {
+            need = {up = coords(65, 237), down = coords(1, 465), highlight = coords(65, 203)},
+            greed = {up = coords(1, 431), down = coords(1, 363), highlight = coords(1, 397)},
+            pass = {up = coords(65, 339), down = coords(65, 271), highlight = coords(65, 305)},
+            disenchant = {up = coords(1, 329), down = coords(1, 261), highlight = coords(1, 295)}
+        }
+
+        local function applyModernArt(btn, key)
+            local art = MODERN_ICONS[key]
+            if not (btn and art) then return false end
+
+            btn:SetNormalTexture(ROLL_ART)
+            btn:SetPushedTexture(ROLL_ART)
+            btn:SetHighlightTexture(ROLL_ART)
+
+            local normal, pushed, highlight = btn:GetNormalTexture(), btn:GetPushedTexture(),
+                                              btn:GetHighlightTexture()
+            if normal then normal:SetTexCoord(art.up[1], art.up[2], art.up[3], art.up[4]) end
+            if pushed then pushed:SetTexCoord(art.down[1], art.down[2], art.down[3], art.down[4]) end
+            if highlight then
+                highlight:SetTexCoord(art.highlight[1], art.highlight[2], art.highlight[3], art.highlight[4])
+                highlight:SetBlendMode('ADD')
+            end
+            return true
+        end
+
         local pass = f.PassButton;
         pass:SetSize(btnSize, btnSize)
         pass:ClearAllPoints()
         pass:SetPoint('RIGHT', f, 'RIGHT', -8, 4)
-        pass:SetNormalTexture('Interface\\Buttons\\UI-GroupLoot-Pass-Up')
-        pass:SetHighlightTexture('Interface\\Buttons\\UI-GroupLoot-Pass-Highlight')
-        pass:SetPushedTexture('Interface\\Buttons\\UI-GroupLoot-Pass-Down')
-        updateTexCoords(pass, 0)
+        if not applyModernArt(pass, 'pass') then
+            pass:SetNormalTexture('Interface\\Buttons\\UI-GroupLoot-Pass-Up')
+            pass:SetHighlightTexture('Interface\\Buttons\\UI-GroupLoot-Pass-Highlight')
+            pass:SetPushedTexture('Interface\\Buttons\\UI-GroupLoot-Pass-Down')
+            updateTexCoords(pass, 0)
+        end
 
         local greed = f.GreedButton
         greed:SetSize(btnSize, btnSize)
         greed:ClearAllPoints()
         greed:SetPoint('RIGHT', pass, 'LEFT', -padding, 0)
-        updateTexCoords(greed, 2)
+        if not applyModernArt(greed, 'greed') then updateTexCoords(greed, 2) end
 
         local need = f.NeedButton;
         need:SetSize(btnSize, btnSize)
         need:ClearAllPoints()
         need:SetPoint('RIGHT', greed, 'LEFT', -padding, 0)
-        updateTexCoords(need, 1)
+        if not applyModernArt(need, 'need') then updateTexCoords(need, 1) end
+
+        local diss = f.DisenchantButton
+        if diss then
+            diss:SetSize(btnSize, btnSize)
+            applyModernArt(diss, 'disenchant')
+        end
     end
 
     -- Current leading roll, retail-style: class-colored "Name (roll)" with
