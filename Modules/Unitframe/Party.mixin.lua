@@ -406,6 +406,7 @@ function SubModuleMixin:SetupModern()
             healthbar:SetPoint('TOPLEFT', 44, -19)
             healthbar:SetStatusBarTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
             healthbar:SetStatusBarColor(1, 1, 1, 1)
+            healthbar.lockColor = true
 
             local fontPath = STANDARD_TEXT_FONT or 'Fonts\\FRIZQT__.ttf'
 
@@ -441,6 +442,7 @@ function SubModuleMixin:SetupModern()
             manabar:SetPoint('TOPLEFT', 41, -30)
             manabar:SetStatusBarTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Mana')
             manabar:SetStatusBarColor(1, 1, 1, 1)
+            manabar.lockColor = true
 
             if not manabar.DFManaBarText then
                 manabar.DFManaBarText = manabar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
