@@ -930,10 +930,22 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
             -- frame's size it cannot line up: the stroke has to sit proud of the
             -- frame by however much margin the art carries. Hence a tunable
             -- size rather than a copy of the background's.
-            local tex = glow:CreateTexture(nil, 'BACKGROUND', nil, -2)
+            -- On top of the frame, not behind it.
+            --
+            -- The in-combat art is the same frame with its border recoloured
+            -- solid and a glow either side of that border - inner and outer. It
+            -- is meant to sit over the frame so the red ring takes the place of
+            -- the gold one. Put behind, the opaque ring hides exactly the part
+            -- that matters, which is what made the last attempt look like
+            -- ghosting rather than a lit-up border.
+            local tex = glow:CreateTexture(nil, 'ARTWORK', nil, 3)
             tex:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
-            tex:SetBlendMode('ADD')
             glow.Tex = tex
+
+            -- ADD brightens what is under it; BLEND paints over it. Which one
+            -- reads as "the ring is now solid red" depends on the art, so it is
+            -- switchable from the tuner.
+            glow.Blend = 'ADD'
 
             glow.Width = ART_W
             glow.Height = ART_H
@@ -947,6 +959,7 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
             function glow:ApplyGlow()
                 local t = self.Tex
 
+                t:SetBlendMode(self.Blend or 'ADD')
                 t:SetTexCoord(ART_L, self.CoordRight, ART_T, self.CoordBottom)
                 t:SetSize(self.Width, self.Height)
                 t:ClearAllPoints()

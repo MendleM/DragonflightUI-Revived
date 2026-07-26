@@ -550,10 +550,24 @@ function DF:FlashTune()
             if tuner.Glow then tuner.Glow.Intensity = v end
         end)
 
+        -- ADD brightens, BLEND paints over. Which reads as a solid recoloured
+        -- ring rather than a wash depends on the art, so try both.
+        local blend = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate')
+        blend:SetSize(250, 22)
+        blend:SetPoint('TOPLEFT', f, 'TOPLEFT', 26, -352)
+        blend:SetText('Blend mode: ADD')
+        blend:SetScript('OnClick', function(self)
+            local g = tuner.Glow
+            if not g then return end
+            g.Blend = (g.Blend == 'ADD') and 'BLEND' or 'ADD'
+            self:SetText('Blend mode: ' .. g.Blend)
+        end)
+        f.BlendButton = blend
+
         -- The art that used to be used, for comparison: same cut and size as
         -- the frame draws it, on a dark swatch so the red reads.
         local caption = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
-        caption:SetPoint('TOPLEFT', f, 'TOPLEFT', 26, -350)
+        caption:SetPoint('TOPLEFT', f, 'TOPLEFT', 26, -384)
         caption:SetText('|cff9d9d9dShipped in-combat art, for comparison|r')
 
         local swatch = f:CreateTexture(nil, 'BACKGROUND')
@@ -633,6 +647,8 @@ function DF:FlashTune()
     _G['DragonflightUIFlashTuneCoordRight']:SetValue(glow.CoordRight or 0.75)
     _G['DragonflightUIFlashTuneCoordBottom']:SetValue(glow.CoordBottom or 0.523)
     _G['DragonflightUIFlashTuneIntensity']:SetValue(glow.Intensity or 1)
+
+    if tuner.BlendButton then tuner.BlendButton:SetText('Blend mode: ' .. (glow.Blend or 'ADD')) end
 
     tuner:Show()
     -- re-attached on every open, since closing clears it
