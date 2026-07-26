@@ -683,6 +683,14 @@ do
     L["UIColoredInventoryItemsDesc"] = "Toggle to color inventory items based on their quality."
     L["UIShowQuestlevel"] = "Show Questlevel"
     L["UIShowQuestlevelDesc"] = "Display the quest level next to the quest name."
+    L["UIMovableWindows"] = "Movable Windows"
+    L["UIMovableWindowsDesc"] =
+        "Drag the character, trade, inspect, quest log, spellbook and talent windows by their title bar, and remember where you put them.\n\nThese windows then stop rearranging each other, so more than one can be open at a time."
+    L["UIMovableWindowsReset"] = "Reset Window Positions"
+    L["UIMovableWindowsResetButton"] = "Reset"
+    L["UIMovableWindowsResetDesc"] =
+        "Forget every saved window position and hand the windows back to the game's own placement."
+
     L["UIFrames"] = "Frames"
     L["UIFramesDesc"] = "Options for modifying various in-game frames."
     L["UIChangeCharacterFrame"] = "Change CharacterFrame"

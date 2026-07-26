@@ -30,8 +30,11 @@ local defaults = {
             changeTradeskill = true,
             changeTrainer = true,
             changeTalents = true,
-            questLevel = true
+            questLevel = true,
+            movableWindows = true
         },
+        -- one saved anchor per window; absent means "never moved"
+        movableWindowPositions = {},
         roll = Module.SubGroupLootContainer.Defaults,
         widgetBelow = {
             scale = 1,
@@ -118,6 +121,29 @@ local UIOptions = {
             name = L["UIShowQuestlevel"],
             desc = L["UIShowQuestlevelDesc"] .. getDefaultStr('questLevel', 'first'),
             order = 23
+        },
+        headerMovable = {
+            type = 'header',
+            name = L["UIMovableWindows"],
+            desc = L["UIMovableWindowsDesc"],
+            order = 50
+        },
+        movableWindows = {
+            type = 'toggle',
+            name = L["UIMovableWindows"],
+            desc = L["UIMovableWindowsDesc"] .. getDefaultStr('movableWindows', 'first'),
+            order = 51,
+            new = true
+        },
+        resetWindowPositions = {
+            type = 'execute',
+            name = L["UIMovableWindowsReset"],
+            btnName = L["UIMovableWindowsResetButton"],
+            desc = L["UIMovableWindowsResetDesc"],
+            func = function()
+                if addonTable.MovableWindows then addonTable.MovableWindows:ResetPositions() end
+            end,
+            order = 52
         },
         headerFrames = {type = 'header', name = L["UIFrames"], desc = L["UIFramesDesc"], order = 100},
         changeCharacterframe = {
@@ -455,6 +481,11 @@ function Module:ApplySettingsInternal(sub, key)
     Module:UpdateWidgetBelowState(db.widgetBelow)
 
     self.SubGroupLootContainer:UpdateState(db.roll)
+
+    -- Deliberately not a ConditionalOption: that helper only ever runs its
+    -- body once, and this option has to take effect in both directions
+    -- without a reload.
+    if addonTable.MovableWindows then addonTable.MovableWindows:Update() end
 end
 
 function Module:ChangeFrames()
