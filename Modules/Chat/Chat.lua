@@ -336,6 +336,33 @@ function Module.SetDockClamping(chatFrame, docked)
     end
 end
 
+-- The combat log needs a strip of its own above the mirror.
+--
+-- Its quick button bar ("My actions", "What happened to me?") is anchored to
+-- the log's own top edge, which is where the dock keeps its tabs - so Blizzard
+-- wraps FCF_DockUpdate to call Blizzard_CombatLog_AdjustCombatLogHeight, which
+-- pushes the docked log's TOPLEFT down by the bar's height and leaves the tab
+-- row clear. Re-anchoring the mirror above discards that: SetAllPoints pins the
+-- log flush against the primary again. Blizzard's adjustment runs inside
+-- FCF_DockUpdate and ours a frame later, so ours is the one that sticks, and
+-- the bar sits on top of the tabs. Blizzard's function is a local, so redo what
+-- it does - keeping its anchor, offsetting only the height.
+local function ReserveCombatLogQuickButtons(dock)
+    local log = COMBATLOG
+    if not (log and log.isDocked and log ~= dock.primary and log.CombatLogQuickButtonFrame) then return end
+
+    local height = log.CombatLogQuickButtonFrame:GetHeight()
+    if not height or height <= 0 then return end
+
+    for i = 1, log:GetNumPoints() do
+        local point, relativeTo, relativePoint, x = log:GetPoint(i)
+        if point == 'TOPLEFT' then
+            log:SetPoint('TOPLEFT', relativeTo, relativePoint, x, -height)
+            return
+        end
+    end
+end
+
 function Module.FixDockedFrames()
     local dock = GENERAL_CHAT_DOCK
     if not (dock and dock.primary and FCFDock_GetChatFrames) then return end
@@ -355,6 +382,8 @@ function Module.FixDockedFrames()
     end
 
     if FCFDock_ForceReanchoring then FCFDock_ForceReanchoring(dock) end
+
+    ReserveCombatLogQuickButtons(dock)
 end
 
 local frame = CreateFrame('FRAME', 'DragonflightUIChatFrame', UIParent)
