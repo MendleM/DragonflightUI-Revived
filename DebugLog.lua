@@ -22,8 +22,13 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log frame <name>   a frame's whole visibility chain
 --     /df log regions <name> [depth]  every region and child of a frame;
 --                          with a depth, recurses into what is visible
+--     /df log bars <name>  every status bar under a frame: bar colour, texture
+--                          vertex colour, desaturation, alpha, lockColor
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
+--
+-- frame, regions and bars all take 'mouse' instead of a name, for whatever is
+-- under the cursor - handy when the frame's name is what you want to find out.
 --
 -- The buffer is per session: it is reset on load, so the file on disk always
 -- holds the session that just ended. Copy anything worth keeping before a
@@ -216,6 +221,75 @@ function DF:LogRegions(frameOrName, tag, maxDepth)
     walk(f, 0, '')
 end
 
+-- Resolves a name, or 'mouse' for whatever is under the cursor - the quickest
+-- way to point the log at a frame whose name you do not know.
+local function ResolveFrame(nameOrMouse)
+    if type(nameOrMouse) ~= 'string' then return nameOrMouse end
+
+    if nameOrMouse:lower() ~= 'mouse' then return _G[nameOrMouse] end
+
+    local focus
+    if GetMouseFoci then
+        local foci = GetMouseFoci()
+        focus = foci and foci[1]
+    elseif GetMouseFocus then
+        focus = GetMouseFocus()
+    end
+    return focus
+end
+
+-- Why does this bar look wrong? A status bar's colour comes from three places
+-- that can each mute it - the bar colour, the texture's own vertex colour, and
+-- desaturation - on top of the alpha chain. Dumps all of them for every bar
+-- under a frame.
+function DF:LogBars(frameOrName, tag, maxDepth)
+    tag = tag or 'bars'
+    maxDepth = tonumber(maxDepth) or 3
+
+    local f = ResolveFrame(frameOrName)
+    if type(f) ~= 'table' or not f.GetObjectType then
+        DF:Log(tag, 'no such frame: %s', tostring(frameOrName))
+        return
+    end
+
+    DF:Log(tag, '=== bars under %s ===', (f.GetName and f:GetName()) or '<anonymous>')
+
+    local function describe(bar, prefix)
+        local tex = bar:GetStatusBarTexture()
+        local r, g, b, a = bar:GetStatusBarColor()
+        local tr, tg, tb, ta = 1, 1, 1, 1
+        if tex and tex.GetVertexColor then tr, tg, tb, ta = tex:GetVertexColor() end
+
+        DF:Log(tag, '%s%s: barColor=%.2f/%.2f/%.2f/%.2f texVertex=%.2f/%.2f/%.2f/%.2f', prefix,
+               (bar.GetName and bar:GetName()) or '<anonymous>', r or -1, g or -1, b or -1, a or -1, tr, tg, tb, ta)
+        DF:Log(tag, '%s  desaturated=%s/%s alpha=%.2f effAlpha=%.2f lockColor=%s shown=%s', prefix,
+               tostring(tex and tex.IsDesaturated and tex:IsDesaturated()),
+               tostring(bar.IsStatusBarDesaturated and bar:IsStatusBarDesaturated()), bar:GetAlpha() or -1,
+               (bar.GetEffectiveAlpha and bar:GetEffectiveAlpha()) or -1, tostring(bar.lockColor),
+               tostring(bar:IsShown()))
+        DF:Log(tag, '%s  texture=%s', prefix, tostring(tex and tex.GetTexture and tex:GetTexture()))
+    end
+
+    local function walk(frame, depth, prefix)
+        if frame:GetObjectType() == 'StatusBar' then describe(frame, prefix) end
+        if depth >= maxDepth then return end
+
+        for _, child in ipairs({frame:GetChildren()}) do
+            if child.GetObjectType then walk(child, depth + 1, prefix .. '  ') end
+        end
+    end
+
+    walk(f, 0, '')
+
+    -- the unit behind it, so a deliberately dimmed offline member is not
+    -- mistaken for a styling bug
+    local unit = f.unit or f.unitToken
+    if unit and UnitExists(unit) then
+        DF:Log(tag, 'unit=%s name=%s connected=%s dead=%s', unit, tostring(UnitName(unit)),
+               tostring(UnitIsConnected(unit)), tostring(UnitIsDeadOrGhost(unit)))
+    end
+end
+
 function DF:LogDump(filter, limit)
     local matching = {}
     for _, entry in ipairs(log) do
@@ -258,17 +332,25 @@ function DF:HandleLogCommand(rest)
         DF:LogEcho(not DF:LogIsEchoing())
     elseif sub == 'frame' then
         if arg == '' then
-            print(PREFIX .. 'usage: /df log frame <FrameName>')
+            print(PREFIX .. 'usage: /df log frame <FrameName|mouse>')
         else
-            DF:LogFrame(arg, 'framedump')
+            DF:LogFrame(ResolveFrame(arg) or arg, 'framedump')
             DF:LogDump('framedump', 40)
+        end
+    elseif sub == 'bars' then
+        local frameName, depth = arg:match('^(%S+)%s*(%S*)$')
+        if not frameName or frameName == '' then
+            print(PREFIX .. 'usage: /df log bars <FrameName|mouse> [depth]')
+        else
+            DF:LogBars(frameName, 'bardump', depth)
+            DF:LogDump('bardump', 60)
         end
     elseif sub == 'regions' then
         local frameName, depth = arg:match('^(%S+)%s*(%S*)$')
         if not frameName or frameName == '' then
-            print(PREFIX .. 'usage: /df log regions <FrameName> [depth]')
+            print(PREFIX .. 'usage: /df log regions <FrameName|mouse> [depth]')
         else
-            DF:LogRegions(frameName, 'regiondump', depth)
+            DF:LogRegions(ResolveFrame(frameName) or frameName, 'regiondump', depth)
             DF:LogDump('regiondump', 80)
         end
     else
