@@ -2184,22 +2184,30 @@ function Module:EnableOutOfCombat()
         end)
         Helper:RunSteps(steps, self, 'Actionbar')
     else
-        Helper:Benchmark('EnableAddonSpecific', function()
-            self:EnableAddonSpecific()
-        end, 0, self)
-        Helper:Benchmark('SetupActionbarFrames', function()
-            self:SetupActionbarFrames()
-        end, 0, self)
-        Helper:Benchmark('AddStateUpdater', function()
-            Module.AddStateUpdater()
-        end, 0, self)
-        Helper:Benchmark('AddEditMode', function()
-            self:AddEditMode()
-        end, 0, self)
-        Helper:Benchmark('RegisterOptionScreens', function()
-            self:RegisterOptionScreens()
-        end, 0, self)
-        Module:ApplySettings('ALL')
+        -- Isolate each phase. These ran as five bare calls in a row, so an error
+        -- anywhere in the first one took the rest with it - and the first is
+        -- EnableAddonSpecific, all the per-flavour restyling. A single refused
+        -- SetPoint in the MoP micro menu therefore meant SetupActionbarFrames
+        -- never ran and the player had no action bars at all, while the options
+        -- still reported them as on.
+        --
+        -- The Era path gets this for free: RunSteps pcalls every step, for
+        -- exactly this reason. Cosmetic work must not be able to stop the bars
+        -- from being built.
+        local function step(label, fn)
+            Helper:Benchmark(label, function()
+                local ok, err = pcall(fn)
+                if not ok then geterrorhandler()('DFUI Actionbar enable (' .. label .. '): ' .. tostring(err)) end
+            end, 0, self)
+        end
+
+        step('EnableAddonSpecific', function() self:EnableAddonSpecific() end)
+        step('SetupActionbarFrames', function() self:SetupActionbarFrames() end)
+        step('AddStateUpdater', function() Module.AddStateUpdater() end)
+        step('AddEditMode', function() self:AddEditMode() end)
+        step('RegisterOptionScreens', function() self:RegisterOptionScreens() end)
+
+        step('ApplySettingsALL', function() Module:ApplySettings('ALL') end)
         self:SecureHook(DF, 'RefreshConfig', function()
             Module:ApplySettings('ALL')
             Module:RefreshOptionScreens()

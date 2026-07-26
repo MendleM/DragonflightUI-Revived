@@ -271,12 +271,18 @@ function DragonflightUIMicroMenuMixin:ChangeButtons()
         self:ChangeMicroMenuButton(StoreMicroButton, 'Shop')
         self:ChangeMicroMenuButton(MainMenuMicroButton, 'GameMenu')
 
-        MainMenuBarTextureExtender:Hide()
+        if MainMenuBarTextureExtender then MainMenuBarTextureExtender:Hide() end
 
-        -- MainMenuBarPerformanceBar:ClearAllPoints()
-        MainMenuBarPerformanceBar:SetPoint('BOTTOM', MainMenuMicroButton, 'BOTTOM', 0, 0)
-        MainMenuBarPerformanceBar:SetSize(19, 39)
-        MainMenuBarPerformanceBar:Hide() -- TODO
+        -- Anchoring the performance bar onto a micro button asks the client to
+        -- join two anchor families, which it refuses outright - and the point
+        -- was pointless anyway, since the very next line hides the frame. The
+        -- refusal threw, and because this runs first in the enable sequence it
+        -- took the whole thing with it: the bars were never built at all.
+        --
+        -- If it turns out Hide() does not stick here - the Edit Mode layout
+        -- re-shows managed frames on some flavours - the Era branch above parks
+        -- it under a hidden holder instead.
+        if MainMenuBarPerformanceBar then MainMenuBarPerformanceBar:Hide() end
 
         -- self:HookMicromenuOverride()
     elseif DF.Cata then
