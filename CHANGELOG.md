@@ -9,6 +9,17 @@ Everything before v0.40.3 is in
 
 ## Revived (26 July 2026)
 
+### Movable windows (new)
+
+- The character pane, trade window, inspect, quest log, spellbook and talent
+  window can be dragged by their title bar, and stay where you put them
+- Settings → Misc → **Movable Windows**, with a Reset button that hands every
+  window back to the game's own placement
+- Windows you never move are left exactly where the game puts them. A window
+  only stops taking part in the game's window arranging once you have moved it
+  — which is also what lets it stay open alongside the others, so the character
+  pane and trade window can finally sit side by side
+
 ### Errors and combat blocks
 
 - Fixed the error when casting certain spells
