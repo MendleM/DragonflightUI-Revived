@@ -491,8 +491,28 @@ function SubModuleMixin:ShowPreview(seconds)
     -- Lift it while previewing, and put it back afterwards.
     if not holder.DFBaseStrata then holder.DFBaseStrata = holder:GetFrameStrata() end
     holder:SetFrameStrata('FULLSCREEN_DIALOG')
+
+    -- The holder is only anchored by Update(), which returns early while the
+    -- feature is disabled - an unanchored frame renders nothing at all. Give
+    -- it a position, and the preview a size, before showing.
+    if holder:GetNumPoints() == 0 or not holder:GetLeft() then
+        local state = self.state
+        local parent = (state and DF.Settings.ValidateFrame(state.customAnchorFrame) and
+                           _G[state.customAnchorFrame]) or (state and _G[state.anchorFrame]) or UIParent
+        holder:ClearAllPoints()
+        if state then
+            holder:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
+        else
+            holder:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, 200)
+        end
+    end
+    if (fake:GetWidth() or 0) < 2 then fake:SetSize(256, 50) end
+
     holder:Show()
     fake:Show()
+
+    DF:Print(('loot roll preview at %d,%d (%dx%d)'):format((holder:GetLeft() or 0), (holder:GetBottom() or 0),
+                                                           (fake:GetWidth() or 0), (fake:GetHeight() or 0)))
 
     if self.PreviewTimer then self.PreviewTimer:Cancel() end
     self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function()

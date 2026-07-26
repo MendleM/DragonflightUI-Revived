@@ -313,7 +313,7 @@ function DFSettingsCategoryElementMixin:Init(node)
     -- can open them and enable the module from their own page), so do not
     -- dim them into looking broken. Mark them instead.
     local label = elementData.elementInfo.name
-    if elementData.isEnabled == false and elementData.DFCanEnableModule then
+    if not elementData.isEnabled and elementData.DFCanEnableModule then
         label = label .. ' |cff808080(off)|r'
     end
     self.Label:SetText(label)
