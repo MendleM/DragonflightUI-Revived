@@ -307,6 +307,7 @@ end
 -- health 71x10 @ 44,-19, mana 74x7 @ 41,-30) using the parentKeys the
 -- pooled PartyMemberFrameTemplate exposes.
 function SubModuleMixin:SetupModern()
+    local subModule = self
     local ATLAS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\uipartyframe'
     local BARS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\'
     local UpdateRoleIcon, UpdateBars
@@ -478,13 +479,33 @@ function SubModuleMixin:SetupModern()
 
         local shade = UnitIsConnected(unit) and 1 or 0.5
 
+        local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
+
         local healthbar = pf.HealthBar
         if healthbar then
             -- (re)assert here too, not just at first styling: frames styled
             -- before this ran would otherwise keep Blizzard's tint until a
             -- reload recreated them.
             healthbar.lockColor = true
-            healthbar:SetStatusBarColor(shade, shade, shade, 1)
+
+            -- Retail's plain Bar-Health art is a muted green (49,153,8) and
+            -- looks dull next to the player frame. The class-color and
+            -- gradient options - which the classic reskin honours but this
+            -- path never did - swap in the greyscale -Status art and tint
+            -- it, exactly like PlayerFrame does.
+            local tex = healthbar:GetStatusBarTexture()
+            local r, g, b = shade, shade, shade
+            if tex and state and state.classcolor then
+                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+                local _, class = UnitClass(unit)
+                r, g, b = DF:GetClassColor(class, 1)
+            elseif tex and state and state.gradient then
+                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+                r, g, b = Helper:ColorGradiant(Helper:GetUnitHealthPercent(unit))
+            elseif tex then
+                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
+            end
+            healthbar:SetStatusBarColor(r * shade, g * shade, b * shade, 1)
         end
 
         local manabar = pf.ManaBar
@@ -517,6 +538,22 @@ function SubModuleMixin:SetupModern()
         hooksecurefunc(PartyFrame, 'InitializePartyMemberFrames', styleAll)
     end
     styleAll()
+
+    -- Gradient coloring follows current health, so it needs health events.
+    -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would
+    -- fire for every unit in a raid.
+    for _, units in ipairs({{'party1', 'party2'}, {'party3', 'party4'}}) do
+        local healthWatcher = CreateFrame('Frame')
+        healthWatcher:RegisterUnitEvent('UNIT_HEALTH', units[1], units[2])
+        healthWatcher:SetScript('OnEvent', function(_, _, unit)
+            local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
+            if not (state and state.gradient) then return end
+            if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
+            for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+                if pf.DFStyled and (pf.unit == unit or pf.unitToken == unit) then UpdateBars(pf) end
+            end
+        end)
+    end
 
     local roleWatcher = CreateFrame('Frame')
     roleWatcher:RegisterEvent('GROUP_ROSTER_UPDATE')
