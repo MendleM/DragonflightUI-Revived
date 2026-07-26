@@ -344,10 +344,26 @@ function SubModuleMixin:SetupModern()
             end
         end
 
-        -- DF border goes on the overlay: above the bar child-frames (its
-        -- purpose in Blizzard's layout), below the overlay's icons/name.
-        local borderHolder = overlay or pf
-        local border = borderHolder:CreateTexture(nil, 'BORDER')
+        -- The frame art goes BEHIND the bars, on pf, not on the overlay.
+        --
+        -- This art is not a hollow border: the atlas region carries the
+        -- frame's dark interior with it. Sampled against the bars' own rects
+        -- it averages RGBA (28,27,25,166) over the health bar and
+        -- (31,30,28,177) over the mana bar - a near-black layer at ~65%
+        -- opacity. On the overlay, which is a child FRAME, it draws above the
+        -- bar frames whatever layer it sits on, and that is what made the bars
+        -- look permanently dimmed: they were rendering at roughly a third of
+        -- the texture's brightness.
+        --
+        -- Raising the bars above the overlay was tried first and reverted: it
+        -- left them outliving the frame art in transitional states (a
+        -- disconnected member showed as a bar floating over nothing). Putting
+        -- the art underneath instead fixes the dimming AND keeps the art and
+        -- the bars appearing and disappearing together. Nothing is lost by
+        -- moving it: the overlay's own ring and vehicle art are cleared just
+        -- above, and its name and role icons are separate children that still
+        -- draw on top.
+        local border = pf:CreateTexture(nil, 'BACKGROUND', nil, 1)
         border:SetSize(120, 49)
         border:SetTexture(ATLAS)
         border:SetTexCoord(0.480469, 0.949219, 0.222656, 0.414062)
