@@ -168,11 +168,15 @@ function SubModuleMixin:SetDefaults()
         showTopRoll = true,
         showWinnerToast = true,
         showItemName = true,
+        previewCount = 3,
         anchorFrame = 'UIParent',
         customAnchorFrame = '',
         anchor = 'BOTTOM',
         anchorParent = 'BOTTOM',
-        x = 425, -- 0
+        -- retail's GroupLootContainer is a bottom managed frame (layoutIndex
+        -- 3), so it sits bottom-CENTRE above the action bars and stacks
+        -- upwards - not off to the right as this defaulted to (x = 425)
+        x = 0,
         y = 200 -- 152 = default blizz
     };
     self.Defaults = defaults;
@@ -250,6 +254,16 @@ function SubModuleMixin:SetupOptions()
             if not ok then DF:Log('rollpreview', 'ShowPreview ERROR: %s', tostring(err)) end
         end,
         order = 0.6
+    }
+    rollOptions.args.previewCount = {
+        type = 'range',
+        name = 'Preview rolls',
+        desc = 'How many sample rolls the preview pops, so a whole drop can be judged'
+            .. ' rather than a single item.' .. getDefaultStr('previewCount', 'roll'),
+        min = 1,
+        max = 4,
+        bigStep = 1,
+        order = 0.65
     }
     rollOptions.args.scale = {
         type = 'range',
@@ -644,24 +658,35 @@ function SubModuleMixin:GetSettingsPreview()
 
     local holder = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreview', UIParent)
     holder:SetSize(RETAIL.borderWidth, RETAIL.borderHeight)
-    -- the settings window is HIGH + toplevel, so anything below TOOLTIP can
-    -- end up behind it depending on where the rolls are configured to sit
-    holder:SetFrameStrata('TOOLTIP')
+    -- Above the settings window (HIGH + toplevel) but below TOOLTIP: at
+    -- TOOLTIP the sample rolls drew over their own button tooltips.
+    holder:SetFrameStrata('FULLSCREEN_DIALOG')
     holder:Hide()
+    holder.Rolls = {}
 
-    local fake = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreviewRoll', holder,
-                             'DFEditModePreviewGroupLootTemplate')
-    fake:SetPoint('CENTER')
-    DF:Log('rollpreview', 'created preview frames, template applied=%s', tostring(fake.IconFrame ~= nil))
-
-    self:PrepPreviewFrame(fake)
-
-    local ok, err = pcall(function() self:UpdateGroupLootFrameStyle(fake) end)
-    if not ok then DF:Log('rollpreview', 'style ERROR: %s', tostring(err)) end
-
-    holder.FakePreview = fake
     self.SettingsPreview = holder
     return holder
+end
+
+-- One sample roll frame, created on demand. Up to four, because that is how
+-- many roll frames the game itself keeps.
+function SubModuleMixin:GetPreviewRoll(index)
+    local holder = self:GetSettingsPreview()
+    if holder.Rolls[index] then return holder.Rolls[index] end
+
+    local roll = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreviewRoll' .. index, holder,
+                             'DFEditModePreviewGroupLootTemplate')
+    DF:Log('rollpreview', 'created preview roll %d, template applied=%s', index, tostring(roll.IconFrame ~= nil))
+
+    self:PrepPreviewFrame(roll)
+
+    local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, roll)
+    if not ok then DF:Log('rollpreview', 'roll %d style ERROR: %s', index, tostring(err)) end
+
+    holder.Rolls[index] = roll
+    -- the first one keeps the old field name; the winner toast anchors to it
+    if index == 1 then holder.FakePreview = roll end
+    return roll
 end
 
 -- The preview template comes with a mixin that picks a random item AND
@@ -725,7 +750,6 @@ function SubModuleMixin:ShowPreview(seconds)
     DF:Log('rollpreview', 'ShowPreview() entered')
 
     local holder = self:GetSettingsPreview()
-    local fake = holder.FakePreview
     local state = self.state or self.Defaults
     DF:Log('rollpreview', 'state source=%s anchor=%s/%s frame=%s x=%s y=%s scale=%s',
            self.state and 'profile' or 'defaults', tostring(state.anchor), tostring(state.anchorParent),
@@ -745,24 +769,42 @@ function SubModuleMixin:ShowPreview(seconds)
     holder:SetAlpha(1)
     holder:Show()
 
-    -- a fresh item each time, so the quality art can be seen doing its job
-    SubModuleMixin.SetPreviewItem(fake, PREVIEW_ITEMS[fastrandom(1, #PREVIEW_ITEMS)])
+    -- A whole drop, not a single item: the rolls stack exactly the way
+    -- GroupLootContainer_Update stacks the real ones - each frame centred
+    -- reservedSize * (i - 0.5) above the container's bottom edge - so the
+    -- preview shows what four simultaneous rolls will actually cover.
+    local count = math.floor(math.max(1, math.min(4, state.previewCount or 3)))
+    local first
 
-    fake:SetAlpha(1)
-    fake:Show()
+    for i = 1, 4 do
+        local roll = (i <= count) and self:GetPreviewRoll(i) or holder.Rolls[i]
+        if roll and i <= count then
+            roll:ClearAllPoints()
+            roll:SetPoint('CENTER', holder, 'BOTTOM', 0, RETAIL.reservedSize * (i - 0.5))
+            -- a different item per roll, and different each time, so the
+            -- quality colouring can be seen doing its job
+            SubModuleMixin.SetPreviewItem(roll, PREVIEW_ITEMS[fastrandom(1, #PREVIEW_ITEMS)])
+            roll:SetAlpha(1)
+            roll:Show()
+            first = first or roll
+        elseif roll then
+            roll:Hide()
+        end
+    end
 
     -- Say where it went. A preview that lands off-screen or behind another
     -- frame is indistinguishable from a button that does nothing.
-    DF:Print(('loot roll preview: %s at %d,%d (%dx%d) - /df log rollpreview for details'):format(
-                 fake:IsVisible() and 'shown' or 'NOT VISIBLE', (holder:GetLeft() or -1), (holder:GetBottom() or -1),
-                 (fake:GetWidth() or 0), (fake:GetHeight() or 0)))
+    local shownText = (first and first:IsVisible()) and 'shown' or 'NOT VISIBLE'
+    local left, bottom = holder:GetLeft() or -1, holder:GetBottom() or -1
+    DF:Print(('loot roll preview: %d roll(s), %s at %d,%d - /df log rollpreview for details'):format(count, shownText,
+                                                                                                    left, bottom))
 
     DF:LogFrame(holder, 'rollpreview')
-    DF:LogFrame(fake, 'rollpreview')
+    if first then DF:LogFrame(first, 'rollpreview') end
 
     if self.PreviewTimer then self.PreviewTimer:Cancel() end
     self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function()
-        DF:Log('rollpreview', 'preview timer expired, hiding (still visible=%s)', tostring(fake:IsVisible()))
+        DF:Log('rollpreview', 'preview timer expired, hiding')
         holder:Hide()
     end)
 end
