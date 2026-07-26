@@ -862,37 +862,62 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
     if flash and DF.Wrath then
         flash:SetTexture('')
 
-        if not self.TargetFrameFlash then
-            local newFlash = frame:CreateTexture('DragonflightUITargetFrameFlash')
+        -- Keyed per frame, the way the background texture right above is.
+        --
+        -- This function dresses four different frames - the target, the focus,
+        -- each boss frame and the edit-mode preview - and the glow is a child of
+        -- whichever one it was first created for. Cached under one shared key,
+        -- the second frame through here adopts the first frame's texture: the
+        -- glow then draws at the first frame's position and size while a
+        -- different frame is the one in combat, which is a glow sitting away
+        -- from the frame it belongs to and shaped for the wrong one.
+        local flashKey = frame:GetName() .. 'Flash'
+
+        if not self[flashKey] then
+            local newFlash = frame:CreateTexture('DragonflightUI' .. frame:GetName() .. 'Flash')
             newFlash:SetDrawLayer('ARTWORK', 2)
             newFlash:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
             newFlash:SetTexCoord(0, 376 / 512, 0, 134 / 256)
+            -- the in-combat art is the narrower piece of the same set, so this
+            -- is the background's 192x67 at -20,6 scaled to it
             newFlash:SetSize(188, 67)
             newFlash:SetPoint('CENTER', frame, 'CENTER', -21 + 0.5, 7 + 0.5)
 
             newFlash:SetVertexColor(1.0, 0.0, 0.0, 1.0)
             newFlash:SetBlendMode('ADD')
-            self.TargetFrameFlash = newFlash
+            self[flashKey] = newFlash
         end
 
-        hooksecurefunc(flash, 'Show', function()
-            -- print('show')
-            flash:SetTexture('')
-            self.TargetFrameFlash:Show()
-            if (UIFrameIsFlashing(self.TargetFrameFlash)) then
-            else
-                -- print('go flash')
-                local dt = 0.5
-                UIFrameFlash(self.TargetFrameFlash, dt, dt, -1)
-            end
-        end)
+        -- kept for anything still reading the old field
+        self.TargetFrameFlash = self[flashKey]
 
-        hooksecurefunc(flash, 'Hide', function()
-            -- print('hide')
-            flash:SetTexture('')
-            if (UIFrameIsFlashing(self.TargetFrameFlash)) then UIFrameFlashStop(self.TargetFrameFlash) end
-            self.TargetFrameFlash:Hide()
-        end)
+        -- Hook once per frame. This runs again on every settings apply, and
+        -- stacked hooks meant every combat flash started another UIFrameFlash on
+        -- the same texture.
+        if not self[flashKey .. 'Hooked'] then
+            self[flashKey .. 'Hooked'] = true
+
+            local ownFlash = self[flashKey]
+
+            hooksecurefunc(flash, 'Show', function()
+                -- print('show')
+                flash:SetTexture('')
+                ownFlash:Show()
+                if (UIFrameIsFlashing(ownFlash)) then
+                else
+                    -- print('go flash')
+                    local dt = 0.5
+                    UIFrameFlash(ownFlash, dt, dt, -1)
+                end
+            end)
+
+            hooksecurefunc(flash, 'Hide', function()
+                -- print('hide')
+                flash:SetTexture('')
+                if (UIFrameIsFlashing(ownFlash)) then UIFrameFlashStop(ownFlash) end
+                ownFlash:Hide()
+            end)
+        end
     end
 
     if not self.PortraitExtra then
