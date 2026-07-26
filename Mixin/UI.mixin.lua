@@ -1498,27 +1498,10 @@ function DragonflightUIMixin:ChangeCharacterFrameEra()
     inset:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMLEFT', 332, 4)
     frame.DFInset = inset
 
-    -- This inset holds the paperdoll's pane background and the gear slot
-    -- pillars, so it belongs to the Character tab alone - but it is a child of
-    -- CharacterFrame, which every tab shares, so it was drawn over Pet,
-    -- Reputation and Skills as well. Tie it to the paperdoll's own visibility
-    -- rather than re-parenting it: half the pane (the expand button, the right
-    -- inset, the slot buttons) anchors to it, and moving it in the frame
-    -- hierarchy would reshuffle what draws above what.
-    if PaperDollFrame then
-        inset:SetShown(PaperDollFrame:IsShown())
-
-        PaperDollFrame:HookScript('OnShow', function()
-            inset:Show()
-            -- the pane is only wide on the character tab
-            if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(frame.Expanded) end
-        end)
-
-        PaperDollFrame:HookScript('OnHide', function()
-            inset:Hide()
-            if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(false) end
-        end)
-    end
+    -- The inset itself is the recessed background for EVERY tab - Pet,
+    -- Reputation, Skills and Honor all sit in it - so it stays put. Only the
+    -- paperdoll art drawn on it is character-specific; see DFPanelBackground
+    -- below.
     -- _G['DragonflightUICharacterFrameInsetBg']:SetAlpha(0.25)
 
     -- Item Slots
@@ -1540,6 +1523,26 @@ function DragonflightUIMixin:ChangeCharacterFrameEra()
         bg:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\uicharacterpanel2x')
         bg:SetTexCoord(1 / 1024, 451 / 1024, 1 / 512, 421 / 512)
         bg:SetAllPoints(inset)
+        frame.DFPanelBackground = bg
+
+        -- This art has the gear-slot pillars baked in, so it belongs to the
+        -- Character tab alone; on Pet, Reputation and Skills it was drawn
+        -- behind their content. The inset it sits on is shared, which is why
+        -- only the art is toggled here.
+        if PaperDollFrame then
+            bg:SetShown(PaperDollFrame:IsShown())
+
+            PaperDollFrame:HookScript('OnShow', function()
+                bg:Show()
+                -- the pane is only wide on the Character tab
+                if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(frame.Expanded) end
+            end)
+
+            PaperDollFrame:HookScript('OnHide', function()
+                bg:Hide()
+                if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(false) end
+            end)
+        end
     end
 
     -- Retail slot frames, 1:1: each paperdoll button carries a piece of
