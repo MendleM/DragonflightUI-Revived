@@ -370,7 +370,15 @@ function SubModuleMixin:SetupModern()
         if name then
             name:ClearAllPoints()
             name:SetPoint('TOPLEFT', pf, 'TOPLEFT', 46, -6)
-            name:SetWidth(74)
+            -- Stop the name before the role icon (12px, inset 5 from the
+            -- right edge of the 120px frame) instead of running underneath
+            -- it, and hold it to a single line: with wrapping left on, a
+            -- long name spilled onto a second line and pushed itself down
+            -- over the health bar.
+            name:SetWidth(UnitGroupRolesAssigned and 54 or 68)
+            name:SetHeight(12)
+            name:SetWordWrap(false)
+            if name.SetMaxLines then name:SetMaxLines(1) end
             name:SetJustifyH('LEFT')
         end
 
