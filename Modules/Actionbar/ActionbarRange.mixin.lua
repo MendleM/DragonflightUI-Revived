@@ -240,6 +240,24 @@ function SubModuleMixin:Setup()
     end
 end
 
+-- On 1.15.9 the ActionButton_UpdateUsable global no longer exists, so the
+-- hook above never installs and our recoloring only ever ran off range
+-- events. Anything else that repainted a button (ACTION_USABLE_CHANGED, a
+-- macro re-resolving to a different spell) left Blizzard's flat colors in
+-- place - and because Blizzard's UpdateUsable never clears desaturation,
+-- an icon we desaturated for out-of-range could stay grey until the next
+-- range event, which is what "grey buttons that recover on mouseover"
+-- was. Buttons own a copy of the mixin method, so hook per button.
+function SubModuleMixin:HookButtonUsable(btn)
+    if not btn or btn.DFUsableHooked or type(btn.UpdateUsable) ~= 'function' then return end
+    btn.DFUsableHooked = true
+
+    hooksecurefunc(btn, 'UpdateUsable', function(b)
+        if not self.activate then return end
+        self:UpdateRangeAndUsable(b, b.checksRange or false, b.inRange or false)
+    end)
+end
+
 function SubModuleMixin:OnEvent(event, ...)
     -- print('event', event, ...)
 end

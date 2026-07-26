@@ -2589,9 +2589,31 @@ function Module:GetSetupActionbarSteps()
         if UIPARENT_MANAGED_FRAME_POSITIONS then UIPARENT_MANAGED_FRAME_POSITIONS.StanceBarFrame = nil; end
     end}
 
+    steps[#steps + 1] = {'HookUsable', function() Module.HookUsableRepaints() end}
     steps[#steps + 1] = {'SlotChangedFilter', function() Module.InstallSlotChangedFilter() end}
 
     return steps
+end
+
+-- Every button that can be repainted by the client must also repaint in
+-- DFUI's colors, or Blizzard's flat grey/blue survives on our bars (and
+-- our out-of-range desaturation never gets cleared). Runs late, once all
+-- bars exist.
+function Module.HookUsableRepaints()
+    local range = Module.SubActionbarRange
+    if not (range and range.HookButtonUsable) then return end
+
+    local bef = _G['ActionBarButtonEventsFrame']
+    if bef and bef.frames then
+        for _, btn in pairs(bef.frames) do range:HookButtonUsable(btn) end
+    end
+
+    for _, key in ipairs({'bar1', 'bar2', 'bar3', 'bar4', 'bar5', 'bar6', 'bar7', 'bar8', 'petbar'}) do
+        local bar = Module[key]
+        if bar and bar.buttonTable then
+            for _, btn in ipairs(bar.buttonTable) do range:HookButtonUsable(btn) end
+        end
+    end
 end
 
 -- #showtooltip [@mouseover] macros make the client fire one
@@ -2624,6 +2646,13 @@ function Module.InstallSlotChangedFilter()
                 local tex = C_ActionBar.GetActionTexture(slot)
                 if btn.icon and tex then btn.icon:SetTexture(tex) end
                 if btn.UpdateCount then btn:UpdateCount() end
+                -- A macro keeps the same action signature while resolving
+                -- to a different spell, so usability can change under an
+                -- unchanged slot. Blizzard's full path repainted on every
+                -- one of these events; skipping it left icons stuck in the
+                -- previous spell's colors (the grey-until-mouseover bug).
+                -- IsUsableAction is a plain query - no table churn.
+                if btn.UpdateUsable then btn:UpdateUsable() end
                 if GameTooltip:GetOwner() == btn and btn.SetTooltip then btn:SetTooltip() end
             end
         end
