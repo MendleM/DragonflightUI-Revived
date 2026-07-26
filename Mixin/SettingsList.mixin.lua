@@ -50,8 +50,6 @@ function ScrollableListItemMixinDF:Init(elementData)
         self.Item.Button:Show()
         self.Item.Button.Button:SetText(data.btnName)
         self.Item.Button:RegisterCallback('OnClick', function(self, ...)
-            local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
-            if DF.Log then DF:Log('settings', 'button handler running (legacy list): %s', tostring(key)) end
             data.func()
         end)
     elseif data.type == 'description' then

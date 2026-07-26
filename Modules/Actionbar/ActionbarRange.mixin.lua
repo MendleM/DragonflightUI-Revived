@@ -262,8 +262,6 @@ function SubModuleMixin:HookButtonUsable(btn)
         local ok, err = pcall(self.UpdateRangeAndUsable, self, b, b.checksRange or false, b.inRange or false)
         if not ok and not self.DFUsableErrorLogged then
             self.DFUsableErrorLogged = true
-            local log = DragonflightUIPerfLog
-            if log and #log < 400 then log[#log + 1] = 'USABLEERR ' .. tostring(err) end
             geterrorhandler()('DFUI ActionbarRange:UpdateUsable: ' .. tostring(err))
         end
     end)

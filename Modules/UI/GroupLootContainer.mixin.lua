@@ -125,7 +125,6 @@ local function ApplyRollButtonArt(btn, key)
     end
 
     local useAtlas = art.atlas and btn.SetNormalAtlas and AtlasExists(art.atlas .. '-up')
-    if DF.Log then DF:Log('lootstyle', 'button %s art via %s', key, useAtlas and 'client atlas' or 'shipped sheet') end
 
     if useAtlas then
         btn:SetNormalAtlas(art.atlas .. '-up')
@@ -251,9 +250,7 @@ function SubModuleMixin:SetupOptions()
         func = function()
             -- logged on the button side as well as inside ShowPreview: a
             -- missing entry here means the click never reached the option
-            DF:Log('rollpreview', 'Show button clicked')
-            local ok, err = pcall(function() self:ShowPreview() end)
-            if not ok then DF:Log('rollpreview', 'ShowPreview ERROR: %s', tostring(err)) end
+            self:ShowPreview()
         end,
         order = 0.6
     }
@@ -705,12 +702,10 @@ function SubModuleMixin:GetPreviewRoll(index)
 
     local roll = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreviewRoll' .. index, holder,
                              'DFEditModePreviewGroupLootTemplate')
-    DF:Log('rollpreview', 'created preview roll %d, template applied=%s', index, tostring(roll.IconFrame ~= nil))
-
     self:PrepPreviewFrame(roll)
 
     local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, roll)
-    if not ok then DF:Log('rollpreview', 'roll %d style ERROR: %s', index, tostring(err)) end
+    if not ok then geterrorhandler()('DFUI loot roll preview restyle: ' .. tostring(err)) end
 
     holder.Rolls[index] = roll
     -- the first one keeps the old field name; the winner toast anchors to it
@@ -776,13 +771,8 @@ end
 -- Shows a sample roll where the real ones will appear, so the settings page
 -- can be judged without waiting for a group loot roll.
 function SubModuleMixin:ShowPreview(seconds)
-    DF:Log('rollpreview', 'ShowPreview() entered')
-
     local holder = self:GetSettingsPreview()
     local state = self.state or self.Defaults
-    DF:Log('rollpreview', 'state source=%s anchor=%s/%s frame=%s x=%s y=%s scale=%s',
-           self.state and 'profile' or 'defaults', tostring(state.anchor), tostring(state.anchorParent),
-           tostring(state.anchorFrame), tostring(state.x), tostring(state.y), tostring(state.scale))
 
     local parent
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
@@ -822,21 +812,8 @@ function SubModuleMixin:ShowPreview(seconds)
         end
     end
 
-    -- Say where it went. A preview that lands off-screen or behind another
-    -- frame is indistinguishable from a button that does nothing.
-    local shownText = (first and first:IsVisible()) and 'shown' or 'NOT VISIBLE'
-    local left, bottom = holder:GetLeft() or -1, holder:GetBottom() or -1
-    DF:Print(('loot roll preview: %d roll(s), %s at %d,%d - /df log rollpreview for details'):format(count, shownText,
-                                                                                                    left, bottom))
-
-    DF:LogFrame(holder, 'rollpreview')
-    if first then DF:LogFrame(first, 'rollpreview') end
-
     if self.PreviewTimer then self.PreviewTimer:Cancel() end
-    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function()
-        DF:Log('rollpreview', 'preview timer expired, hiding')
-        holder:Hide()
-    end)
+    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function() holder:Hide() end)
 end
 
 function SubModuleMixin:CreateRollPreview()
@@ -853,7 +830,6 @@ function SubModuleMixin:CreateRollPreview()
     -- OnEnable - a throw here used to abort the rest of that setup
     local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, fakePreview)
     if not ok then
-        DF:Log('lootstyle', 'edit mode preview style ERROR: %s', tostring(err))
         geterrorhandler()('DFUI loot roll preview restyle: ' .. tostring(err))
     end
     SubModuleMixin.SetPreviewItem(fakePreview, PREVIEW_ITEMS[1])
@@ -876,7 +852,6 @@ function SubModuleMixin:StyleRollFrames()
         -- default look until a reload.
         local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, f)
         if not ok then
-            DF:Log('lootstyle', 'GroupLootFrame%d style ERROR: %s', i, tostring(err))
             geterrorhandler()('DFUI loot roll restyle: ' .. tostring(err))
         end
         -- Blizzard's GroupLootFrame_OnShow re-applies the classic dialog
@@ -1338,8 +1313,6 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
     f.DFTopRollIcon:Hide()
 
     SubModuleMixin.ApplyDFBackdrop(f)
-
-    if DF.Log then DF:Log('lootstyle', '%s styled', (f.GetName and f:GetName()) or '<anonymous>') end
 
     -- Refresh cycle for LIVE frames only: at setup time these are hidden,
     -- and an unconditional Hide/Show popped four empty roll frames on login.
