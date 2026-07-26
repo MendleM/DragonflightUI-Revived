@@ -169,6 +169,7 @@ function SubModuleMixin:SetDefaults()
         showWinnerToast = true,
         showItemName = true,
         previewCount = 3,
+        rollSpacing = 33, -- retail: reservedSize 100 on a 67px frame
         anchorFrame = 'UIParent',
         customAnchorFrame = '',
         anchor = 'BOTTOM',
@@ -264,6 +265,17 @@ function SubModuleMixin:SetupOptions()
         max = 4,
         bigStep = 1,
         order = 0.65
+    }
+    rollOptions.args.rollSpacing = {
+        type = 'range',
+        name = 'Spacing between rolls',
+        desc = 'Vertical gap between stacked roll frames when several items drop at once.'
+            .. getDefaultStr('rollSpacing', 'roll'),
+        min = 0,
+        max = 100,
+        bigStep = 1,
+        order = 0.75,
+        editmode = true
     }
     rollOptions.args.scale = {
         type = 'range',
@@ -598,6 +610,16 @@ function SubModuleMixin:UpdateState(state)
     self:Update();
 end
 
+-- Vertical space one roll occupies in the stack: its own height plus the
+-- configured gap. Retail's reservedSize of 100 on a 67px frame is a 33px gap,
+-- which is the default here.
+function SubModuleMixin:GetReservedSize()
+    local state = self.state or self.Defaults
+    local gap = state.rollSpacing
+    if type(gap) ~= 'number' then gap = RETAIL.reservedSize - RETAIL.height end
+    return RETAIL.height + math.max(0, math.min(150, gap))
+end
+
 function SubModuleMixin:Update()
     local state = self.state;
     if not state then return end
@@ -633,6 +655,12 @@ function SubModuleMixin:Update()
     f:SetScale(scale)
     f:ClearAllPoints()
     f:SetPoint('BOTTOM', preview, 'BOTTOM', 0, 0)
+
+    -- Spacing between stacked rolls. Blizzard drives the whole stack off
+    -- reservedSize (frame height + gap), so setting it and re-running the
+    -- container's own layout applies the change to rolls already on screen.
+    f.reservedSize = self:GetReservedSize()
+    if GroupLootContainer_Update then pcall(GroupLootContainer_Update, f) end
 
     -- toggled pieces on the live frames
     for i = 1, 4 do
@@ -774,13 +802,14 @@ function SubModuleMixin:ShowPreview(seconds)
     -- reservedSize * (i - 0.5) above the container's bottom edge - so the
     -- preview shows what four simultaneous rolls will actually cover.
     local count = math.floor(math.max(1, math.min(4, state.previewCount or 3)))
+    local reserved = self:GetReservedSize()
     local first
 
     for i = 1, 4 do
         local roll = (i <= count) and self:GetPreviewRoll(i) or holder.Rolls[i]
         if roll and i <= count then
             roll:ClearAllPoints()
-            roll:SetPoint('CENTER', holder, 'BOTTOM', 0, RETAIL.reservedSize * (i - 0.5))
+            roll:SetPoint('CENTER', holder, 'BOTTOM', 0, reserved * (i - 0.5))
             -- a different item per roll, and different each time, so the
             -- quality colouring can be seen doing its job
             SubModuleMixin.SetPreviewItem(roll, PREVIEW_ITEMS[fastrandom(1, #PREVIEW_ITEMS)])
@@ -834,9 +863,9 @@ end
 -- Restyles the REAL roll frames - destructive, so it only runs once the
 -- 'roll' state confirms the feature is enabled (see Update).
 function SubModuleMixin:StyleRollFrames()
-    -- Space per roll slot. Retail reserves 100 for a 67px frame, and the
-    -- frames are now retail-sized, so keep its spacing too.
-    if _G['GroupLootContainer'] then _G['GroupLootContainer'].reservedSize = RETAIL.reservedSize end
+    -- Space per roll slot: frame height plus the configured gap (retail
+    -- reserves 100 for a 67px frame, i.e. a 33px gap).
+    if _G['GroupLootContainer'] then _G['GroupLootContainer'].reservedSize = self:GetReservedSize() end
 
     for i = 1, 4 do
         local f = _G['GroupLootFrame' .. i]
