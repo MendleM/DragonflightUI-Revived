@@ -506,7 +506,7 @@ function DF:FlashTune()
 
     if not tuner then
         local f = CreateFrame('Frame', 'DragonflightUIFlashTuneFrame', UIParent, 'BackdropTemplate')
-        f:SetSize(310, 470)
+        f:SetSize(310, 660)
         f:SetPoint('CENTER', UIParent, 'CENTER', 330, 0)
         f:SetFrameStrata('DIALOG')
         f:EnableMouse(true)
@@ -528,23 +528,32 @@ function DF:FlashTune()
         title:SetPoint('TOP', f, 'TOP', 0, -16)
         title:SetText('Target combat glow')
 
-        TunerSlider(f, 'Spread', 'Spread', 0, 40, 0.5, -44, function(v)
-            if tuner.Glow then tuner.Glow.Spread = v end
+        TunerSlider(f, 'Width', 'Width', 120, 340, 1, -44, function(v)
+            if tuner.Glow then tuner.Glow.Width = v end
         end)
-        TunerSlider(f, 'Intensity', 'Intensity', 0, 2, 0.05, -92, function(v)
-            if tuner.Glow then tuner.Glow.Intensity = v end
+        TunerSlider(f, 'Height', 'Height', 40, 200, 1, -88, function(v)
+            if tuner.Glow then tuner.Glow.Height = v end
         end)
-        TunerSlider(f, 'OffsetX', 'X offset', -60, 60, 1, -140, function(v)
+        TunerSlider(f, 'OffsetX', 'X offset', -80, 80, 1, -132, function(v)
             if tuner.Glow then tuner.Glow.OffsetX = v end
         end)
-        TunerSlider(f, 'OffsetY', 'Y offset', -60, 60, 1, -188, function(v)
+        TunerSlider(f, 'OffsetY', 'Y offset', -80, 80, 1, -176, function(v)
             if tuner.Glow then tuner.Glow.OffsetY = v end
+        end)
+        TunerSlider(f, 'CoordRight', 'Atlas right edge', 0.3, 1, 0.002, -220, function(v)
+            if tuner.Glow then tuner.Glow.CoordRight = v end
+        end)
+        TunerSlider(f, 'CoordBottom', 'Atlas bottom edge', 0.3, 1, 0.002, -264, function(v)
+            if tuner.Glow then tuner.Glow.CoordBottom = v end
+        end)
+        TunerSlider(f, 'Intensity', 'Intensity', 0, 2, 0.05, -308, function(v)
+            if tuner.Glow then tuner.Glow.Intensity = v end
         end)
 
         -- The art that used to be used, for comparison: same cut and size as
         -- the frame draws it, on a dark swatch so the red reads.
         local caption = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
-        caption:SetPoint('TOPLEFT', f, 'TOPLEFT', 26, -228)
+        caption:SetPoint('TOPLEFT', f, 'TOPLEFT', 26, -350)
         caption:SetText('|cff9d9d9dShipped in-combat art, for comparison|r')
 
         local swatch = f:CreateTexture(nil, 'BACKGROUND')
@@ -602,8 +611,9 @@ function DF:FlashTune()
             g:Show()
             g:SetAlpha(1)
 
-            self.Out:SetText(string.format('Spread %.1f   Intensity %.2f   Offset %.0f, %.0f', g.Spread, g.Intensity,
-                                           g.OffsetX, g.OffsetY))
+            self.Out:SetText(string.format(
+                                 'Size %.0f x %.0f   Offset %.0f, %.0f\nTexCoord 0, %.4f, 0, %.4f   Intensity %.2f',
+                                 g.Width, g.Height, g.OffsetX, g.OffsetY, g.CoordRight, g.CoordBottom, g.Intensity))
         end
 
         f:SetScript('OnHide', function(self)
@@ -616,10 +626,13 @@ function DF:FlashTune()
 
     tuner.Glow = glow
 
-    _G['DragonflightUIFlashTuneSpread']:SetValue(glow.Spread or 12)
-    _G['DragonflightUIFlashTuneIntensity']:SetValue(glow.Intensity or 1)
+    _G['DragonflightUIFlashTuneWidth']:SetValue(glow.Width or 192)
+    _G['DragonflightUIFlashTuneHeight']:SetValue(glow.Height or 67)
     _G['DragonflightUIFlashTuneOffsetX']:SetValue(glow.OffsetX or 0)
     _G['DragonflightUIFlashTuneOffsetY']:SetValue(glow.OffsetY or 0)
+    _G['DragonflightUIFlashTuneCoordRight']:SetValue(glow.CoordRight or 0.75)
+    _G['DragonflightUIFlashTuneCoordBottom']:SetValue(glow.CoordBottom or 0.523)
+    _G['DragonflightUIFlashTuneIntensity']:SetValue(glow.Intensity or 1)
 
     tuner:Show()
     -- re-attached on every open, since closing clears it

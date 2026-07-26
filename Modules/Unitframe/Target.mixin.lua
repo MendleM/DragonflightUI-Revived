@@ -917,38 +917,41 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
             glow:SetAllPoints(frame)
             glow:Hide()
 
-            glow.Layers = {}
-            for i = 1, 3 do
-                local tex = glow:CreateTexture(nil, 'BACKGROUND', nil, -(i + 1))
-                tex:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-2x')
-                tex:SetTexCoord(ART_L, ART_R, ART_T, ART_B)
-                tex:SetBlendMode('ADD')
-                glow.Layers[i] = tex
-            end
+            -- One texture, the shipped in-combat art.
+            --
+            -- Stacking scaled copies of the frame art was wrong: that art has
+            -- internal detail, so enlarging it produces offset copies of the
+            -- whole picture rather than a stroke, which reads as concentric
+            -- ghosts. The in-combat file is already what is wanted - a stroke
+            -- around the silhouette with a falloff, transparent inside.
+            --
+            -- The catch is that a glow lives OUTSIDE the outline, so its art
+            -- covers more ground than the frame does. Drawn at exactly the
+            -- frame's size it cannot line up: the stroke has to sit proud of the
+            -- frame by however much margin the art carries. Hence a tunable
+            -- size rather than a copy of the background's.
+            local tex = glow:CreateTexture(nil, 'BACKGROUND', nil, -2)
+            tex:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
+            tex:SetBlendMode('ADD')
+            glow.Tex = tex
 
-            -- Driven by these four, so /df flashtune can move them live and the
-            -- values it lands on drop straight back in here.
-            glow.Spread = 12
-            glow.Intensity = 1.0
+            glow.Width = ART_W
+            glow.Height = ART_H
             glow.OffsetX = ART_X
             glow.OffsetY = ART_Y
-            glow.Red, glow.Green, glow.Blue = 1.0, 0.1, 0.1
+            glow.CoordRight = ART_R
+            glow.CoordBottom = ART_B
+            glow.Intensity = 1.0
+            glow.Red, glow.Green, glow.Blue = 1.0, 0.15, 0.15
 
             function glow:ApplyGlow()
-                local count = #self.Layers
+                local t = self.Tex
 
-                for i, tex in ipairs(self.Layers) do
-                    -- innermost tightest and brightest, outermost widest and
-                    -- faintest, which is what reads as a falloff rather than
-                    -- three visible outlines
-                    local reach = self.Spread * (i / count)
-                    local alpha = self.Intensity * (0.55 / i)
-
-                    tex:SetSize(ART_W + reach * 2, ART_H + reach * 2)
-                    tex:ClearAllPoints()
-                    tex:SetPoint('CENTER', frame, 'CENTER', self.OffsetX, self.OffsetY)
-                    tex:SetVertexColor(self.Red, self.Green, self.Blue, alpha)
-                end
+                t:SetTexCoord(ART_L, self.CoordRight, ART_T, self.CoordBottom)
+                t:SetSize(self.Width, self.Height)
+                t:ClearAllPoints()
+                t:SetPoint('CENTER', frame, 'CENTER', self.OffsetX, self.OffsetY)
+                t:SetVertexColor(self.Red, self.Green, self.Blue, self.Intensity)
             end
 
             glow:ApplyGlow()
