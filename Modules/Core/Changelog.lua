@@ -13,10 +13,10 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local Changelog = {}
 DF.Changelog = Changelog
 
--- TEMP: always open on login, whatever has been seen, so the window can be
--- looked at without faking a version bump. Set back to false to restore
--- "once per version, until dismissed".
-local ALWAYS_SHOW = true
+-- Set true to force the window open on every login regardless of what has been
+-- seen, which is how the layout gets looked at without faking a version bump.
+-- Off for release: once per version, until dismissed.
+local ALWAYS_SHOW = false
 
 local WIDTH, HEIGHT = 780, 660
 local PAD = 26

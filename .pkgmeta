@@ -1,5 +1,9 @@
 package-as: DragonflightUI
 
+# Ship the written changelog rather than the one the packager generates from
+# commit messages, so a release carries the same notes as the in-game window.
+manual-changelog: CHANGELOG.md
+
 ignore:
   - Screenshots
   - "*.png"
