@@ -1497,6 +1497,28 @@ function DragonflightUIMixin:ChangeCharacterFrameEra()
     -- if DF.API.Version.IsWotlk then inset:SetPoint('TOPLEFT', frame, 'TOPLEFT', 4, -73) end
     inset:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMLEFT', 332, 4)
     frame.DFInset = inset
+
+    -- This inset holds the paperdoll's pane background and the gear slot
+    -- pillars, so it belongs to the Character tab alone - but it is a child of
+    -- CharacterFrame, which every tab shares, so it was drawn over Pet,
+    -- Reputation and Skills as well. Tie it to the paperdoll's own visibility
+    -- rather than re-parenting it: half the pane (the expand button, the right
+    -- inset, the slot buttons) anchors to it, and moving it in the frame
+    -- hierarchy would reshuffle what draws above what.
+    if PaperDollFrame then
+        inset:SetShown(PaperDollFrame:IsShown())
+
+        PaperDollFrame:HookScript('OnShow', function()
+            inset:Show()
+            -- the pane is only wide on the character tab
+            if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(frame.Expanded) end
+        end)
+
+        PaperDollFrame:HookScript('OnHide', function()
+            inset:Hide()
+            if frame.DFUpdateFrameWidth then frame:DFUpdateFrameWidth(false) end
+        end)
+    end
     -- _G['DragonflightUICharacterFrameInsetBg']:SetAlpha(0.25)
 
     -- Item Slots
