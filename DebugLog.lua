@@ -582,6 +582,26 @@ function DF:FlashTune()
         close:SetText(CLOSE or 'Close')
         close:SetScript('OnClick', function() f:Hide() end)
 
+        -- Hold it on screen while tuning.
+        --
+        -- The flash is shown and hidden by whether the target is in combat, so
+        -- a one-off Show is undone by the next update a moment later - and on
+        -- the Wrath path DFUI hooks Show and Hide on it as well. Rather than
+        -- fight either of them, re-assert everything a few times a second for
+        -- as long as the tuner is open.
+        f.Tick = function(self, elapsed)
+            self.since = (self.since or 0) + elapsed
+            if self.since < 0.1 then return end
+            self.since = 0
+
+            if self.Flash then self.Apply() end
+        end
+
+        f:SetScript('OnHide', function(self)
+            self:SetScript('OnUpdate', nil)
+            print(PREFIX .. 'tuner closed - /reload to put the glow back under the addon\'s control.')
+        end)
+
         tuner = f
     end
 
@@ -626,6 +646,8 @@ function DF:FlashTune()
     end
 
     tuner:Show()
+    -- re-attached on every open, since closing clears it
+    tuner:SetScript('OnUpdate', tuner.Tick)
     tuner.Apply()
     print(PREFIX .. 'tuning ' .. which .. '. Drag the sliders, then send me the line at the bottom.')
 end
