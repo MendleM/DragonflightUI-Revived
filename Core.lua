@@ -67,10 +67,23 @@ function DF:Dump(value)
     if showDebug then DevTools_Dump(value) end
 end
 
-function DF:ShowStartMessage()
+-- The Version field is only filled in by the release packager, so anyone
+-- running a git checkout or a zip of the repo reported "@project-version@"
+-- as their version - useless for triaging bug reports. Fall back to the
+-- literal X-DFUI-Version, marked as a dev build.
+function DF:GetVersion()
     local version = C_AddOns.GetAddOnMetadata('DragonflightUI', 'Version')
 
-    self:Print(version .. " loaded! Type '/dragonflight' or '/df' to open the options menu.")
+    if not version or version == '' or version:find('@', 1, true) then
+        local fallback = C_AddOns.GetAddOnMetadata('DragonflightUI', 'X-DFUI-Version')
+        version = (fallback and (fallback .. '-dev')) or 'unknown'
+    end
+
+    return version
+end
+
+function DF:ShowStartMessage()
+    self:Print(DF:GetVersion() .. " loaded! Type '/dragonflight' or '/df' to open the options menu.")
 end
 
 -- BLIZZ:
