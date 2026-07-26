@@ -2579,7 +2579,10 @@ function Module:GetSetupActionbarSteps()
             -- ActionBarActionEventsFrame drops them.
             for i = 1, 12 do
                 local btn = _G[barName .. 'Button' .. i]
-                if btn then
+                -- ...but on flavors where DFUI adopts these very buttons as
+                -- its own bars 6-8 (TBC) they are live and carry a BarRef.
+                -- Neutering those killed bars 6-8 outright.
+                if btn and not btn.BarRef then
                     btn:SetID(0)
                     btn:SetAttribute('action', 0)
                 end

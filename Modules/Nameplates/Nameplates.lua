@@ -8,19 +8,104 @@ local Module = DF:NewModule(mName, 'AceConsole-3.0', 'AceHook-3.0')
 
 Mixin(Module, DragonflightUIModulesMixin)
 
-local defaults = {profile = {classColors = true, modernStyle = true}}
+-- style: which nameplate look DFUI enforces at load.
+--   'THIN'    - the Dragonflight-style plate (thin bar, name above)
+--   'MODERN'  - Midnight's chunky plate (20px bar, name inside)
+--   'CLASSIC' - the classic Era look (border ring + level box)
+--   'BLIZZARD'- do not touch the CVar at all; whatever you set in
+--               Blizzard's options sticks across reloads
+local defaults = {profile = {classColors = true, modernStyle = true, style = 'THIN', styleTexture = true}}
 Module:SetDefaults(defaults)
+
+local function getDefaultStr(key, sub)
+    return Module:GetDefaultStr(key, sub)
+end
+
+local function setDefaultValues()
+    Module:SetDefaultValues()
+end
+
+local function getOption(info)
+    return Module:GetOption(info)
+end
+
+local function setOption(info, value)
+    Module:SetOption(info, value)
+end
+
+local styleValues = {
+    THIN = 'Dragonflight (thin bar, name above)',
+    MODERN = 'Midnight (thick bar, name inside)',
+    CLASSIC = 'Classic (border ring, level box)',
+    BLIZZARD = "Don't manage (use Blizzard's setting)"
+}
+
+local options = {
+    name = 'Nameplates',
+    desc = 'Nameplates',
+    get = getOption,
+    set = setOption,
+    type = 'group',
+    args = {
+        style = {
+            type = 'select',
+            name = 'Nameplate style',
+            desc = 'Which nameplate look to enforce.'
+                .. " Pick \"Don't manage\" to leave the style entirely to Blizzard's own settings"
+                .. ' - useful if you change it there and want it to stick across reloads.'
+                .. getDefaultStr('style'),
+            values = styleValues,
+            order = 1
+        },
+        styleTexture = {
+            type = 'toggle',
+            name = 'DragonflightUI plate styling',
+            desc = 'Apply the DragonflightUI health bar texture, outlined names and enemy level text.'
+                .. ' Turn this off for untouched, native plates (needs a /reload to fully restore).'
+                .. getDefaultStr('styleTexture'),
+            order = 2
+        },
+        classColors = {
+            type = 'toggle',
+            name = 'Class-colored enemy plates',
+            desc = 'Color enemy player health bars by class.' .. getDefaultStr('classColors'),
+            order = 3
+        }
+    }
+}
 
 function Module:OnInitialize()
     DF:Debug(self, 'Module ' .. mName .. ' OnInitialize()')
     self.db = DF.db:RegisterNamespace(mName, defaults)
+
+    hooksecurefunc(DF:GetModule('Config'), 'AddConfigFrame', function()
+        Module:RegisterSettings()
+    end)
+
     self:SetEnabledState(DF.ConfigModule:GetModuleEnabled(mName))
+
+    DF:RegisterModuleOptions(mName, options)
+end
+
+function Module:RegisterSettings()
+    local function register(name, data)
+        data.module = mName
+        DF.ConfigModule:RegisterSettingsElement(name, 'misc', data, true)
+    end
+
+    register('nameplates', {order = 2, name = 'Nameplates', descr = 'Nameplates', isNew = true})
+end
+
+function Module:RefreshOptionScreens()
+    local configFrame = DF.ConfigModule.ConfigFrame
+    if configFrame then configFrame:RefreshCatSub('Misc', 'Nameplates') end
 end
 
 local BAR_TEXTURE =
     'Interface\\Addons\\DragonflightUI\\Textures\\UI-HUD-UnitFrame-Player-PortraitOff-Bar-Health-Status32'
 
 local function StylePlate(unit)
+    if not (Module.db and Module.db.profile.styleTexture) then return end
     if not (C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
     local plate = C_NamePlate.GetNamePlateForUnit(unit)
     if not plate then return end
@@ -79,6 +164,43 @@ local function StylePlate(unit)
     end
 end
 
+-- Era 1.15.9 defaults nameplateStyle to the classic look (border ring +
+-- level box). Careful with the enum: 'Modern' is MIDNIGHT's chunky plate
+-- (20px bar, name inside) - the style everyone calls the Dragonflight
+-- plate (thin bar, name above) is 'Thin'.
+--
+-- We only write the CVar for an explicit DFUI choice. On 'BLIZZARD' we
+-- keep our hands off it entirely, so a style picked in Blizzard's options
+-- survives a reload instead of being forced back every load.
+function Module:ApplyStyleCVar()
+    if not (C_CVar and C_CVar.SetCVar and Enum and Enum.NamePlateStyle) then return end
+
+    local profile = self.db and self.db.profile
+    if not profile then return end
+
+    -- migrate the old boolean toggle onto the style setting, once
+    if profile.style == nil then profile.style = profile.modernStyle and 'THIN' or 'BLIZZARD' end
+    if profile.style == 'BLIZZARD' then return end
+
+    local wanted = Enum.NamePlateStyle[({THIN = 'Thin', MODERN = 'Modern', CLASSIC = 'Classic'})[profile.style]
+                       or 'Thin']
+    if wanted ~= nil then C_CVar.SetCVar('nameplateStyle', wanted) end
+end
+
+function Module:ApplySettings(sub, key)
+    self:ApplyStyleCVar()
+
+    if self.db.profile.classColors and C_CVar and C_CVar.SetCVar then
+        C_CVar.SetCVar('nameplateShowClassColor', 1)
+    end
+
+    if C_NamePlate and C_NamePlate.GetNamePlates then
+        for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
+            if plate.namePlateUnitToken then StylePlate(plate.namePlateUnitToken) end
+        end
+    end
+end
+
 function Module:OnEnable()
     DF:Debug(self, 'Module ' .. mName .. ' OnEnable()')
     self:SetWasEnabled(true)
@@ -89,15 +211,7 @@ function Module:OnEnable()
         C_CVar.SetCVar('nameplateShowClassColor', 1)
     end
 
-    -- THE switch: Era 1.15.9 defaults nameplateStyle to the classic look
-    -- (border ring + level box). Careful with the enum: 'Modern' is
-    -- MIDNIGHT's chunky plate (20px bar, name inside) - the style everyone
-    -- calls the Dragonflight plate (thin bar, name above) is 'Thin'.
-    -- Blizzard-native; the driver re-reads options via the CVar callback
-    -- registry on change.
-    if self.db.profile.modernStyle and C_CVar and C_CVar.SetCVar and Enum.NamePlateStyle then
-        C_CVar.SetCVar('nameplateStyle', Enum.NamePlateStyle.Thin)
-    end
+    self:ApplyStyleCVar()
 
     local frame = CreateFrame('Frame')
     self.Frame = frame
@@ -112,6 +226,14 @@ function Module:OnEnable()
             if plate.namePlateUnitToken then StylePlate(plate.namePlateUnitToken) end
         end
     end
+
+    DF.ConfigModule:RegisterSettingsData('nameplates', 'misc',
+                                         {name = 'Nameplates', options = options, default = setDefaultValues})
+
+    self:SecureHook(DF, 'RefreshConfig', function()
+        Module:ApplySettings()
+        Module:RefreshOptionScreens()
+    end)
 end
 
 function Module:OnDisable()
