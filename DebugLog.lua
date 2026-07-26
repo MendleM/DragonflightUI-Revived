@@ -20,7 +20,8 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log echo         toggle live echo of every entry to chat
 --     /df log clear        empty the buffer
 --     /df log frame <name>   a frame's whole visibility chain
---     /df log regions <name> every region and child of a frame
+--     /df log regions <name> [depth]  every region and child of a frame;
+--                          with a depth, recurses into what is visible
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
 --
@@ -163,8 +164,9 @@ end
 -- What is this frame actually made of? Lists every region and child with its
 -- art, geometry and anchors - the fastest way to find the piece that is
 -- stranded, unstyled, or wearing the wrong texture.
-function DF:LogRegions(frameOrName, tag)
+function DF:LogRegions(frameOrName, tag, maxDepth)
     tag = tag or 'regions'
+    maxDepth = tonumber(maxDepth) or 0
 
     local f = frameOrName
     if type(f) == 'string' then f = _G[f] end
@@ -173,7 +175,7 @@ function DF:LogRegions(frameOrName, tag)
         return
     end
 
-    local function describe(kind, index, obj)
+    local function describe(kind, index, obj, prefix)
         local objName = (obj.GetName and obj:GetName()) or '<anonymous>'
         local art = ''
         if obj.GetAtlas and obj:GetAtlas() then
@@ -184,17 +186,34 @@ function DF:LogRegions(frameOrName, tag)
         end
 
         local left, bottom = obj:GetLeft(), obj:GetBottom()
-        DF:Log(tag, '%s %d: %s (%s) shown=%s %.0fx%.0f at %s,%s points=%d%s', kind, index, objName,
+        DF:Log(tag, '%s%s %d: %s (%s) shown=%s %.0fx%.0f at %s,%s points=%d%s', prefix, kind, index, objName,
                obj:GetObjectType(), tostring(obj:IsShown()), obj:GetWidth() or -1, obj:GetHeight() or -1,
                left and string.format('%.0f', left) or 'UNANCHORED', bottom and string.format('%.0f', bottom) or '?',
                (obj.GetNumPoints and obj:GetNumPoints()) or 0, art)
     end
 
-    DF:Log(tag, '=== %s: %d regions, %d children ===', (f:GetName() or '<anonymous>'), select('#', f:GetRegions()),
-           select('#', f:GetChildren()))
+    -- Recursing lists only what is actually drawn: hunting for the one stray
+    -- rectangle in a frame tree means looking for something VISIBLE, and the
+    -- hidden half of the tree is noise that buries it.
+    local function walk(frame, depth, prefix)
+        DF:Log(tag, '%s=== %s: %d regions, %d children ===', prefix, (frame:GetName() or '<anonymous>'),
+               select('#', frame:GetRegions()), select('#', frame:GetChildren()))
 
-    for i, region in ipairs({f:GetRegions()}) do describe('region', i, region) end
-    for i, child in ipairs({f:GetChildren()}) do describe('child', i, child) end
+        for i, region in ipairs({frame:GetRegions()}) do
+            if depth == 0 or region:IsShown() then describe('region', i, region, prefix) end
+        end
+
+        for i, child in ipairs({frame:GetChildren()}) do
+            if depth == 0 or child:IsShown() then describe('child', i, child, prefix) end
+        end
+
+        if depth >= maxDepth then return end
+        for _, child in ipairs({frame:GetChildren()}) do
+            if child:IsShown() and child.GetRegions then walk(child, depth + 1, prefix .. '  ') end
+        end
+    end
+
+    walk(f, 0, '')
 end
 
 function DF:LogDump(filter, limit)
@@ -245,11 +264,12 @@ function DF:HandleLogCommand(rest)
             DF:LogDump('framedump', 40)
         end
     elseif sub == 'regions' then
-        if arg == '' then
-            print(PREFIX .. 'usage: /df log regions <FrameName>')
+        local frameName, depth = arg:match('^(%S+)%s*(%S*)$')
+        if not frameName or frameName == '' then
+            print(PREFIX .. 'usage: /df log regions <FrameName> [depth]')
         else
-            DF:LogRegions(arg, 'regiondump')
-            DF:LogDump('regiondump', 60)
+            DF:LogRegions(frameName, 'regiondump', depth)
+            DF:LogDump('regiondump', 80)
         end
     else
         DF:LogDump(rest, 60)
