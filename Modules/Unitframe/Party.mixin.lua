@@ -307,18 +307,34 @@ end
 -- health 71x10 @ 44,-19, mana 74x7 @ 41,-30) using the parentKeys the
 -- pooled PartyMemberFrameTemplate exposes.
 function SubModuleMixin:SetupModern()
-    local subModule = self
     local ATLAS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\uipartyframe'
     local BARS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\'
-    local UpdateRoleIcon, UpdateBars
+    local UpdateRoleIcon
 
-    local POWER_BAR_ART = {
-        MANA = 'Mana',
-        RAGE = 'Rage',
-        FOCUS = 'Focus',
-        ENERGY = 'Energy',
-        RUNIC_POWER = 'RunicPower'
-    }
+    if not self.PartyMoveFrame then
+        local PartyMoveFrame = CreateFrame('Frame', 'DragonflightUIPartyMoveFrame', UIParent)
+        PartyMoveFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
+        PartyMoveFrame:SetFrameStrata('LOW')
+        PartyMoveFrame:SetFrameLevel(2)
+        PartyMoveFrame:SetSize(120, 53 * 4 + 3 * 10)
+        self.PartyMoveFrame = PartyMoveFrame
+    end
+
+    if PartyFrame then
+        PartyFrame:ClearAllPoints()
+        PartyFrame:SetParent(self.PartyMoveFrame)
+        PartyFrame:SetPoint('TOPLEFT', self.PartyMoveFrame, 'TOPLEFT', 0, 0)
+
+        if not self.PartyFrameHooked then
+            self.PartyFrameHooked = true
+            hooksecurefunc(PartyFrame, 'SetPoint', function(frame, _, relativeTo)
+                if relativeTo ~= self.PartyMoveFrame then
+                    frame:ClearAllPoints()
+                    frame:SetPoint('TOPLEFT', self.PartyMoveFrame, 'TOPLEFT', 0, 0)
+                end
+            end)
+        end
+    end
 
     local function styleMember(pf)
         if pf.DFStyled then return end
@@ -379,15 +395,7 @@ function SubModuleMixin:SetupModern()
         if name then
             name:ClearAllPoints()
             name:SetPoint('TOPLEFT', pf, 'TOPLEFT', 46, -6)
-            -- Stop the name before the role icon (12px, inset 5 from the
-            -- right edge of the 120px frame) instead of running underneath
-            -- it, and hold it to a single line: with wrapping left on, a
-            -- long name spilled onto a second line and pushed itself down
-            -- over the health bar.
-            name:SetWidth(UnitGroupRolesAssigned and 54 or 68)
-            name:SetHeight(12)
-            name:SetWordWrap(false)
-            if name.SetMaxLines then name:SetMaxLines(1) end
+            name:SetWidth(74)
             name:SetJustifyH('LEFT')
         end
 
@@ -398,10 +406,25 @@ function SubModuleMixin:SetupModern()
             healthbar:SetPoint('TOPLEFT', 44, -19)
             healthbar:SetStatusBarTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
             healthbar:SetStatusBarColor(1, 1, 1, 1)
-            -- UnitFrameHealthBar_Update re-tints this green on every health
-            -- event, and that green multiplied into the DF art is what made
-            -- the bars look dark. lockColor is Blizzard's own opt-out.
-            healthbar.lockColor = true
+
+            local fontPath = STANDARD_TEXT_FONT or 'Fonts\\FRIZQT__.ttf'
+
+            if not healthbar.DFHealthBarText then
+                healthbar.DFHealthBarText = healthbar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
+                healthbar.DFHealthBarText:SetPoint('CENTER', healthbar, 'CENTER', 0, 0)
+                healthbar.DFHealthBarText:SetFont(fontPath, 9, 'OUTLINE')
+                healthbar.DFTextString = healthbar.DFHealthBarText
+
+                healthbar.DFHealthBarTextLeft = healthbar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
+                healthbar.DFHealthBarTextLeft:SetPoint('LEFT', healthbar, 'LEFT', 0, 0)
+                healthbar.DFHealthBarTextLeft:SetFont(fontPath, 9, 'OUTLINE')
+                healthbar.DFLeftText = healthbar.DFHealthBarTextLeft
+
+                healthbar.DFHealthBarTextRight = healthbar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
+                healthbar.DFHealthBarTextRight:SetPoint('RIGHT', healthbar, 'RIGHT', 0, 0)
+                healthbar.DFHealthBarTextRight:SetFont(fontPath, 9, 'OUTLINE')
+                healthbar.DFRightText = healthbar.DFHealthBarTextRight
+            end
 
             local hpMask = healthbar:CreateMaskTexture()
             hpMask:SetPoint('CENTER', healthbar, 'CENTER', 0, 0)
@@ -418,9 +441,23 @@ function SubModuleMixin:SetupModern()
             manabar:SetPoint('TOPLEFT', 41, -30)
             manabar:SetStatusBarTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Mana')
             manabar:SetStatusBarColor(1, 1, 1, 1)
-            -- Without this, UnitFrameManaBar_UpdateType swaps our art out
-            -- for the plain UI-StatusBar and tints it by power color.
-            manabar.lockColor = true
+
+            if not manabar.DFManaBarText then
+                manabar.DFManaBarText = manabar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
+                manabar.DFManaBarText:SetPoint('CENTER', manabar, 'CENTER', 1.5, 0)
+                manabar.DFManaBarText:SetFont(fontPath, 9, 'OUTLINE')
+                manabar.DFTextString = manabar.DFManaBarText
+
+                manabar.DFManaBarTextLeft = manabar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
+                manabar.DFManaBarTextLeft:SetPoint('LEFT', manabar, 'LEFT', 3, 0)
+                manabar.DFManaBarTextLeft:SetFont(fontPath, 9, 'OUTLINE')
+                manabar.DFLeftText = manabar.DFManaBarTextLeft
+
+                manabar.DFManaBarTextRight = manabar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
+                manabar.DFManaBarTextRight:SetPoint('RIGHT', manabar, 'RIGHT', 0, 0)
+                manabar.DFManaBarTextRight:SetFont(fontPath, 9, 'OUTLINE')
+                manabar.DFRightText = manabar.DFManaBarTextRight
+            end
 
             local manaMask = manabar:CreateMaskTexture()
             manaMask:SetPoint('CENTER', manabar, 'CENTER', 0, 0)
@@ -430,36 +467,6 @@ function SubModuleMixin:SetupModern()
             manabar:GetStatusBarTexture():AddMaskTexture(manaMask)
         end
 
-        -- NOTE: lifting the bars above PartyMemberOverlay was tried here to
-        -- test whether the overlay art was dimming them. It made the bars
-        -- outlive the frame art in transitional states (a disconnected
-        -- member rendered as a bar floating over nothing), so the bars stay
-        -- in Blizzard's layering.
-
-        -- Blizzard flips health-bar desaturation in UpdateOnlineStatus and
-        -- the flag could stay stuck on a pooled frame reused for a
-        -- connected player; re-assert our own state right after it runs.
-        if pf.UpdateOnlineStatus and not pf.DFOnlineHooked then
-            pf.DFOnlineHooked = true
-            -- pcall: this runs INSIDE Blizzard's party frame update. An
-            -- error here aborts their loop, leaving the frame being
-            -- processed half-built and the remaining members never created.
-            hooksecurefunc(pf, 'UpdateOnlineStatus', function(f) pcall(UpdateBars, f) end)
-        end
-
-        -- Debuff row. We adopted retail's bar geometry (mana 74x7 at
-        -- 41,-30) but the template still carried Classic's aura anchor of
-        -- (48,-32), which was written for Classic's mana bar ending at
-        -- -29 - so the icons landed on top of our power bar. Retail pairs
-        -- that bar geometry with (48,-43); use its number.
-        local auras = pf.AuraFrameContainer
-        if auras then
-            auras:ClearAllPoints()
-            auras:SetPoint('TOPLEFT', pf, 'TOPLEFT', 48, -43)
-        end
-
-        -- Role icon (Era 1.15.x has LFG roles), same treatment as the
-        -- classic reskin: top-right corner of the member frame.
         if UnitGroupRolesAssigned then
             local roleIcon = pf:CreateTexture(nil, 'OVERLAY')
             roleIcon:SetSize(12, 12)
@@ -468,6 +475,10 @@ function SubModuleMixin:SetupModern()
             pf.DFRoleIcon = roleIcon
             UpdateRoleIcon(pf)
         end
+
+        local unit = pf.unit or pf.unitToken or ('party' .. (pf.layoutIndex or 1))
+        SubModuleMixin:UpdateModernPartyHPBar(pf, unit)
+        SubModuleMixin:UpdateModernPartyManaBar(pf, unit)
     end
 
     function UpdateRoleIcon(pf)
@@ -487,68 +498,6 @@ function SubModuleMixin:SetupModern()
         end
     end
 
-    -- With lockColor set, Blizzard no longer swaps the power art per power
-    -- type or greys out offline members, so we own both. Uses
-    -- GetStatusBarTexture():SetTexture so the bar's mask survives.
-    function UpdateBars(pf)
-        local unit = pf.unit or pf.unitToken
-        if not (unit and UnitExists(unit)) then return end
-
-        local connected = UnitIsConnected(unit)
-        local shade = connected and 1 or 0.5
-
-        local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
-
-        local healthbar = pf.HealthBar
-        if healthbar then
-            -- (re)assert here too, not just at first styling: frames styled
-            -- before this ran would otherwise keep Blizzard's tint until a
-            -- reload recreated them.
-            healthbar.lockColor = true
-
-            -- Retail's plain Bar-Health art is a muted green (49,153,8) and
-            -- looks dull next to the player frame. The class-color and
-            -- gradient options - which the classic reskin honours but this
-            -- path never did - swap in the greyscale -Status art and tint
-            -- it, exactly like PlayerFrame does.
-            local tex = healthbar:GetStatusBarTexture()
-            local r, g, b = shade, shade, shade
-            if tex and state and state.classcolor then
-                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
-                local _, class = UnitClass(unit)
-                r, g, b = DF:GetClassColor(class, 1)
-            elseif tex and state and state.gradient then
-                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
-                r, g, b = Helper:ColorGradiant(Helper:GetUnitHealthPercent(unit))
-            elseif tex then
-                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
-            end
-            -- Blizzard desaturates this bar for disconnected members
-            -- (PartyMemberFrameMixin:UpdateOnlineStatus) and the flag could
-            -- stay stuck on afterwards, which is what made bars look washed
-            -- out. Drive it from the same connection check as the shade.
-            if healthbar.SetStatusBarDesaturated then
-                healthbar:SetStatusBarDesaturated(not connected)
-            elseif tex and tex.SetDesaturated then
-                tex:SetDesaturated(not connected)
-            end
-            if tex and tex.SetDesaturated then tex:SetDesaturated(not connected) end
-            healthbar:SetStatusBarColor(r * shade, g * shade, b * shade, 1)
-        end
-
-        local manabar = pf.ManaBar
-        if manabar then
-            manabar.lockColor = true
-            local _, powerToken = UnitPowerType(unit)
-            local art = POWER_BAR_ART[powerToken] or 'Mana'
-            local tex = manabar:GetStatusBarTexture()
-            if tex then tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-' .. art) end
-            if manabar.SetStatusBarDesaturated then manabar:SetStatusBarDesaturated(false) end
-            if tex and tex.SetDesaturated then tex:SetDesaturated(false) end
-            manabar:SetStatusBarColor(shade, shade, shade, 1)
-        end
-    end
-
     local function styleAll()
         if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
         local count = 0
@@ -556,7 +505,6 @@ function SubModuleMixin:SetupModern()
             count = count + 1
             local ok, err = pcall(styleMember, pf)
             if not ok then geterrorhandler()('DFPartyModern: ' .. tostring(err)) end
-            pcall(UpdateBars, pf)
         end
         if DragonflightUIPerfLog and #DragonflightUIPerfLog < 400 then
             DragonflightUIPerfLog[#DragonflightUIPerfLog + 1] =
@@ -569,54 +517,20 @@ function SubModuleMixin:SetupModern()
     end
     styleAll()
 
-    -- Gradient coloring follows current health, so it needs health events.
-    -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would
-    -- fire for every unit in a raid.
-    for _, units in ipairs({{'party1', 'party2'}, {'party3', 'party4'}}) do
-        local healthWatcher = CreateFrame('Frame')
-        healthWatcher:RegisterUnitEvent('UNIT_HEALTH', units[1], units[2])
-        healthWatcher:SetScript('OnEvent', function(_, _, unit)
-            local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
-            if not (state and state.gradient) then return end
-            if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
-            for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
-                if pf.DFStyled and (pf.unit == unit or pf.unitToken == unit) then pcall(UpdateBars, pf) end
-            end
-        end)
-    end
-
     local roleWatcher = CreateFrame('Frame')
     roleWatcher:RegisterEvent('GROUP_ROSTER_UPDATE')
     if C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid('PLAYER_ROLES_ASSIGNED') then
         roleWatcher:RegisterEvent('PLAYER_ROLES_ASSIGNED')
     end
-    -- Power type changes (shapeshift, vehicle) and members going offline.
-    -- Both are rare, so unfiltered is fine here - unlike the high-frequency
-    -- UNIT_* events, which must always be unit-filtered on this client.
-    roleWatcher:RegisterEvent('UNIT_DISPLAYPOWER')
-    roleWatcher:RegisterEvent('UNIT_CONNECTION')
-    roleWatcher:SetScript('OnEvent', function(_, event, unit)
+    roleWatcher:SetScript('OnEvent', function()
         if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
-        local barsOnly = (event == 'UNIT_DISPLAYPOWER' or event == 'UNIT_CONNECTION')
-        if barsOnly and not (unit and unit:find('party', 1, true)) then return end
         for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
-            if pf.DFStyled then
-                if not barsOnly then pcall(UpdateRoleIcon, pf) end
-                pcall(UpdateBars, pf)
-            end
+            if pf.DFStyled then UpdateRoleIcon(pf) end
         end
     end)
 end
 
 function SubModuleMixin:Setup()
-    -- Modern (Midnight-UI) clients pool anonymous PartyFrame member frames;
-    -- the classic PartyMemberFrame1-4 reskin cannot attach. Restyle the
-    -- pooled frames in place instead (era-1159).
-    if DF.API.Version.IsModern then
-        self:SetupModern()
-        return
-    end
-    if not _G['PartyMemberFrame1'] then return end
     local function setDefaultSubValues(sub)
         self.ModuleRef:SetDefaultSubValues(sub)
     end
@@ -627,11 +541,13 @@ function SubModuleMixin:Setup()
             setDefaultSubValues('party')
         end
     })
-    --
+
     self:RegisterEvent('CVAR_UPDATE')
-    --
-    self:ChangePartyFrame()
-    self:AddStateUpdater()
+    self:RegisterEvent('UNIT_HEALTH')
+    self:RegisterEvent('UNIT_MAXHEALTH')
+    self:RegisterEvent('UNIT_POWER_UPDATE')
+    self:RegisterEvent('UNIT_MAXPOWER')
+    self:RegisterEvent('GROUP_ROSTER_UPDATE')
 
     -- editmode
     local EditModeModule = DF:GetModule('Editmode');
@@ -649,45 +565,100 @@ function SubModuleMixin:Setup()
     fakeParty.DFEditModeSelection:RegisterOptions({
         options = self.Options,
         extra = self.OptionsEditmode,
-        -- parentExtra = Module.PartyMoveFrame,
         default = function()
             setDefaultSubValues('party')
         end,
         moduleRef = self.ModuleRef,
-        -- fakeParty is a dummy party used to drag the real one into place; it
-        -- must not survive edit mode, or it lingers as a second, made-up
-        -- party next to the real frames.
         previewOnly = true
-        -- showFunction = function()
-        --     --           
-        --     for k = 1, 4 do
-        --         local p = _G['PartyMemberFrame' .. k]
-        --         -- p:SetAlpha(0)
-        --         -- print('p', k)
-        --     end
-        --     -- Module.PartyMoveFrame:Hide()
-        -- end,
-        -- hideFunction = function()
-        --     --            
-        --     for k = 1, 4 do
-        --         local p = _G['PartyMemberFrame' .. k]
-        --         -- p:SetAlpha(0)
-        --         -- print('p', k)
-        --     end
-        --     -- Module.PartyMoveFrame:Show()
-        -- end
     });
+
+    -- Modern (Midnight-UI / 1.15.9) clients pool anonymous PartyFrame member frames;
+    -- the classic PartyMemberFrame1-4 reskin cannot attach. Restyle the
+    -- pooled frames in place instead (era-1159).
+    if _G['PartyMemberFrame1'] then
+        self:ChangePartyFrame()
+        self:AddStateUpdater()
+    elseif DF.API.Version.IsModern then
+        self:SetupModern()
+    end
 end
 
 function SubModuleMixin:OnEvent(event, ...)
     if event == 'CVAR_UPDATE' then
         local arg1 = ...;
         if arg1 == 'statusText' or arg1 == 'statusTextDisplay' then
-            for i = 1, 4 do
+            self:UpdateAllPartyMembers()
+        end
+    elseif event == 'UNIT_HEALTH' or event == 'UNIT_MAXHEALTH' then
+        local unitTarget = ...;
+        if unitTarget then
+            self:UpdatePartyHPBarForUnit(unitTarget)
+        end
+    elseif event == 'UNIT_POWER_UPDATE' or event == 'UNIT_MAXPOWER' then
+        local unitTarget, powerType = ...;
+        if unitTarget then
+            self:UpdatePartyManaBarForUnit(unitTarget)
+        end
+    elseif event == 'GROUP_ROSTER_UPDATE' then
+        self:UpdateAllPartyMembers()
+    end
+end
+
+function SubModuleMixin:UpdatePartyHPBarForUnit(unitTarget)
+    if not unitTarget then return end
+
+    -- Classic frames
+    for i = 1, 4 do
+        local pf = _G['PartyMemberFrame' .. i]
+        if pf then
+            local unit = pf.unit or ('party' .. i)
+            if unit == unitTarget or UnitIsUnit(unit, unitTarget) then
                 self:UpdatePartyHPBar(i)
+            end
+        end
+    end
+
+    -- Modern pooled frames (1.15.9 / 2.5.6)
+    if PartyFrame and PartyFrame.PartyMemberFramePool then
+        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            local unit = pf.unit or pf.unitToken or ('party' .. (pf.layoutIndex or 1))
+            if unit == unitTarget or UnitIsUnit(unit, unitTarget) then
+                self:UpdateModernPartyHPBar(pf, unit)
+            end
+        end
+    end
+end
+
+function SubModuleMixin:UpdatePartyManaBarForUnit(unitTarget, powerType)
+    if not unitTarget then return end
+
+    -- Classic frames
+    for i = 1, 4 do
+        local pf = _G['PartyMemberFrame' .. i]
+        if pf then
+            local unit = pf.unit or ('party' .. i)
+            if unit == unitTarget or UnitIsUnit(unit, unitTarget) then
                 self:UpdatePartyManaBar(i)
             end
         end
+    end
+
+    -- Modern pooled frames (1.15.9 / 2.5.6)
+    if PartyFrame and PartyFrame.PartyMemberFramePool then
+        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            local unit = pf.unit or pf.unitToken or ('party' .. (pf.layoutIndex or 1))
+            if unit == unitTarget or UnitIsUnit(unit, unitTarget) then
+                self:UpdateModernPartyManaBar(pf, unit)
+            end
+        end
+    end
+end
+
+function SubModuleMixin:UpdateAllPartyMembers()
+    for i = 1, 4 do
+        local unit = 'party' .. i
+        self:UpdatePartyHPBarForUnit(unit)
+        self:UpdatePartyManaBarForUnit(unit)
     end
 end
 
@@ -697,21 +668,20 @@ function SubModuleMixin:UpdateState(state)
 end
 
 function SubModuleMixin:Update()
-    if DF.API.Version.IsModern then return end -- modern party frames are pooled
+    if self.PreviewParty and self.state then self.PreviewParty:UpdateState(self.state) end
     if not self.PartyMoveFrame then return end
     local state = self.state;
     if not state then return end
 
-    local parent = _G[state.anchorFrame]
-    self.PartyMoveFrame:ClearAllPoints();
+    local parent = _G[state.anchorFrame] or UIParent
+    self.PartyMoveFrame:ClearAllPoints()
     self.PartyMoveFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     self.PartyMoveFrame:SetScale(state.scale)
 
-    -- local party1 = _G['PartyMemberFrame' .. 1]
-    -- party1:ClearAllPoints()
-    -- party1:SetPoint('TOPLEFT', PartyMoveFrame, 'TOPLEFT', 0, 0)
-
-    local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    local sizeX, sizeY = 120, 53
+    if _G['PartyMemberFrame' .. 1] then
+        sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    end
 
     if state.orientation == 'vertical' then
         self.PartyMoveFrame:SetSize(sizeX, sizeY * 4 + 3 * state.padding)
@@ -719,36 +689,48 @@ function SubModuleMixin:Update()
         self.PartyMoveFrame:SetSize(sizeX * 4 + 3 * state.padding, sizeY)
     end
 
-    for i = 2, 4 do
-        local pf = _G['PartyMemberFrame' .. i]
-        pf:ClearAllPoints()
+    if _G['PartyMemberFrame1'] then
+        for i = 2, 4 do
+            local pf = _G['PartyMemberFrame' .. i]
+            if pf then
+                pf:ClearAllPoints()
 
-        if state.orientation == 'vertical' then
-            pf:SetPoint('TOPLEFT', _G['PartyMemberFrame' .. (i - 1)], 'BOTTOMLEFT', 0, -state.padding)
-        else
-            pf:SetPoint('TOPLEFT', _G['PartyMemberFrame' .. (i - 1)], 'TOPRIGHT', state.padding, 0)
+                if state.orientation == 'vertical' then
+                    pf:SetPoint('TOPLEFT', _G['PartyMemberFrame' .. (i - 1)], 'BOTTOMLEFT', 0, -state.padding)
+                else
+                    pf:SetPoint('TOPLEFT', _G['PartyMemberFrame' .. (i - 1)], 'TOPRIGHT', state.padding, 0)
+                end
+            end
+        end
+
+        for i = 1, 4 do
+            local pf = _G['PartyMemberFrame' .. i]
+            if pf then
+                local debuffOne = _G['PartyMemberFrame' .. i .. 'Debuff1']
+                if debuffOne then
+                    if state.orientation == 'vertical' then
+                        debuffOne:SetPoint('TOPLEFT', 120, -20)
+                    else
+                        debuffOne:SetPoint('TOPLEFT', 40 + 2, -40)
+                    end
+                end
+
+                self:UpdatePartyHPBar(i)
+                if _G['PartyMemberFrame' .. i .. 'HealthBar'] then
+                    TextStatusBar_UpdateTextString(_G['PartyMemberFrame' .. i .. 'HealthBar'])
+                end
+                if _G['PartyMemberFrame' .. i .. 'ManaBar'] then
+                    TextStatusBar_UpdateTextString(_G['PartyMemberFrame' .. i .. 'ManaBar'])
+                end
+
+                if pf.UpdateStateHandler then pf:UpdateStateHandler(state) end
+                if PartyMemberFrame_UpdateMember then PartyMemberFrame_UpdateMember(pf) end
+            end
         end
     end
 
-    for i = 1, 4 do
-        local pf = _G['PartyMemberFrame' .. i]
-
-        local debuffOne = _G['PartyMemberFrame' .. i .. 'Debuff1']
-        if state.orientation == 'vertical' then
-            debuffOne:SetPoint('TOPLEFT', 120, -20)
-        else
-            debuffOne:SetPoint('TOPLEFT', 40 + 2, -40)
-        end
-
-        self:UpdatePartyHPBar(i)
-        TextStatusBar_UpdateTextString(_G['PartyMemberFrame' .. i .. 'HealthBar'])
-        TextStatusBar_UpdateTextString(_G['PartyMemberFrame' .. i .. 'ManaBar'])
-
-        pf:UpdateStateHandler(state)
-        PartyMemberFrame_UpdateMember(pf)
-    end
-
-    self.PreviewParty:UpdateState(state)
+    if self.PreviewParty then self.PreviewParty:UpdateState(state) end
+    self:UpdateAllPartyMembers()
 end
 
 function SubModuleMixin:ChangePartyFrame()
@@ -1170,53 +1152,17 @@ local function DFTextStatusBar_UpdateTextString(textStatusBar)
     end
 end
 
--- TEMP diagnostics: /df partydump - what the party bars actually are at
--- runtime (colors, textures, alpha chain, desaturation).
-function SubModuleMixin:DumpBars()
-    local log = DragonflightUIPerfLog
-    local function out(fmt, ...)
-        local line = string.format(fmt, ...)
-        print('|cff0070ddDFUI:|r ' .. line)
-        if log and #log < 400 then log[#log + 1] = 'PARTYBAR ' .. line end
-    end
-
-    local function describe(label, bar, pf)
-        if not bar then
-            out('%s: nil', label)
-            return
-        end
-        local r, g, b, a = bar:GetStatusBarColor()
-        local tex = bar:GetStatusBarTexture()
-        local tr, tg, tb, ta = 1, 1, 1, 1
-        if tex and tex.GetVertexColor then tr, tg, tb, ta = tex:GetVertexColor() end
-        out('%s: barColor=%.2f/%.2f/%.2f/%.2f texVertex=%.2f/%.2f/%.2f/%.2f desat=%s alpha=%.2f effAlpha=%.2f lockColor=%s',
-            label, r, g, b, a, tr, tg, tb, ta,
-            tostring(tex and tex.IsDesaturated and tex:IsDesaturated()), bar:GetAlpha(), bar:GetEffectiveAlpha(),
-            tostring(bar.lockColor))
-        out('%s: texture=%s parentAlpha=%.2f frameEffAlpha=%.2f', label,
-            tostring(tex and tex.GetTexture and tex:GetTexture()), pf:GetAlpha(), pf:GetEffectiveAlpha())
-    end
-
-    if PartyFrame and PartyFrame.PartyMemberFramePool then
-        local n = 0
-        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
-            n = n + 1
-            out('--- member %d (%s) styled=%s ---', n, tostring(pf.unit or pf.unitToken), tostring(pf.DFStyled))
-            describe('health', pf.HealthBar, pf)
-            describe('mana', pf.ManaBar, pf)
-        end
-        if n == 0 then out('no active pooled party frames - are you in a party?') end
-    else
-        out('modern PartyFrame pool not present')
-    end
-end
-
 function SubModuleMixin:UpdatePartyManaBar(i)
     local pf = _G['PartyMemberFrame' .. i]
+    if not (pf and UnitExists(pf.unit)) then return end
     local manabar = _G['PartyMemberFrame' .. i .. 'ManaBar']
-    if UnitExists(pf.unit) then
+    if manabar then
+        local power = UnitPower(pf.unit)
+        local maxPower = UnitPowerMax(pf.unit)
         local powerType, powerTypeString = UnitPowerType(pf.unit)
-        -- powerTypeString = 'RUNIC_POWER'
+
+        manabar:SetMinMaxValues(0, maxPower)
+        manabar:SetValue(power)
 
         if powerTypeString == 'MANA' then
             manabar:GetStatusBarTexture():SetTexture(
@@ -1236,41 +1182,142 @@ function SubModuleMixin:UpdatePartyManaBar(i)
         end
         manabar:SetStatusBarColor(1, 1, 1, 1)
         DFTextStatusBar_UpdateTextString(manabar)
-    else
     end
-    -- print('UpdatePartyManaBar', i, powerType, powerTypeString)
 end
 
 function SubModuleMixin:UpdatePartyHPBar(i)
     local pf = _G['PartyMemberFrame' .. i]
+    if not (pf and UnitExists(pf.unit)) then return end
     local healthbar = _G['PartyMemberFrame' .. i .. 'HealthBar']
-    if UnitExists(pf.unit) then
+    if healthbar then
+        local health = UnitHealth(pf.unit)
+        local maxHealth = UnitHealthMax(pf.unit)
+
+        healthbar:SetMinMaxValues(0, maxHealth)
+        healthbar:SetValue(health)
+
         if self.ModuleRef.db.profile.party.classcolor then
-            healthbar:GetStatusBarTexture():SetTexture(
-                'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
-            local localizedClass, englishClass, classIndex = UnitClass(pf.unit)
-            healthbar:SetStatusBarColor(DF:GetClassColor(englishClass, 1))
+            local localizedClass, englishClass = UnitClass(pf.unit)
+            local r, g, b = DF:GetClassColor(englishClass)
+            if healthbar:GetStatusBarTexture() then
+                healthbar:GetStatusBarTexture():SetTexture(
+                    'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+                healthbar:GetStatusBarTexture():SetVertexColor(r, g, b, 1)
+            end
+            healthbar:SetStatusBarColor(r, g, b, 1)
         elseif self.ModuleRef.db.profile.party.gradient then
-            healthbar:GetStatusBarTexture():SetTexture(
-                'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
             local r, g, b = Helper:ColorGradiant(Helper:GetUnitHealthPercent(pf.unit))
+            if healthbar:GetStatusBarTexture() then
+                healthbar:GetStatusBarTexture():SetTexture(
+                    'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+                healthbar:GetStatusBarTexture():SetVertexColor(r, g, b, 1)
+            end
             healthbar:SetStatusBarColor(r, g, b, 1)
         else
-            healthbar:GetStatusBarTexture():SetTexture(
-                'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
+            if healthbar:GetStatusBarTexture() then
+                healthbar:GetStatusBarTexture():SetTexture(
+                    'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
+                healthbar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
+            end
             healthbar:SetStatusBarColor(1, 1, 1, 1)
         end
         DFTextStatusBar_UpdateTextString(healthbar)
+    end
+end
+
+function SubModuleMixin:UpdateModernPartyHPBar(pf, unit)
+    if not (pf and pf.HealthBar and UnitExists(unit)) then return end
+
+    local healthbar = pf.HealthBar
+    local health = UnitHealth(unit)
+    local maxHealth = UnitHealthMax(unit)
+
+    if healthbar.SetMinMaxValues then healthbar:SetMinMaxValues(0, maxHealth) end
+    if healthbar.SetValue then healthbar:SetValue(health) end
+
+    local BARS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\'
+    local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile and self.ModuleRef.db.profile.party
+
+    if profile and profile.classcolor then
+        local localizedClass, englishClass = UnitClass(unit)
+        local r, g, b = DF:GetClassColor(englishClass)
+        if healthbar.GetStatusBarTexture and healthbar:GetStatusBarTexture() then
+            healthbar:GetStatusBarTexture():SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+            healthbar:GetStatusBarTexture():SetVertexColor(r, g, b, 1)
+        end
+        if healthbar.SetStatusBarColor then
+            healthbar:SetStatusBarColor(r, g, b, 1)
+        end
+    elseif profile and profile.gradient then
+        local r, g, b = Helper:ColorGradiant(Helper:GetUnitHealthPercent(unit))
+        if healthbar.GetStatusBarTexture and healthbar:GetStatusBarTexture() then
+            healthbar:GetStatusBarTexture():SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+            healthbar:GetStatusBarTexture():SetVertexColor(r, g, b, 1)
+        end
+        if healthbar.SetStatusBarColor then
+            healthbar:SetStatusBarColor(r, g, b, 1)
+        end
     else
+        if healthbar.GetStatusBarTexture and healthbar:GetStatusBarTexture() then
+            healthbar:GetStatusBarTexture():SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
+            healthbar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
+        end
+        if healthbar.SetStatusBarColor then
+            healthbar:SetStatusBarColor(1, 1, 1, 1)
+        end
+    end
+
+    if healthbar.DFTextString then
+        DFTextStatusBar_UpdateTextString(healthbar)
+    end
+end
+
+function SubModuleMixin:UpdateModernPartyManaBar(pf, unit)
+    if not (pf and pf.ManaBar and UnitExists(unit)) then return end
+
+    local manabar = pf.ManaBar
+    local power = UnitPower(unit)
+    local maxPower = UnitPowerMax(unit)
+    local powerType, powerTypeString = UnitPowerType(unit)
+
+    if manabar.SetMinMaxValues then manabar:SetMinMaxValues(0, maxPower) end
+    if manabar.SetValue then manabar:SetValue(power) end
+
+    local BARS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\'
+    local tex = BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Mana'
+
+    if powerTypeString == 'MANA' then
+        tex = BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Mana'
+    elseif powerTypeString == 'FOCUS' then
+        tex = BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Focus'
+    elseif powerTypeString == 'RAGE' then
+        tex = BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Rage'
+    elseif powerTypeString == 'ENERGY' then
+        tex = BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Energy'
+    elseif powerTypeString == 'RUNIC_POWER' then
+        tex = BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-RunicPower'
+    end
+
+    if manabar.GetStatusBarTexture and manabar:GetStatusBarTexture() then
+        manabar:GetStatusBarTexture():SetTexture(tex)
+    end
+    if manabar.SetStatusBarColor then
+        manabar:SetStatusBarColor(1, 1, 1, 1)
+    end
+
+    if manabar.DFTextString then
+        DFTextStatusBar_UpdateTextString(manabar)
     end
 end
 
 function SubModuleMixin:AddStateUpdater()
     for i = 1, 4 do
         local pf = _G['PartyMemberFrame' .. i]
-        Mixin(pf, DragonflightUIStateHandlerMixin)
-        pf:InitStateHandler()
-        pf:SetUnit('party' .. i)
+        if pf then
+            Mixin(pf, DragonflightUIStateHandlerMixin)
+            pf:InitStateHandler()
+            pf:SetUnit('party' .. i)
+        end
     end
 end
 

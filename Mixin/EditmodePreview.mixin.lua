@@ -559,7 +559,10 @@ DragonflightUIEditModePreviewPartyFrameMixin = {}
 function DragonflightUIEditModePreviewPartyFrameMixin:OnLoad()
     -- print('~~ DragonflightUIEditModePreviewPartyFrameMixin:OnLoad()')
 
-    local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    local sizeX, sizeY = 120, 53
+    if _G['PartyMemberFrame' .. 1] then
+        sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    end
     local gap = 10;
     self:SetSize(sizeX, sizeY * 4 + 3 * gap)
 
@@ -631,7 +634,10 @@ function DragonflightUIEditModePreviewPartyFrameMixin:Update()
     self:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     self:SetScale(state.scale)
 
-    local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    local sizeX, sizeY = 120, 53
+    if _G['PartyMemberFrame' .. 1] then
+        sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    end
 
     if state.orientation == 'vertical' then
         self:SetSize(sizeX, sizeY * 4 + 3 * state.padding)
@@ -660,7 +666,7 @@ function DragonflightUIEditModePreviewPartyFrameMixin:Update()
 end
 
 function DragonflightUIEditModePreviewPartyFrameMixin:UpdateVisibility()
-    if (GetDisplayedAllyFrames() ~= "party") then
+    if GetDisplayedAllyFrames and (GetDisplayedAllyFrames() ~= "party") then
         for k, v in ipairs(self.PartyFrames) do
             --           
             v:Show()
@@ -696,7 +702,10 @@ Mixin(DragonflightUIEditModePreviewPartyMixin, DragonflightUIEditModePreviewTarg
 function DragonflightUIEditModePreviewPartyMixin:OnLoad()
     -- print('~~~~~~~~~~~~DragonflightUIEditModePreviewPartyMixin:OnLoad()')
 
-    local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    local sizeX, sizeY = 120, 53
+    if _G['PartyMemberFrame' .. 1] then
+        sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    end
     self:SetSize(sizeX, sizeY)
     self:SetupFrame()
     self:SetRandomUnit()
@@ -705,18 +714,12 @@ end
 function DragonflightUIEditModePreviewPartyMixin:SetupFrame()
     local base = 'Interface\\Addons\\DragonflightUI\\Textures\\uiunitframe'
 
-    local textureFrame = CreateFrame('Frame', 'DragonflightUIPartyFrameTextureFrame', self)
+    local textureFrame = CreateFrame('Frame', nil, self)
     textureFrame:SetPoint('CENTER')
     textureFrame:SetFrameLevel(3)
     self.TextureFrame = textureFrame
 
-    -- local background = self:CreateTexture('DragonflightUITargetFrameBackground')
-    -- background:SetDrawLayer('BACKGROUND', 2)
-    -- background:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\UI-HUD-UnitFrame-Target-PortraitOn-BACKGROUND')
-    -- background:SetPoint('LEFT', self, 'LEFT', 0, -32.5 + 10)
-    -- self.TargetFrameBackground = background
-
-    local border = self:CreateTexture('DragonflightUIPartyFrameBorder')
+    local border = self:CreateTexture(nil)
     border:SetDrawLayer('ARTWORK', 3)
     border:SetSize(120, 49)
     border:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\uipartyframe')
@@ -724,7 +727,7 @@ function DragonflightUIEditModePreviewPartyMixin:SetupFrame()
     border:SetPoint('TOPLEFT', self, 'TOPLEFT', 1, -2)
     self.TargetFrameBorder = border
 
-    local portrait = self:CreateTexture('DragonflightUIPartyFramePortrait')
+    local portrait = self:CreateTexture(nil)
     portrait:SetDrawLayer('ARTWORK', 1)
     portrait:SetSize(37, 37)
     portrait:SetPoint('TOPLEFT', self, 'TOPLEFT', 7, -6)
@@ -776,7 +779,7 @@ function DragonflightUIEditModePreviewPartyMixin:SetupFrame()
     -- -- self.PortraitExtra:UpdateStyle('worldboss')
 
     if DF.Wrath then
-        local roleIcon = self.TextureFrame:CreateTexture('DragonflightUIPartyFrameRoleIcon')
+        local roleIcon = self.TextureFrame:CreateTexture(nil)
         roleIcon:SetSize(12, 12)
         roleIcon:SetPoint('TOPRIGHT', self, 'TOPRIGHT', -5, -5)
         roleIcon:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\roleicons')
@@ -1230,7 +1233,10 @@ Mixin(DragonflightUIEditModePreviewRaidMixin, DragonflightUIEditModePreviewTarge
 function DragonflightUIEditModePreviewRaidMixin:OnLoad()
     -- print('~~~~~~~~~~~~DragonflightUIEditModePreviewRaidMixin:OnLoad()')
 
-    local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    local sizeX, sizeY = 120, 53
+    if _G['PartyMemberFrame' .. 1] then
+        sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    end
     self:SetSize(sizeX, sizeY)
     self:SetupFrame()
     self:SetRandomUnit()

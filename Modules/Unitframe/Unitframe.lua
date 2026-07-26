@@ -249,23 +249,32 @@ function Module:ApplySettings(sub, key)
     end, 0, self)
 end
 
+local function DFSafeCall(name, func)
+    local ok, err = pcall(func)
+    if not ok then
+        print('|cFFFF0000[DF-ERROR] in ' .. name .. ': ' .. tostring(err) .. '|r')
+        geterrorhandler()(name .. ' error: ' .. tostring(err))
+    end
+    return ok
+end
+
 function Module:ApplySettingsInternal(sub, key)
     local db = Module.db.profile
 
-    self.SubParty:UpdateState(db.party)
-    self.SubPlayer:UpdateState(db.player)
-    self.SubPlayerSecondaryRes:UpdateState(db.playerSecondaryRes)
-    self.SubPlayerTotemFrame:UpdateState(db.playerTotemFrame)
-    self.SubPet:UpdateState(db.pet)
-    self.SubTarget:UpdateState(db.target)
-    self.SubTargetOfTarget:UpdateState(db.tot)
-    self.SubRaid:UpdateState(db.raid)
+    DFSafeCall('SubParty:UpdateState', function() self.SubParty:UpdateState(db.party) end)
+    DFSafeCall('SubPlayer:UpdateState', function() self.SubPlayer:UpdateState(db.player) end)
+    DFSafeCall('SubPlayerSecondaryRes:UpdateState', function() self.SubPlayerSecondaryRes:UpdateState(db.playerSecondaryRes) end)
+    DFSafeCall('SubPlayerTotemFrame:UpdateState', function() self.SubPlayerTotemFrame:UpdateState(db.playerTotemFrame) end)
+    DFSafeCall('SubPet:UpdateState', function() self.SubPet:UpdateState(db.pet) end)
+    DFSafeCall('SubTarget:UpdateState', function() self.SubTarget:UpdateState(db.target) end)
+    DFSafeCall('SubTargetOfTarget:UpdateState', function() self.SubTargetOfTarget:UpdateState(db.tot) end)
+    DFSafeCall('SubRaid:UpdateState', function() self.SubRaid:UpdateState(db.raid) end)
 
     if DF.Wrath or DF.API.Version.IsTBC then
-        self.SubFocus:UpdateState(db.focus)
-        self.SubFocusTarget:UpdateState(db.focusTarget)
+        DFSafeCall('SubFocus:UpdateState', function() self.SubFocus:UpdateState(db.focus) end)
+        DFSafeCall('SubFocusTarget:UpdateState', function() self.SubFocusTarget:UpdateState(db.focusTarget) end)
     end
-    if DF.Cata then self.SubAltPower:UpdateState(db.altpower) end
+    if DF.Cata then DFSafeCall('SubAltPower:UpdateState', function() self.SubAltPower:UpdateState(db.altpower) end) end
 end
 
 function Module:FixBlizzardBug()
@@ -480,19 +489,35 @@ function Module:ChangeFonts()
     changeFont(TargetFrameTextureFrame.ManaBarTextLeft, std)
     changeFont(TargetFrameTextureFrame.ManaBarTextRight, std)
 
+    local partyFont = 9
     for i = 1, 4 do
         local healthbar = _G['PartyMemberFrame' .. i .. 'HealthBar']
         if healthbar then
-            changeFont(healthbar.DFHealthBarText, std)
-            changeFont(healthbar.DFHealthBarTextLeft, std)
-            changeFont(healthbar.DFHealthBarTextRight, std)
+            changeFont(healthbar.DFHealthBarText, partyFont)
+            changeFont(healthbar.DFHealthBarTextLeft, partyFont)
+            changeFont(healthbar.DFHealthBarTextRight, partyFont)
         end
 
         local manabar = _G['PartyMemberFrame' .. i .. 'ManaBar']
         if manabar then
-            changeFont(manabar.DFManaBarText, std)
-            changeFont(manabar.DFManaBarTextLeft, std)
-            changeFont(manabar.DFManaBarTextRight, std)
+            changeFont(manabar.DFManaBarText, partyFont)
+            changeFont(manabar.DFManaBarTextLeft, partyFont)
+            changeFont(manabar.DFManaBarTextRight, partyFont)
+        end
+    end
+
+    if PartyFrame and PartyFrame.PartyMemberFramePool then
+        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            if pf.HealthBar then
+                changeFont(pf.HealthBar.DFHealthBarText, partyFont)
+                changeFont(pf.HealthBar.DFHealthBarTextLeft, partyFont)
+                changeFont(pf.HealthBar.DFHealthBarTextRight, partyFont)
+            end
+            if pf.ManaBar then
+                changeFont(pf.ManaBar.DFManaBarText, partyFont)
+                changeFont(pf.ManaBar.DFManaBarTextLeft, partyFont)
+                changeFont(pf.ManaBar.DFManaBarTextRight, partyFont)
+            end
         end
     end
 
@@ -675,24 +700,20 @@ end
 Module:RegisterChatCommand('cheeese', 'TakePicture')
 
 function Module:Era()
-    -- self.SubFocus:Setup()
-    -- self.SubFocusTarget:Setup()
-    -- self.SubAltPower:Setup()
+    DFSafeCall('SubParty:Setup', function() self.SubParty:Setup() end)
+    DFSafeCall('SubPlayer:Setup', function() self.SubPlayer:Setup() end)
+    DFSafeCall('SubPlayerSecondaryRes:Setup', function() self.SubPlayerSecondaryRes:Setup() end)
 
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
+    DFSafeCall('SubPet:Setup', function() self.SubPet:Setup() end)
+    DFSafeCall('SubTarget:Setup', function() self.SubTarget:Setup() end)
+    DFSafeCall('SubTargetOfTarget:Setup', function() self.SubTargetOfTarget:Setup() end)
+    DFSafeCall('SubRaid:Setup', function() self.SubRaid:Setup() end)
 
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
+    DFSafeCall('HookEnergyBar', function() self:HookEnergyBar() end)
+    DFSafeCall('ChangeFonts', function() self:ChangeFonts() end)
+    DFSafeCall('HookDrag', function() self:HookDrag() end)
+    DFSafeCall('AddPortraitMasks', function() self:AddPortraitMasks() end)
+    DFSafeCall('HookClassIcon', function() self:HookClassIcon() end)
 end
 
 function Module:TBC()
