@@ -359,74 +359,7 @@ function DFEditModeSystemSelectionBaseMixin:OnLoad()
     table.insert(EditModeModule.SelectionFrames, self);
 
     EditModeModule:RegisterCallback('OnEditMode', function(self, editValue)
-        -- print('SELECTION: OnEditMode', value)
-        local db = EditModeModule.db.profile
-        local state = db.advanced
-
-        -- A missing advanced entry must not read as "disabled": frames
-        -- registered without an advancedName used to evaluate falsy even
-        -- while ENTERING edit mode, and the branch below then hid them.
-        local advancedEnabled = true
-        if self.AdvancedName ~= nil then
-            local flag = state[self.AdvancedName]
-            if flag ~= nil then advancedEnabled = flag end
-        end
-
-        local value = editValue and advancedEnabled
-
-        self:ShowHighlighted()
-        self:SetShown(value)
-
-        if value then
-            self.parent.DFEditMode = true;
-            if self.parent.SetEditMode then
-                self.parent:SetEditMode(true)
-            else
-                self.parent:Show();
-            end
-            -- self:SetFrameLevel(self.Prio or 1000)
-
-            if self.ModuleRef then
-                --            
-                local db = self.ModuleRef.db.profile[self.ModuleSub]
-                if db then db.EditModeActive = true; end
-                -- 
-                if self.ShowFunction then
-                    self.ShowFunction();
-                else
-                    self.ModuleRef:ApplySettings(self.ModuleSub or false);
-                end
-            end
-        else
-            self.parent.DFEditMode = false;
-            if self.parent.SetEditMode then
-                self.parent:SetEditMode(false)
-            elseif self.PreviewOnly then
-                -- Leaving edit mode may only hide frames that exist solely as
-                -- edit-mode handles. Registrations are a mix: some are dummy
-                -- previews, but most are live containers - the pet frame's
-                -- holder (which the real PetFrame is parented to), the target
-                -- and focus holders, the durability frame, the LFG eye, the
-                -- chat window. Hiding those here is how they "disappeared
-                -- until a reload": nothing re-shows them, because a
-                -- registration carrying a HideFunction never reaches the
-                -- module's ApplySettings below. Their visibility belongs to
-                -- their module and to the state handler, not to edit mode.
-                self.parent:Hide()
-            end
-            if self.ModuleRef then
-                --            
-                local db = self.ModuleRef.db.profile[self.ModuleSub]
-                if db then db.EditModeActive = false; end
-                -- self.ModuleRef:ApplySettings(self.ModuleSub or false)
-                if self.HideFunction then
-                    self.HideFunction();
-                else
-                    self.ModuleRef:ApplySettings(self.ModuleSub or false);
-                end
-            end
-
-        end
+        self:ApplyEditModeState(editValue)
     end, self)
 
     EditModeModule:RegisterCallback('OnSelection', function(self, value)
@@ -434,16 +367,8 @@ function DFEditModeSystemSelectionBaseMixin:OnLoad()
         if value and value == self then
             DF:Debug(EditModeModule, 'SELECTION', value:GetName())
             self:ShowSelected()
-        else
-            local db = EditModeModule.db.profile
-            local state = db.advanced
-
-            if state[self.AdvancedName] then
-                -- 
-                self:ShowHighlighted()
-            else
-                -- deactivated ~> dont change
-            end
+        elseif self:IsEditModeEnabled() then
+            self:ShowHighlighted()
         end
     end, self)
 
@@ -451,6 +376,180 @@ function DFEditModeSystemSelectionBaseMixin:OnLoad()
     -- self:EnableMouse(true)      
     self:RegisterForDrag("LeftButton")
     -- self:SetClampedToScreen(true) --TODO
+end
+
+-- May edit mode show this frame at all? That is the per-frame "show in edit
+-- mode" flag. A frame with no entry - or no advancedName at all - reads as
+-- ENABLED: absent is not the same as switched off, and treating it as off is
+-- what used to hide frames the moment edit mode was touched.
+function DFEditModeSystemSelectionBaseMixin:IsEditModeEnabled()
+    if self.AdvancedName == nil then return true end
+
+    local EditModeModule = DF:GetModule('Editmode')
+    local flag = EditModeModule.db.profile.advanced[self.AdvancedName]
+    if flag == nil then return true end
+    return flag and true or false
+end
+
+-- Everything edit mode does to one registered frame, in one place, so that
+-- entering edit mode and toggling a single frame's visibility go through
+-- identical code instead of the second one having to fake the first.
+-- Re-evaluates one frame and does the work only if its state actually changed.
+-- Ticking a single frame's checkbox has no business re-applying the settings of
+-- every other registered frame.
+function DFEditModeSystemSelectionBaseMixin:RefreshEditModeState(editValue)
+    local value = (editValue and self:IsEditModeEnabled()) or false
+    if value == self.EditModeStateApplied then return end
+
+    self:ApplyEditModeState(editValue)
+end
+
+function DFEditModeSystemSelectionBaseMixin:ApplyEditModeState(editValue)
+    local value = editValue and self:IsEditModeEnabled()
+    self.EditModeStateApplied = value or false
+
+    self:ShowHighlighted()
+    self:SetShown(value)
+
+    if value then
+        self.parent.DFEditMode = true;
+        -- remembered before we force it open, so the ghost below can tell a
+        -- frame that had something to show from one that did not
+        if self.ParentWasShown == nil then self.ParentWasShown = self.parent:IsShown() end
+
+        if self.parent.SetEditMode then
+            self.parent:SetEditMode(true)
+        else
+            self.parent:Show();
+        end
+
+        if self.ModuleRef then
+            local db = self.ModuleRef.db.profile[self.ModuleSub]
+            if db then db.EditModeActive = true; end
+
+            if self.ShowFunction then
+                self.ShowFunction();
+            else
+                self.ModuleRef:ApplySettings(self.ModuleSub or false);
+            end
+        end
+    else
+        self.parent.DFEditMode = false;
+        self.ParentWasShown = nil
+
+        if self.parent.SetEditMode then
+            self.parent:SetEditMode(false)
+        elseif self.PreviewOnly then
+            -- Leaving edit mode may only hide frames that exist solely as
+            -- edit-mode handles. Registrations are a mix: some are dummy
+            -- previews, but most are live containers - the pet frame's holder
+            -- (which the real PetFrame is parented to), the target and focus
+            -- holders, the durability frame, the LFG eye, the chat window.
+            -- Hiding those here is how they "disappeared until a reload":
+            -- nothing re-shows them, because a registration carrying a
+            -- HideFunction never reaches the module's ApplySettings below.
+            -- Their visibility belongs to their module and to the state
+            -- handler, not to edit mode.
+            self.parent:Hide()
+        end
+
+        if self.ModuleRef then
+            local db = self.ModuleRef.db.profile[self.ModuleSub]
+            if db then db.EditModeActive = false; end
+
+            if self.HideFunction then
+                self.HideFunction();
+            else
+                self.ModuleRef:ApplySettings(self.ModuleSub or false);
+            end
+        end
+    end
+
+    self:UpdateGhost(value)
+end
+
+-- Does this frame draw anything right now? Our own selection overlay does not
+-- count, and neither does a region with no texture and no text.
+local function HasVisibleContent(frame, ignore)
+    for _, region in ipairs({frame:GetRegions()}) do
+        if region:IsShown() then
+            local hasArt = (region.GetTexture and region:GetTexture()) or (region.GetAtlas and region:GetAtlas())
+            local hasText = region.GetText and region:GetText() and region:GetText() ~= ''
+            if hasArt or hasText then return true end
+        end
+    end
+
+    for _, child in ipairs({frame:GetChildren()}) do
+        if child ~= ignore and child:IsShown() and not child.IsDFEditModeSelection then return true end
+    end
+
+    return false
+end
+
+-- An empty frame cannot be edited: nothing is drawn, so there is nothing to
+-- aim at, nothing to drag, and no way to tell which system the box belongs to.
+-- Frames with a real preview (a fake party, a sample loot roll) already solve
+-- this for themselves; everything else gets a labelled placeholder at a size
+-- big enough to grab - a pet bar with no pet, a boss frame out of a raid, a
+-- castbar that is not casting.
+local GHOST_MIN_WIDTH, GHOST_MIN_HEIGHT = 150, 40
+
+function DFEditModeSystemSelectionBaseMixin:UpdateGhost(shown)
+    if not shown then
+        if self.Ghost then self.Ghost:Hide() end
+        self:RestoreSelectionAnchors()
+        return
+    end
+
+    local parent = self.parent
+    local width, height = parent:GetWidth() or 0, parent:GetHeight() or 0
+    local tooSmallToGrab = width < GHOST_MIN_WIDTH or height < GHOST_MIN_HEIGHT
+    local empty = not HasVisibleContent(parent, self)
+
+    if not empty then
+        if self.Ghost then self.Ghost:Hide() end
+        self:RestoreSelectionAnchors()
+        return
+    end
+
+    -- The overlay is pinned to the parent's corners, so a parent with no
+    -- usable size leaves nothing to click. Float the overlay at a workable
+    -- size instead; dragging still moves the parent.
+    if tooSmallToGrab then
+        self:ClearAllPoints()
+        self:SetPoint('CENTER', parent, 'CENTER', 0, 0)
+        self:SetSize(math.max(width, GHOST_MIN_WIDTH), math.max(height, GHOST_MIN_HEIGHT))
+        self.SelectionAnchorsFloated = true
+    end
+
+    if not self.Ghost then
+        local ghost = self:CreateTexture(nil, 'BACKGROUND')
+        ghost:SetAllPoints(self)
+        ghost:SetColorTexture(0, 0, 0, 0.45)
+        self.Ghost = ghost
+
+        local text = self:CreateFontString(nil, 'OVERLAY', 'GameFontDisableSmall')
+        text:SetPoint('CENTER', self, 'CENTER', 0, -10)
+        self.GhostText = text
+    end
+
+    self.Ghost:Show()
+    self.GhostText:SetText(EMPTY or 'Empty')
+    self.GhostText:Show()
+    -- a ghost has nothing else to identify it, so name it whether or not it is
+    -- selected or hovered
+    if self.getLabelText then self.Label:SetText(self.getLabelText()) end
+    self.Label:Show()
+end
+
+function DFEditModeSystemSelectionBaseMixin:RestoreSelectionAnchors()
+    if not self.SelectionAnchorsFloated then return end
+    self.SelectionAnchorsFloated = nil
+
+    self:ClearAllPoints()
+    self:SetPoint('TOPLEFT', self.parent, 'TOPLEFT', 0, 0)
+    self:SetPoint('BOTTOMRIGHT', self.parent, 'BOTTOMRIGHT', 0, 0)
+    if self.GhostText then self.GhostText:Hide() end
 end
 
 function DFEditModeSystemSelectionBaseMixin:OnEnter()
@@ -618,12 +717,18 @@ function DFEditModeSystemSelectionBaseMixin:ShowSelected()
 end
 
 function DFEditModeSystemSelectionBaseMixin:OnUpdate()
-    if self.isDragging then
-        --
-        -- print('drag drag')
-        -- local anchor, anchorFrame, anchorParent, xxx, yyy = self:CalcSnapParentToGrid()
-        -- self:SetPoint(anchor, anchorFrame, anchorParent, xxx, yyy)
-    end
+    if not self.isDragging then return end
+
+    -- Live coordinates while dragging, and they are the numbers that will
+    -- actually be saved: snapped, relative to screen centre, exactly what the
+    -- settings page will read afterwards. Dragging blind and then going to
+    -- look up where the frame ended is the slow way to line two frames up.
+    local ok, _, _, _, x, y = pcall(self.CalcSnapParentToGrid, self)
+    if not ok or not x then return end
+
+    local name = (self.getLabelText and self.getLabelText()) or ''
+    self.Label:SetText(('%s  |cffffd100%d, %d|r'):format(name, x, y))
+    self.Label:Show()
 end
 
 function DFEditModeSystemSelectionBaseMixin:CalcSnapParentToGrid()
@@ -663,7 +768,15 @@ function DFEditModeSystemSelectionBaseMixin:SnapToGrid(value, gridSize)
 end
 
 function DFEditModeSystemSelectionBaseMixin:OnDragStart()
-    if not self.isSelected then return end
+    -- Dragging used to require selecting the frame first, so the first drag of
+    -- every frame did nothing. Grab it and select it in one motion instead,
+    -- the way Blizzard's own edit mode behaves.
+    if not self.isSelected then
+        local EditModeModule = DF:GetModule('Editmode')
+        EditModeModule:SelectFrame(self)
+        if not self.isSelected then return end
+    end
+
     -- self.parent:OnDragStart();
     local x, y = self:GetCenter()
 
@@ -757,6 +870,11 @@ function DFEditModeSystemSelectionBaseMixin:OnDragStop()
     self.ModuleRef:RefreshOptionScreens()
     parent:Show()
 
+    -- back to the plain name, and re-measure: a frame that was ghosted may now
+    -- have content, or the reverse
+    self:UpdateLabelVisibility()
+    self:UpdateGhost(true)
+
     if self.DragStopFunc then self.DragStopFunc(); end
 end
 
@@ -775,7 +893,8 @@ end
 function DFEditModeSystemSelectionBaseMixin:UpdateLabelVisibility()
     if self.getLabelText then self.Label:SetText(self.getLabelText()); end
 
-    self.Label:SetShown(self.isSelected);
+    -- a ghosted frame draws nothing of its own, so its name has to stay up
+    self.Label:SetShown(self.isSelected or (self.Ghost and self.Ghost:IsShown()) or false);
 end
 
 function DFEditModeSystemSelectionBaseMixin:RegisterOptions(data)

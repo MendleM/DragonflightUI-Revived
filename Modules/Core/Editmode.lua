@@ -62,6 +62,18 @@ local defaults = {
 }
 Module:SetDefaults(defaults)
 
+-- Modules whose frame positions the Blizzard layout knows nothing about, and
+-- which therefore have to be re-applied after every layout application (see
+-- applyNow). Modules can add themselves at load time.
+addonTable.BlizzEditmodeReapply = addonTable.BlizzEditmodeReapply or {'Unitframe', 'Chat'}
+
+function addonTable:RegisterBlizzEditmodeReapply(name)
+    for _, existing in ipairs(addonTable.BlizzEditmodeReapply) do
+        if existing == name then return end
+    end
+    table.insert(addonTable.BlizzEditmodeReapply, name)
+end
+
 local function getDefaultStr(key, sub)
     return Module:GetDefaultStr(key, sub)
 end
@@ -262,9 +274,9 @@ if true then
     AddTableToCategory(miscFrames, 'headerMisc')
 
     advancedOptions.set = function(...)
-        -- print(...)
         setOption(...)
-        Module:SetEditMode(Module.IsEditMode)
+        -- only the overlays change; see RefreshSelectionVisibility
+        Module:RefreshSelectionVisibility()
     end
 end
 
@@ -435,6 +447,14 @@ end
 function Module:SetEditMode(isEditMode)
     DF:Debug(self, 'SetEditMode', isEditMode)
 
+    -- Moving frames is protected work: in combat the drags are refused by the
+    -- client without a word, so the mode would look open and do nothing.
+    if isEditMode and Helper:IsCombatLocked() then
+        Module:Print('Edit mode is not available in combat - it will open when combat ends.')
+        Module.WasEditMode = true
+        return
+    end
+
     Module.IsEditMode = isEditMode;
     Module.EditModeFrame:SetShown(isEditMode)
 
@@ -444,12 +464,38 @@ function Module:SetEditMode(isEditMode)
         if not InCombatLockdown() then
             HideUIPanel(GameMenuFrame)
             HideUIPanel(SettingsPanel)
+
+            -- Blizzard's own Edit Mode manages several of the same frames -
+            -- the player and target frames, the chat window, the minimap, the
+            -- action bars. Two overlays on one frame fight over the drag, and
+            -- Blizzard's Save writes its whole layout over ours, so only one
+            -- of the two may be open.
+            if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
+                Module:Print("Closing Blizzard's Edit Mode - only one edit mode can be open at a time.")
+                HideUIPanel(EditModeManagerFrame)
+            end
         end
-    else
     end
 
     self.SelectedFrame = nil;
     self:TriggerEvent(self.Event.OnEditMode, isEditMode)
+end
+
+-- Re-evaluates which frames edit mode may show, and nothing else.
+--
+-- Toggling one frame's "show in edit mode" flag used to call
+-- SetEditMode(IsEditMode), which re-broadcast the whole edit-mode state: every
+-- module re-applied its settings, every frame that re-anchors did so again, and
+-- a full Blizzard layout application got scheduled off the back of it. Ticking
+-- a checkbox moved the chat window and hid the pet frame. It is a checkbox: it
+-- may touch the overlays and nothing more.
+function Module:RefreshSelectionVisibility()
+    for _, selection in ipairs(self.SelectionFrames or {}) do
+        if selection.RefreshEditModeState then
+            local ok, err = pcall(selection.RefreshEditModeState, selection, self.IsEditMode)
+            if not ok then geterrorhandler()('DFUI Editmode refresh: ' .. tostring(err)) end
+        end
+    end
 end
 
 function Module:AddEditModeToFrame(frameRef)
@@ -523,7 +569,21 @@ function Module:InitEditmodeOverride()
             return
         end
 
+        -- ApplyChanges works by showing and immediately hiding
+        -- EditModeManagerFrame. If the player has Blizzard's Edit Mode open
+        -- right now, that slams their session shut mid-edit and discards what
+        -- they were doing. Wait for them to leave it.
+        if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
+            addonTable.BlizzApplyPending = true
+            return
+        end
+
+        -- Our own application fires Blizzard's EditMode.Enter and .Exit as a
+        -- side effect of that show/hide. Flag it, so the handlers that react to
+        -- the player opening the native edit mode do not react to us.
+        addonTable.ApplyingBlizzLayout = true
         LibEditModeOverride:ApplyChanges()
+        addonTable.ApplyingBlizzLayout = false
 
         -- An application resets every frame whose position DFUI owns but the
         -- Blizzard layout has no record of - player and target above all.
@@ -537,7 +597,7 @@ function Module:InitEditmodeOverride()
         -- edit-mode visibility - which broadcasts OnEditMode, which makes a
         -- module re-anchor, which schedules an application - dragged the chat
         -- window off its configured spot.
-        for _, name in ipairs({'Unitframe', 'Chat'}) do
+        for _, name in ipairs(addonTable.BlizzEditmodeReapply) do
             local m = DF:GetModule(name, true)
             if m and m.GetWasEnabled and m:GetWasEnabled() then
                 local ok, err = pcall(function() m:ApplySettings() end)
@@ -550,6 +610,32 @@ function Module:InitEditmodeOverride()
         if applyScheduled then return end
         applyScheduled = true
         C_Timer.After(0.5, applyNow)
+    end
+
+    -- One edit mode at a time, and hands off theirs. Registered once: this
+    -- function runs per flavour entry point and must stay re-entrant.
+    if not addonTable.BlizzEditmodeHooksInstalled then
+        addonTable.BlizzEditmodeHooksInstalled = true
+
+        EventRegistry:RegisterCallback('EditMode.Enter', function()
+            if addonTable.ApplyingBlizzLayout then return end
+
+            if Module.IsEditMode then
+                Module:Print("Blizzard's Edit Mode opened - closing Dragonflight edit mode so the two do not fight"
+                                 .. ' over the same frames.')
+                Module:SetEditMode(false)
+            end
+        end)
+
+        EventRegistry:RegisterCallback('EditMode.Exit', function()
+            if addonTable.ApplyingBlizzLayout then return end
+
+            -- a layout application we deferred while their session was open
+            if addonTable.BlizzApplyPending then
+                addonTable.BlizzApplyPending = nil
+                addonTable:ScheduleBlizzEditmodeApply()
+            end
+        end)
     end
 
     function addonTable:OverrideBlizzEditmode(f, ...)

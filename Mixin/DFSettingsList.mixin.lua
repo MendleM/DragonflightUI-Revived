@@ -196,7 +196,10 @@ function DFSettingsListMixin:Display(data, small)
             newInfo[1] = 'advanced'
             newInfo[2] = info[1]
             editmodeModule:SetOption(newInfo, value)
-            editmodeModule:SetEditMode(editmodeModule.IsEditMode)
+            -- the flag only decides whether edit mode may show this frame, so
+            -- re-evaluate the overlays - do NOT re-broadcast the edit-mode
+            -- state, which makes every module re-apply its settings
+            editmodeModule:RefreshSelectionVisibility()
         end
 
         local args = {
