@@ -111,38 +111,54 @@ function DragonflightUIStateHandlerMixin:InitStateHandler(extraX, extraY)
     --
     local handlerAlpha = CreateFrame('FRAME', self:GetName() .. 'HandlerAlpha', nil, 'SecureHandlerStateTemplate')
     self.DFAlphaHandler = handlerAlpha;
-    handlerAlpha:SetFrameRef('frameRef', self)
-    handlerAlpha:SetFrameRef('MainHandler', handler)
-    handlerAlpha:SetAttribute('_onstate-alpha', [[
-        -- if not newstate then return end     
-        local frameRef = self:GetFrameRef("frameRef")
-        if not frameRef then return end     
 
-        -- print('newState:',newstate,' ~~~ ', frameRef:GetName())
-        -- print('--',frameRef:GetAttribute('alphaNormal'),frameRef:GetAttribute('alphaCombat'))
-        local newAlpha = 1.0;
-        if newstate == 'combat' then
-            newAlpha = frameRef:GetAttribute('alphaCombat') or 0.5;
-        elseif newstate == 'normal' then
-            newAlpha = frameRef:GetAttribute('alphaNormal') or 0.8;
-        elseif newstate == 'fullAlpha' then
-            newAlpha = 1.0;
-        else
-            --
-        end
-        frameRef:SetAlpha(newAlpha);
-      
-        local MainHandler = self:GetFrameRef("MainHandler")
+    -- Alpha is applied from ordinary code, not a restricted snippet.
+    --
+    -- This used to be an _onstate-alpha snippet that resolved frame handles -
+    -- the frame itself, the main handler, and HideFrame1..13 - which is up to
+    -- fifteen dereferences every time the driver fires. The driver is
+    -- '[combat]combat;[nocombat]normal', registered for every frame with a
+    -- state handler, so it fires on entering combat, always. Any of those
+    -- handles that will not resolve throws "Invalid frame handle" out of
+    -- RestrictedFrames, the snippet dies, and the alpha is never applied.
+    -- ('if not frameRef then return end' does not help: it catches a ref that
+    -- was never set, not a handle that fails to resolve when used.)
+    --
+    -- None of this needed to be secure. SetAlpha is not a protected call - it
+    -- works on any frame, in combat, from anywhere. The snippet bought nothing
+    -- and cost an error per frame per pull.
+    handlerAlpha:HookScript('OnAttributeChanged', function(_, name, value)
+        if name ~= 'state-alpha' then return end
+        self:ApplyStateAlpha(value)
+    end)
+end
 
-        for i=1,13 do
-            local f = MainHandler:GetFrameRef('HideFrame'..i)
-            if f then f:SetAlpha(newAlpha) end
-        end   
-    ]])
+function DragonflightUIStateHandlerMixin:ApplyStateAlpha(newstate)
+    local newAlpha = 1.0
+
+    if newstate == 'combat' then
+        newAlpha = self:GetAttribute('alphaCombat') or 0.5
+    elseif newstate == 'normal' then
+        newAlpha = self:GetAttribute('alphaNormal') or 0.8
+    end
+
+    self:SetAlpha(newAlpha)
+
+    -- the frames this one speaks for: Blizzard's containers are anchored to
+    -- ours rather than parented, so they need the alpha applied to them too
+    if self.DFHideFrames then
+        for _, f in pairs(self.DFHideFrames) do f:SetAlpha(newAlpha) end
+    end
 end
 
 function DragonflightUIStateHandlerMixin:SetHideFrame(frame, index)
+    -- The ref stays: the visibility snippet is genuinely secure work and still
+    -- shows and hides these. The plain table is for the alpha path, which is
+    -- not.
     self.DFStateHandler:SetFrameRef('HideFrame' .. index, frame)
+
+    self.DFHideFrames = self.DFHideFrames or {}
+    self.DFHideFrames[index] = frame
 end
 
 function DragonflightUIStateHandlerMixin:SetUnit(unit)
