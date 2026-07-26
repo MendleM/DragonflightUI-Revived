@@ -301,9 +301,19 @@ local function StylePlate(unit, force)
         uf.name:SetShadowOffset(0, 0)
     end
 
-    -- Enemy level, top-right in line with the name. Plates are pooled, so the
-    -- FontString is created once but refreshed for every new unit.
-    if uf.name then
+    -- Enemy level, top-right in line with the name - but only on the styles
+    -- that have no level of their own. The classic plate already draws a level
+    -- box at the end of the health bar (CompactUnitFrame_UpdateLevel, gated on
+    -- optionTable.showLevel), so ours was a second copy of the same number
+    -- sitting on top of the unit's name.
+    --
+    -- Read it off the plate rather than off our style setting: the style can
+    -- also be changed in Blizzard's own options, and on 'Don't manage' we have
+    -- no idea which one is in force.
+    local plateShowsLevel = (uf.LevelFrame and uf.LevelFrame.IsShown and uf.LevelFrame:IsShown()) or
+                                (uf.optionTable and uf.optionTable.showLevel) or false
+
+    if uf.name and not plateShowsLevel then
         local levelText = uf.DFLevelText
         if not levelText then
             levelText = uf:CreateFontString(nil, 'OVERLAY')
@@ -331,6 +341,10 @@ local function StylePlate(unit, force)
         else
             levelText:Hide()
         end
+    elseif uf.DFLevelText then
+        -- pooled plates: this one may have carried our level under a style that
+        -- had none of its own
+        uf.DFLevelText:Hide()
     end
 end
 
