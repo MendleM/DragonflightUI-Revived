@@ -266,6 +266,51 @@ local function StyleDrawsOwnLevel()
     return style == 'CLASSIC'
 end
 
+-- Enemy level, top-right in line with the name - but only on the styles that
+-- have no level of their own. The classic plate draws a level box at the end of
+-- its health bar, and ours came out as a second copy of the same number sitting
+-- on top of the unit's name.
+local function UpdateLevelText(uf, unit)
+    if not (uf and uf.name and unit) then return end
+
+    local styling = Module.db and Module.db.profile.styleTexture
+
+    if not styling or StyleDrawsOwnLevel() then
+        if uf.DFLevelText then uf.DFLevelText:Hide() end
+        return
+    end
+
+    local levelText = uf.DFLevelText
+    if not levelText then
+        levelText = uf:CreateFontString(nil, 'OVERLAY')
+        local path = uf.name:GetFont()
+        if path then levelText:SetFont(path, 10, 'OUTLINE') end
+        levelText:SetShadowOffset(0, 0)
+        -- Right-aligned to the plate itself (the healthbar edge), on the name's
+        -- line - anchoring off the centered name text pushed the level past the
+        -- plate's end for long names.
+        local container = uf.HealthBarsContainer
+        local levelAnchor = (container and container.healthBar) or uf
+        levelText:SetPoint('BOTTOMRIGHT', levelAnchor, 'TOPRIGHT', 0, 2)
+        uf.DFLevelText = levelText
+    end
+
+    if UnitCanAttack('player', unit) then
+        local level = UnitLevel(unit)
+        if level and level > 0 then
+            local color = GetQuestDifficultyColor and GetQuestDifficultyColor(level) or {r = 1, g = 0.82, b = 0}
+            levelText:SetText(level)
+            levelText:SetTextColor(color.r, color.g, color.b)
+        else
+            levelText:SetText('??')
+            levelText:SetTextColor(1, 0.1, 0.1)
+        end
+        levelText:Show()
+    else
+        levelText:Hide()
+    end
+end
+
 -- force: re-apply even where our own marker says the plate was already done.
 -- Blizzard rebuilds plate contents on style and size changes, which throws our
 -- texture and font away while the marker stays behind - so a style change used
@@ -322,43 +367,7 @@ local function StylePlate(unit, force)
         uf.name:SetShadowOffset(0, 0)
     end
 
-    -- Enemy level, top-right in line with the name - but only on the styles
-    -- that have no level of their own. The classic plate draws a level box at
-    -- the end of its health bar, and ours came out as a second copy of the same
-    -- number sitting on top of the unit's name.
-    if uf.name and not StyleDrawsOwnLevel() then
-        local levelText = uf.DFLevelText
-        if not levelText then
-            levelText = uf:CreateFontString(nil, 'OVERLAY')
-            local path = uf.name:GetFont()
-            if path then levelText:SetFont(path, 10, 'OUTLINE') end
-            levelText:SetShadowOffset(0, 0)
-            -- Right-aligned to the plate itself (the healthbar edge), on the
-            -- name's line - anchoring off the centered name text pushed the
-            -- level past the plate's end for long names.
-            local levelAnchor = (container and container.healthBar) or uf
-            levelText:SetPoint('BOTTOMRIGHT', levelAnchor, 'TOPRIGHT', 0, 2)
-            uf.DFLevelText = levelText
-        end
-        if UnitCanAttack('player', unit) then
-            local level = UnitLevel(unit)
-            if level and level > 0 then
-                local color = GetQuestDifficultyColor and GetQuestDifficultyColor(level) or {r = 1, g = 0.82, b = 0}
-                levelText:SetText(level)
-                levelText:SetTextColor(color.r, color.g, color.b)
-            else
-                levelText:SetText('??')
-                levelText:SetTextColor(1, 0.1, 0.1)
-            end
-            levelText:Show()
-        else
-            levelText:Hide()
-        end
-    elseif uf.DFLevelText then
-        -- pooled plates: this one may have carried our level under a style that
-        -- had none of its own
-        uf.DFLevelText:Hide()
-    end
+    UpdateLevelText(uf, unit)
 end
 
 function Module:RestyleAll(force)
@@ -436,6 +445,24 @@ function Module:OnEnable()
     if NamePlateDriverFrame and NamePlateDriverFrame.UpdateNamePlateOptions then
         hooksecurefunc(NamePlateDriverFrame, 'UpdateNamePlateOptions', function()
             C_Timer.After(0, function() Module:RestyleAll(true) end)
+        end)
+    end
+
+    -- Blizzard's own level call, hooked so our level text reconciles with
+    -- theirs the moment they touch it - whichever side changed the style, and
+    -- whether or not the plate is rebuilt. Without this, switching to the
+    -- classic style left our level next to the name on every plate already on
+    -- screen: it only corrected itself when the unit went out of range and its
+    -- plate was recycled.
+    if CompactUnitFrame_UpdateLevel then
+        hooksecurefunc('CompactUnitFrame_UpdateLevel', function(frame)
+            if not (frame and frame.GetParent) then return end
+
+            -- CompactUnitFrame is shared with the raid and party frames; only a
+            -- nameplate's parent carries a unit token.
+            local plate = frame:GetParent()
+            local unit = plate and plate.namePlateUnitToken
+            if unit then UpdateLevelText(frame, unit) end
         end)
     end
 
