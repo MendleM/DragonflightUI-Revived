@@ -2606,10 +2606,13 @@ function Module.HookUsableRepaints()
     local range = Module.SubActionbarRange
     if not (range and range.HookButtonUsable) then return end
 
-    local bef = _G['ActionBarButtonEventsFrame']
-    if bef and bef.frames then
-        for _, btn in pairs(bef.frames) do range:HookButtonUsable(btn) end
-    end
+    -- Deliberately NOT sweeping ActionBarButtonEventsFrame.frames: that
+    -- reaches every action button in the game, including ones DFUI never
+    -- touches, and marking them taints frames Blizzard still needs to
+    -- drive. Blizzard's OnEnter runs a FORCED UpdateAction on mouseover,
+    -- which calls SetAttribute/SetShown - protected in combat - so a
+    -- tainted button throws "action blocked" the moment you hover it mid
+    -- fight. Only our own bars, which DFUI already owns.
 
     -- Action bars only: pet/stance/possess buttons have no action slot, so
     -- the usable coloring does not apply to them.

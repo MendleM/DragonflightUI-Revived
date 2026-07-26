@@ -1699,6 +1699,17 @@ function DragonflightUIActionbarMixin:StyleButton(btn, keepNormalHighlight)
     -- print(btn:GetName())
     -- print(btn:GetName(), btn:GetAttribute("statehidden"))
 
+    -- Blizzard's ActionButton OnEnter runs a FORCED UpdateAction whenever
+    -- this texture exists, and that path calls SetAttribute/SetShown -
+    -- both protected in combat. DFUI's buttons are inevitably tainted (we
+    -- restyle and re-attribute them), so every hover of a bar mid-fight
+    -- raised "action blocked". We replace the button art anyway, and every
+    -- other use of this texture in Blizzard's code is nil-guarded.
+    if btn.NewActionTexture then
+        btn.NewActionTexture:Hide()
+        btn.NewActionTexture = nil
+    end
+
     local icon = _G[btnName .. 'Icon']
     -- icon:ClearAllPoints()
     icon:SetSize(45, 45)

@@ -248,9 +248,13 @@ end
 -- an icon we desaturated for out-of-range could stay grey until the next
 -- range event, which is what "grey buttons that recover on mouseover"
 -- was. Buttons own a copy of the mixin method, so hook per button.
+-- Tracked outside the frames: writing a marker field onto a button taints
+-- its table, and Blizzard's mouseover path performs protected calls on it.
+local usableHooked = setmetatable({}, {__mode = 'k'})
+
 function SubModuleMixin:HookButtonUsable(btn)
-    if not btn or btn.DFUsableHooked or type(btn.UpdateUsable) ~= 'function' then return end
-    btn.DFUsableHooked = true
+    if not btn or usableHooked[btn] or type(btn.UpdateUsable) ~= 'function' then return end
+    usableHooked[btn] = true
 
     hooksecurefunc(btn, 'UpdateUsable', function(b)
         if not self.activate then return end
