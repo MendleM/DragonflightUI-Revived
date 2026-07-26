@@ -3187,26 +3187,37 @@ function Module:RefreshOptionScreens()
     refreshCat('Micromenu')
     refreshCat('FPS')
 
-    for i = 1, 8 do
-        local bar = Module['bar' .. i]
-        bar.DFEditModeSelection:RefreshOptionScreen();
+    -- Refresh whatever actually got an edit-mode registration.
+    --
+    -- These were a run of bare calls, and every one of them assumed its frame
+    -- exists on this flavour and was registered. MultiCastActionBarFrame is the
+    -- one that proved otherwise: DF.Cata is true on MoP but the totem bar is
+    -- gone in 5.5.4, so the registration above is guarded and correctly skipped
+    -- it, while this list indexed it anyway and threw. That runs from
+    -- OnDragStop, so it fired on every drag in edit mode and took the rest of
+    -- the refresh with it each time.
+    local function refresh(frame)
+        local selection = frame and frame.DFEditModeSelection
+        if selection then selection:RefreshOptionScreen() end
     end
 
-    Module.petbar.DFEditModeSelection:RefreshOptionScreen();
-    Module.xpbar.DFEditModeSelection:RefreshOptionScreen();
-    Module.repbar.DFEditModeSelection:RefreshOptionScreen();
-    PossessBarFrame.DFEditModeSelection:RefreshOptionScreen();
-    Module.stancebar.DFEditModeSelection:RefreshOptionScreen();
+    for i = 1, 8 do refresh(Module['bar' .. i]) end
+
+    refresh(Module.petbar)
+    refresh(Module.xpbar)
+    refresh(Module.repbar)
+    refresh(PossessBarFrame)
+    refresh(Module.stancebar)
+
     if DF.Cata then
-        MultiCastActionBarFrame.DFEditModeSelection:RefreshOptionScreen();
-        Module.ExtraActionButtonPreview.DFEditModeSelection:RefreshOptionScreen();
+        refresh(MultiCastActionBarFrame)
+        refresh(Module.ExtraActionButtonPreview)
     end
 
-    _G['DragonflightUIBagBar'].DFEditModeSelection:RefreshOptionScreen();
-    Module.MicroFrame.DFEditModeSelection:RefreshOptionScreen();
-    Module.FPSFrame.DFEditModeSelection:RefreshOptionScreen();
-
-    _G['DragonflightUIVehicleLeaveButton'].DFEditModeSelection:RefreshOptionScreen();
+    refresh(_G['DragonflightUIBagBar'])
+    refresh(Module.MicroFrame)
+    refresh(Module.FPSFrame)
+    refresh(_G['DragonflightUIVehicleLeaveButton'])
 end
 
 function Module:ApplySettings(sub, key)
