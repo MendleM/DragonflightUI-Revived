@@ -427,14 +427,22 @@ function Module:SetupMainmenuButton()
     end)
 end
 
+-- WasEditMode is a request, not a memory: "the player wants edit mode open and
+-- the fight is in the way". Combat ending honours it; closing edit mode - by
+-- any route a player can take - withdraws it.
 function Module:CombatHandler(preCombat)
     if preCombat then
-        self.WasEditMode = self.IsEditMode
+        local wasOpen = self.IsEditMode
 
-        if self.IsEditMode then
+        if wasOpen then
             self:Print('Combat started while in edit mode - deactivating until combat is over.')
             self:SetEditMode(false)
         end
+
+        -- after the close, never before: SetEditMode(false) withdraws the
+        -- request, and this one is the addon's own doing rather than the
+        -- player's, so it re-arms behind it
+        self.WasEditMode = wasOpen
     else
         if self.WasEditMode then
             self:Print('Combat ended - restoring edit mode.')
@@ -450,12 +458,26 @@ function Module:SetEditMode(isEditMode)
     -- Moving frames is protected work: in combat the drags are refused by the
     -- client without a word, so the mode would look open and do nothing.
     if isEditMode and Helper:IsCombatLocked() then
-        Module:Print('Edit mode is not available in combat - it will open when combat ends.')
-        Module.WasEditMode = true
+        -- The button is a toggle, and it has to stay one in combat: IsEditMode
+        -- never goes true here, so without this a second press just re-queues
+        -- and the player has no way to take the request back.
+        if Module.WasEditMode then
+            Module.WasEditMode = false
+            Module:Print('Edit mode no longer queued - it will stay closed when combat ends.')
+        else
+            Module.WasEditMode = true
+            Module:Print('Edit mode is not available in combat - it will open when combat ends.')
+        end
         return
     end
 
     Module.IsEditMode = isEditMode;
+
+    -- Closing edit mode answers the question the queue is waiting on, so it
+    -- withdraws any pending restore. Otherwise a fight that interrupted edit
+    -- mode - or a single press of the button during one - reopens it after
+    -- combat no matter what the player did in between.
+    if not isEditMode then Module.WasEditMode = false end
     Module.EditModeFrame:SetShown(isEditMode)
 
     Module:ApplySettings()
