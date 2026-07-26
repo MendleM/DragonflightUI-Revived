@@ -1358,12 +1358,42 @@ function SubModuleMixin:UpdatePartyHPBar(i)
     end
 end
 
+-- TEMP DIAGNOSTIC: who hides a party frame.
+--
+-- Party members keep vanishing mid-fight and the first fix for it - the anchor
+-- hook re-anchoring from inside Blizzard's update - was not the whole story.
+-- Rather than guess again, record every hide with a stack, so the next time it
+-- happens the log names whatever did it.
+--
+-- Tracked outside the frames: writing a marker field onto a protected frame
+-- taints it, and these are exactly the frames whose taint is under suspicion.
+local hideLogged = setmetatable({}, {__mode = 'k'})
+
+local function LogHides(pf)
+    if hideLogged[pf] then return end
+    hideLogged[pf] = true
+
+    local function record(what)
+        return function(frame)
+            if not DF.Log then return end
+            DF:Log('party', '%s %s | combat=%s | %s', frame:GetName() or '?', what,
+                   tostring(InCombatLockdown()), tostring(debugstack(2, 8, 0)):gsub('\n', ' | '):sub(1, 700))
+        end
+    end
+
+    hooksecurefunc(pf, 'Hide', record('hidden'))
+    hooksecurefunc(pf, 'SetShown', function(frame, shown)
+        if not shown then record('SetShown(false)')(frame) end
+    end)
+end
+
 function SubModuleMixin:AddStateUpdater()
     for i = 1, 4 do
         local pf = _G['PartyMemberFrame' .. i]
         Mixin(pf, DragonflightUIStateHandlerMixin)
         pf:InitStateHandler()
         pf:SetUnit('party' .. i)
+        LogHides(pf)
     end
 end
 
