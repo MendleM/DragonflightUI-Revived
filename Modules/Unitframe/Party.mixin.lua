@@ -429,6 +429,17 @@ function SubModuleMixin:SetupModern()
             manabar:GetStatusBarTexture():AddMaskTexture(manaMask)
         end
 
+        -- Debuff row. We adopted retail's bar geometry (mana 74x7 at
+        -- 41,-30) but the template still carried Classic's aura anchor of
+        -- (48,-32), which was written for Classic's mana bar ending at
+        -- -29 - so the icons landed on top of our power bar. Retail pairs
+        -- that bar geometry with (48,-43); use its number.
+        local auras = pf.AuraFrameContainer
+        if auras then
+            auras:ClearAllPoints()
+            auras:SetPoint('TOPLEFT', pf, 'TOPLEFT', 48, -43)
+        end
+
         -- Role icon (Era 1.15.x has LFG roles), same treatment as the
         -- classic reskin: top-right corner of the member frame.
         if UnitGroupRolesAssigned then
@@ -468,10 +479,17 @@ function SubModuleMixin:SetupModern()
         local shade = UnitIsConnected(unit) and 1 or 0.5
 
         local healthbar = pf.HealthBar
-        if healthbar then healthbar:SetStatusBarColor(shade, shade, shade, 1) end
+        if healthbar then
+            -- (re)assert here too, not just at first styling: frames styled
+            -- before this ran would otherwise keep Blizzard's tint until a
+            -- reload recreated them.
+            healthbar.lockColor = true
+            healthbar:SetStatusBarColor(shade, shade, shade, 1)
+        end
 
         local manabar = pf.ManaBar
         if manabar then
+            manabar.lockColor = true
             local _, powerToken = UnitPowerType(unit)
             local art = POWER_BAR_ART[powerToken] or 'Mana'
             local tex = manabar:GetStatusBarTexture()
