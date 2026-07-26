@@ -2,4 +2,5 @@
 	<Include file="Config.lua" />
 	<Include file="Profiles.lua" />
 	<Include file="Editmode.lua" />
+	<Include file="EditmodeUndo.lua" />
 </Ui>

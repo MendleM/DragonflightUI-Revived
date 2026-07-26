@@ -1,3 +1,4 @@
+local addonName, addonTable = ...;
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 ---@type API
@@ -73,13 +74,27 @@ function DragonflightUIModulesMixin:SetOption(info, value)
     local sub = info[2]
     -- print('setOption', self:GetName(), '|', key, sub, value)
 
-    if sub then
-        local t = self.db.profile[key]
-        t[sub] = value
-        self:ApplySettings(key, sub)
+    -- Every settings page writes through here, so this is where edit mode's
+    -- undo picks changes up. Outside edit mode it records nothing and simply
+    -- runs the change.
+    local undo = addonTable.EditmodeUndo
+    local label = (self.GetName and self:GetName() or '?') .. ' - ' .. tostring(sub or key)
+
+    local function apply()
+        if sub then
+            local t = self.db.profile[key]
+            t[sub] = value
+            self:ApplySettings(key, sub)
+        else
+            self.db.profile[key] = value
+            self:ApplySettings(nil, key)
+        end
+    end
+
+    if undo then
+        undo:Capture(self, key, apply, label)
     else
-        self.db.profile[key] = value
-        self:ApplySettings(nil, key)
+        apply()
     end
 end
 

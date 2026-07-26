@@ -1,3 +1,4 @@
+local addonName, addonTable = ...;
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- local EditModeModule = DF:GetModule('Editmode');
 local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
@@ -860,11 +861,25 @@ function DFEditModeSystemSelectionBaseMixin:OnDragStop()
 
     local anchor, anchorFrame, anchorParent, xxx, yyy = self:CalcSnapParentToGrid()
 
-    db.anchor = anchor;
-    db.anchorFrame = anchorFrame;
-    db.anchorParent = anchorParent;
-    db.x = xxx
-    db.y = yyy
+    -- A drag does not go through SetOption, so it records itself. Only when the
+    -- registration names a profile sub-table - without one there is no bounded
+    -- thing to snapshot, and the whole profile is too big to copy per drag.
+    local undo = self.ModuleSub and addonTable.EditmodeUndo
+
+    local function commit()
+        db.anchor = anchor;
+        db.anchorFrame = anchorFrame;
+        db.anchorParent = anchorParent;
+        db.x = xxx
+        db.y = yyy
+    end
+
+    if undo then
+        local label = (self.getLabelText and self.getLabelText()) or self.ModuleSub
+        undo:Capture(self.ModuleRef, self.ModuleSub, commit, label)
+    else
+        commit()
+    end
 
     self.ModuleRef:ApplySettings(self.ModuleSub or false)
     self.ModuleRef:RefreshOptionScreens()

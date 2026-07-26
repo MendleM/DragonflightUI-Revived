@@ -499,6 +499,9 @@ function Module:SetEditMode(isEditMode)
         end
     end
 
+    -- Undo records only while the mode is open, and its history ends with it.
+    if addonTable.EditmodeUndo then addonTable.EditmodeUndo:SetActive(isEditMode) end
+
     self.SelectedFrame = nil;
     self:TriggerEvent(self.Event.OnEditMode, isEditMode)
 end
