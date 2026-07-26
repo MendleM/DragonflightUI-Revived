@@ -430,6 +430,26 @@ function SubModuleMixin:SetupModern()
             manabar:GetStatusBarTexture():AddMaskTexture(manaMask)
         end
 
+        -- The DF border sits on the overlay, i.e. above the bar child
+        -- frames, and its inner region is not fully transparent - measured
+        -- against the source art, the bars were rendering at ~50% of the
+        -- texture's brightness, uniformly across the whole gradient, which
+        -- is the signature of a translucent dark layer on top. Lift the
+        -- bars above the overlay so nothing paints over them.
+        if overlay then
+            local lvl = overlay:GetFrameLevel() + 1
+            if pf.HealthBar then pf.HealthBar:SetFrameLevel(lvl) end
+            if pf.ManaBar then pf.ManaBar:SetFrameLevel(lvl) end
+        end
+
+        -- Blizzard flips health-bar desaturation in UpdateOnlineStatus and
+        -- the flag could stay stuck on a pooled frame reused for a
+        -- connected player; re-assert our own state right after it runs.
+        if pf.UpdateOnlineStatus and not pf.DFOnlineHooked then
+            pf.DFOnlineHooked = true
+            hooksecurefunc(pf, 'UpdateOnlineStatus', function(f) UpdateBars(f) end)
+        end
+
         -- Debuff row. We adopted retail's bar geometry (mana 74x7 at
         -- 41,-30) but the template still carried Classic's aura anchor of
         -- (48,-32), which was written for Classic's mana bar ending at
