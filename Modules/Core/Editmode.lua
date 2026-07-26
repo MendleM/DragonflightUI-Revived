@@ -573,6 +573,40 @@ function Module:InitEditmodeOverride()
     local applyScheduled = false
     local combatGate
 
+    -- A layout application resets every frame whose position DFUI owns but the
+    -- Blizzard layout has no record of - player and target above all. Without
+    -- this the frames sit correctly for a moment after login and then jump to
+    -- the layout's spots.
+    --
+    -- Chat belongs on this list for the same reason: ChatFrame1 is a Blizzard
+    -- edit-mode system on 1.15.9+, so an application re-anchors and re-sizes it
+    -- from the layout. That is why toggling a frame's edit-mode visibility -
+    -- which broadcasts OnEditMode, which makes a module re-anchor, which
+    -- schedules an application - dragged the chat window off its configured
+    -- spot.
+    --
+    -- This runs after ANY application, not only ours. Opening Blizzard's own
+    -- Edit Mode shows EditModeManagerFrame, and showing that frame IS a full
+    -- application - the very property LibEditModeOverride:ApplyChanges() relies
+    -- on. So the player opening it displaced the unit frames exactly as one of
+    -- our own applications would, and nothing put them back until the next
+    -- PLAYER_REGEN_ENABLED, where Unitframe's own re-apply happens to catch it.
+    -- That is the "opening edit mode moves my frames, leaving combat fixes
+    -- them" report.
+    local function ReapplyOwnedPositions()
+        -- Positioning these is protected work; in combat it is refused
+        -- silently. Unitframe's own regen re-apply is the safety net.
+        if Helper:IsCombatLocked() then return end
+
+        for _, name in ipairs(addonTable.BlizzEditmodeReapply) do
+            local m = DF:GetModule(name, true)
+            if m and m.GetWasEnabled and m:GetWasEnabled() then
+                local ok, err = pcall(function() m:ApplySettings() end)
+                if not ok then geterrorhandler()('DFUI Editmode reapply ' .. name .. ': ' .. tostring(err)) end
+            end
+        end
+    end
+
     local function applyNow()
         applyScheduled = false
         if not (LibEditModeOverride and LibEditModeOverride.ApplyChanges) then return end
@@ -607,25 +641,7 @@ function Module:InitEditmodeOverride()
         LibEditModeOverride:ApplyChanges()
         addonTable.ApplyingBlizzLayout = false
 
-        -- An application resets every frame whose position DFUI owns but the
-        -- Blizzard layout has no record of - player and target above all.
-        -- Without this the frames sit correctly for a moment after login and
-        -- then jump to the layout's spots, and only opening edit mode (which
-        -- re-applies our settings) puts them back.
-        --
-        -- Chat belongs on this list for the same reason: ChatFrame1 is a
-        -- Blizzard edit-mode system on 1.15.9+, so an application re-anchors
-        -- and re-sizes it from the layout. That is why toggling a frame's
-        -- edit-mode visibility - which broadcasts OnEditMode, which makes a
-        -- module re-anchor, which schedules an application - dragged the chat
-        -- window off its configured spot.
-        for _, name in ipairs(addonTable.BlizzEditmodeReapply) do
-            local m = DF:GetModule(name, true)
-            if m and m.GetWasEnabled and m:GetWasEnabled() then
-                local ok, err = pcall(function() m:ApplySettings() end)
-                if not ok then geterrorhandler()('DFUI Editmode reapply ' .. name .. ': ' .. tostring(err)) end
-            end
-        end
+        ReapplyOwnedPositions()
     end
 
     function addonTable:ScheduleBlizzEditmodeApply()
@@ -647,10 +663,17 @@ function Module:InitEditmodeOverride()
                                  .. ' over the same frames.')
                 Module:SetEditMode(false)
             end
+
+            -- Opening it applied the layout and displaced our frames. Next
+            -- frame, so the application has finished before we answer it.
+            C_Timer.After(0, ReapplyOwnedPositions)
         end)
 
         EventRegistry:RegisterCallback('EditMode.Exit', function()
             if addonTable.ApplyingBlizzLayout then return end
+
+            -- Leaving applies the layout again, Save or no Save.
+            C_Timer.After(0, ReapplyOwnedPositions)
 
             -- a layout application we deferred while their session was open
             if addonTable.BlizzApplyPending then
