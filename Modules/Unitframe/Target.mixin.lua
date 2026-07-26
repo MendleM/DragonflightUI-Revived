@@ -969,7 +969,9 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
             glow.OffsetY = 7
             glow.CoordRight = ART_R
             glow.CoordBottom = ART_B
-            glow.Intensity = 1.8
+            -- Settled at 0.9 against a live frame: the replacing pass just under
+            -- full, additive passes off. They only come in past 1.
+            glow.Intensity = 0.9
             glow.Red, glow.Green, glow.Blue = 1.0, 0.0, 0.0
 
             function glow:ApplyGlow()
