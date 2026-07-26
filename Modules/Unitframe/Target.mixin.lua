@@ -733,6 +733,16 @@ end
 function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
     local tex2xBase = 'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe2x\\'
 
+    -- The frame art and the in-combat glow are the same picture - the glow file
+    -- is the frame with red drawn around it, and both atlases are 512x256 with
+    -- the art in the same place. So they have to be cut, sized and positioned
+    -- identically or the glow traces a different outline than the frame it is
+    -- supposed to be glowing around. Shared here rather than written twice,
+    -- which is how they drifted apart.
+    local ART_L, ART_R, ART_T, ART_B = 0, 384 / 512, 0, 134 / 256
+    local ART_W, ART_H = 192, 67
+    local ART_X, ART_Y = -20, 6
+
     local port = frame.Portrait or _G[frame:GetName() .. 'Portrait']
     local healthBar = frame.HealthBar or _G[frame:GetName() .. 'HealthBar']
     local manaBar = frame.ManaBar or _G[frame:GetName() .. 'ManaBar']
@@ -759,9 +769,9 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
         local background = frame:CreateTexture('DragonflightUI' .. frame:GetName() .. 'Background')
         background:SetDrawLayer('BACKGROUND', 1)
         background:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-2x')
-        background:SetTexCoord(0, 384 / 512, 0, 134 / 256)
-        background:SetSize(192, 67)
-        background:SetPoint('CENTER', frame, 'CENTER', -20, 6)
+        background:SetTexCoord(ART_L, ART_R, ART_T, ART_B)
+        background:SetSize(ART_W, ART_H)
+        background:SetPoint('CENTER', frame, 'CENTER', ART_X, ART_Y)
 
         self[frame:GetName() .. 'Background'] = background
         self.TargetFrameBackground = background;
@@ -877,11 +887,10 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
             local newFlash = frame:CreateTexture('DragonflightUI' .. frame:GetName() .. 'Flash')
             newFlash:SetDrawLayer('ARTWORK', 2)
             newFlash:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
-            newFlash:SetTexCoord(0, 376 / 512, 0, 134 / 256)
-            -- the in-combat art is the narrower piece of the same set, so this
-            -- is the background's 192x67 at -20,6 scaled to it
-            newFlash:SetSize(188, 67)
-            newFlash:SetPoint('CENTER', frame, 'CENTER', -21 + 0.5, 7 + 0.5)
+            -- exactly the background's cut, size and place: same picture
+            newFlash:SetTexCoord(ART_L, ART_R, ART_T, ART_B)
+            newFlash:SetSize(ART_W, ART_H)
+            newFlash:SetPoint('CENTER', frame, 'CENTER', ART_X, ART_Y)
 
             newFlash:SetVertexColor(1.0, 0.0, 0.0, 1.0)
             newFlash:SetBlendMode('ADD')
