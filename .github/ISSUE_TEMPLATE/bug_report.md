@@ -3,7 +3,7 @@ name: Bug report
 about: Create a report to help us improve
 title: "[BUG]"
 labels: bug
-assignees: Karl-HeinzSchneider
+assignees: MendleM
 
 ---
 
@@ -15,7 +15,7 @@ If applicable, add screenshots to help explain your problem.
 Please provide any lua error you encounter. Make sure you have error reporting enabled ingame ('/console scriptErrors 1'). Also consider using [BugSack](https://www.curseforge.com/wow/addons/bugsack) **and** [BugGrabber](https://www.curseforge.com/wow/addons/bug-grabber).
 
 **Versions (please complete the following information):**
- - WoW: [e.g. Cata classic, Era/SoD, Wrath classic (chinese?)]
+ - WoW: [e.g. Era 1.15.9, TBC 2.5.6, MoP 5.5.4, Cata classic]
  - Addon [e.g. v0.12.1]
 
 **Additional context**
