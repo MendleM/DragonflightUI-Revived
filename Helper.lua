@@ -90,6 +90,9 @@ local loadedInCombat = false
 local function DrainOutOfCombatQueue()
     if #pendingOrder == 0 then return end
 
+    local loadingState = addonTable.LoadingState
+    if loadingState then loadingState:ShowFinishing(pendingOrder) end
+
     local labels = {}
     for _, label in ipairs(pendingOrder) do
         local fn = pendingOutOfCombat[label]
@@ -123,6 +126,8 @@ function Helper.ReapplyAfterCombat()
         local ok, err = pcall(DF.RefreshConfig, DF)
         if not ok then geterrorhandler()('DFUI post-combat re-apply: ' .. tostring(err)) end
     end
+
+    if addonTable.LoadingState then addonTable.LoadingState:Complete() end
 end
 
 function Helper:QueueOutOfCombat(label, fn)
@@ -132,6 +137,11 @@ function Helper:QueueOutOfCombat(label, fn)
     pendingOutOfCombat[label] = fn
 
     if #perfLog < 400 then perfLog[#perfLog + 1] = 'deferred ' .. label .. ' to end of combat' end
+
+    -- on screen as well as in chat: a line in the chat frame during a pull is
+    -- easy to miss, and a half-built UI with no explanation reads as a broken
+    -- addon
+    if addonTable.LoadingState then addonTable.LoadingState:ShowWaiting(pendingOrder) end
 
     if not combatGate then
         combatGate = CreateFrame('Frame')

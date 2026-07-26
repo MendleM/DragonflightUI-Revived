@@ -59,6 +59,7 @@ Mixin\DFColor.mixin.lua
 
 Core.lua
 Helper.lua
+LoadingState.lua
 DebugLog.lua
 SharedMedia.lua
 API.xml
