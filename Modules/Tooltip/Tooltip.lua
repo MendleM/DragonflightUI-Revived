@@ -1363,21 +1363,28 @@ function Module:UnitPlayerTooltip(self)
         self:SetBackdropColor(r, g, b, state.backdropAlpha);
     end
 
-    -- A unit out of range may have no name through UnitName even though the
-    -- tooltip is already showing one: GetUnit hands back what the client had
-    -- resolved when it built the tooltip. Falling through with nil put an empty
-    -- string on the line - GetClassColoredText returns '' for a nil name - and
-    -- an empty line still takes its full height, which is the blank gap where
-    -- the name should be.
+    local line = _G[self:GetName() .. 'TextLeft1']
+
+    -- A unit out of range has no name to give, and it says so with an EMPTY
+    -- STRING rather than nil - which is truthy, so an `or` chain sails straight
+    -- past it and puts nothing on the line. The line still takes its full
+    -- height, so the tooltip keeps a blank gap where the name should be, and an
+    -- offline player shows nothing but the <DC> that gets appended to it.
+    --
+    -- Fall back in order of trustworthiness: what UnitName knows, then the name
+    -- the tooltip was built with, then whatever Blizzard already wrote on this
+    -- line, then Unknown.
+    local function usable(value)
+        return value and value ~= '' and value
+    end
+
     local unitName, realm = UnitName(unit)
-    unitName = unitName or name or UNKNOWN
+    unitName = usable(unitName) or usable(name) or usable(line:GetText()) or UNKNOWN
 
     if state.unitTitle then
         --
-        unitName = UnitPVPName(unit) or unitName
+        unitName = usable(UnitPVPName(unit)) or unitName
     end
-
-    local line = _G[self:GetName() .. 'TextLeft1']
     if realm and realm ~= '' and state.unitRealm then
         --
         unitName = unitName .. ' (' .. realm .. ')';
