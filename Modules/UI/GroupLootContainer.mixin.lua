@@ -113,9 +113,16 @@ local function ApplyRollButtonArt(btn, key)
     local art = MODERN_ICONS[key]
     if not (btn and art) then return end
 
-    -- the classic pass button is a UIPanelCloseButton; its inherited art has
-    -- to go, disabled state included, or it shows through
-    if btn.SetDisabledTexture then btn:SetDisabledTexture(nil) end
+    -- The classic pass button is a UIPanelCloseButton; its inherited art has
+    -- to go, disabled state included, or it shows through. Clear the texture
+    -- object rather than calling SetDisabledTexture(nil): 1.15.9 rejects nil
+    -- for the button's asset setters outright ("Usage:
+    -- self:SetDisabledTexture(asset)"), and that error aborted the restyle.
+    local disabled = btn.GetDisabledTexture and btn:GetDisabledTexture()
+    if disabled then
+        disabled:SetTexture(nil)
+        disabled:Hide()
+    end
 
     local useAtlas = art.atlas and btn.SetNormalAtlas and AtlasExists(art.atlas .. '-up')
     if DF.Log then DF:Log('lootstyle', 'button %s art via %s', key, useAtlas and 'client atlas' or 'shipped sheet') end
@@ -1259,6 +1266,8 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
     f.DFTopRollIcon:Hide()
 
     SubModuleMixin.ApplyDFBackdrop(f)
+
+    if DF.Log then DF:Log('lootstyle', '%s styled', (f.GetName and f:GetName()) or '<anonymous>') end
 
     -- Refresh cycle for LIVE frames only: at setup time these are hidden,
     -- and an unconditional Hide/Show popped four empty roll frames on login.
