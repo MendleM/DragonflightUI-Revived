@@ -464,6 +464,172 @@ function DF:LogClear()
     print(PREFIX .. 'cleared')
 end
 
+-- TEMP: live tuner for the target frame's combat glow.
+--
+-- Which texture is actually on screen depends on the flavour. On Wrath DFUI
+-- swaps in its own DragonflightUITargetFrameFlash; on TBC the branch is skipped
+-- entirely and Blizzard's own flash - an anonymous texture, file id 137016 -
+-- stays put, drawn for Blizzard's frame rather than ours. So find whichever one
+-- is there and let it be dragged into place by hand instead of guessing offsets
+-- one commit at a time.
+local tuner
+
+local function FindTargetFlash()
+    local mine = _G['DragonflightUITargetFrameFlash']
+    if mine then return mine, 'DragonflightUITargetFrameFlash' end
+
+    if not TargetFrame then return nil end
+    for _, region in ipairs({TargetFrame:GetRegions()}) do
+        if region:GetObjectType() == 'Texture' and region:GetTexture() == 137016 then
+            return region, "Blizzard's own flash (137016)"
+        end
+    end
+end
+
+local function TunerSlider(parent, label, low, high, step, y, onChange)
+    local s = CreateFrame('Slider', 'DragonflightUIFlashTune' .. label:gsub('%s', ''), parent,
+                          'OptionsSliderTemplate')
+    s:SetWidth(240)
+    s:SetPoint('TOPLEFT', parent, 'TOPLEFT', 24, y)
+    s:SetMinMaxValues(low, high)
+    s:SetValueStep(step)
+    s:SetObeyStepOnDrag(true)
+
+    local name = s:GetName()
+    _G[name .. 'Low']:SetText(tostring(low))
+    _G[name .. 'High']:SetText(tostring(high))
+    _G[name .. 'Text']:SetText(label)
+
+    s:SetScript('OnValueChanged', function(self, value)
+        _G[name .. 'Text']:SetText(string.format('%s: %.1f', label, value))
+        onChange(value)
+    end)
+
+    return s
+end
+
+function DF:FlashTune()
+    local flash, which = FindTargetFlash()
+    if not flash then
+        print(PREFIX .. 'no target flash texture found - target something first, then try again.')
+        return
+    end
+
+    if not tuner then
+        local f = CreateFrame('Frame', 'DragonflightUIFlashTuneFrame', UIParent, 'BackdropTemplate')
+        f:SetSize(300, 420)
+        f:SetPoint('CENTER', UIParent, 'CENTER', 300, 0)
+        f:SetFrameStrata('DIALOG')
+        f:EnableMouse(true)
+        f:SetMovable(true)
+        f:RegisterForDrag('LeftButton')
+        f:SetScript('OnDragStart', f.StartMoving)
+        f:SetScript('OnDragStop', f.StopMovingOrSizing)
+        f:SetClampedToScreen(true)
+        f:SetBackdrop({
+            bgFile = 'Interface\\DialogFrame\\UI-DialogBox-Background-Dark',
+            edgeFile = 'Interface\\DialogFrame\\UI-DialogBox-Border',
+            tile = true,
+            tileSize = 32,
+            edgeSize = 32,
+            insets = {left = 11, right = 12, top = 12, bottom = 11}
+        })
+
+        local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormal')
+        title:SetPoint('TOP', f, 'TOP', 0, -16)
+        title:SetText('Target flash tuner')
+
+        f.Which = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+        f.Which:SetPoint('TOP', title, 'BOTTOM', 0, -4)
+        f.Which:SetWidth(260)
+
+        f.Values = {x = 0, y = 0, w = 0, h = 0, r = 1, b = 1}
+
+        local function apply()
+            local t, v = f.Flash, f.Values
+            if not t then return end
+            t:ClearAllPoints()
+            t:SetPoint('CENTER', TargetFrame, 'CENTER', v.x, v.y)
+            t:SetSize(v.w, v.h)
+            t:SetTexCoord(0, v.r, 0, v.b)
+            t:Show()
+            t:SetAlpha(1)
+
+            f.Out:SetText(string.format(
+                              'SetPoint(CENTER, %.0f, %.0f)  SetSize(%.0f, %.0f)\nSetTexCoord(0, %.4f, 0, %.4f)', v.x,
+                              v.y, v.w, v.h, v.r, v.b))
+        end
+        f.Apply = apply
+
+        TunerSlider(f, 'X offset', -120, 120, 1, -70, function(v) f.Values.x = v; apply() end)
+        TunerSlider(f, 'Y offset', -120, 120, 1, -120, function(v) f.Values.y = v; apply() end)
+        TunerSlider(f, 'Width', 40, 400, 1, -170, function(v) f.Values.w = v; apply() end)
+        TunerSlider(f, 'Height', 20, 200, 1, -220, function(v) f.Values.h = v; apply() end)
+        TunerSlider(f, 'TexCoord right', 0.2, 1, 0.002, -270, function(v) f.Values.r = v; apply() end)
+        TunerSlider(f, 'TexCoord bottom', 0.2, 1, 0.002, -320, function(v) f.Values.b = v; apply() end)
+
+        f.Out = CreateFrame('EditBox', nil, f)
+        f.Out:SetMultiLine(true)
+        f.Out:SetFontObject(GameFontHighlightSmall)
+        f.Out:SetPoint('BOTTOMLEFT', f, 'BOTTOMLEFT', 20, 46)
+        f.Out:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -20, 46)
+        f.Out:SetHeight(34)
+        f.Out:SetAutoFocus(false)
+
+        local close = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate')
+        close:SetSize(120, 22)
+        close:SetPoint('BOTTOM', f, 'BOTTOM', 0, 16)
+        close:SetText(CLOSE or 'Close')
+        close:SetScript('OnClick', function() f:Hide() end)
+
+        tuner = f
+    end
+
+    -- Seed the sliders from wherever the texture currently sits, so tuning
+    -- starts from what is on screen rather than snapping somewhere else.
+    tuner.Flash = flash
+    tuner.Which:SetText('|cff9d9d9d' .. which .. '|r')
+
+    local w, h = flash:GetWidth(), flash:GetHeight()
+    local _, _, _, x, y = flash:GetPoint(1)
+
+    -- GetTexCoord hands back the four corners: upper-left, lower-left,
+    -- upper-right, lower-right. The right edge and the bottom edge are the two
+    -- worth a slider.
+    local right, bottom = 1, 1
+    if flash.GetTexCoord then
+        local _, _, _, lly, urx = flash:GetTexCoord()
+        right = urx or 1
+        bottom = lly or 1
+    end
+
+    tuner.Values.x = x or 0
+    tuner.Values.y = y or 0
+    tuner.Values.w = (w and w > 0) and w or 192
+    tuner.Values.h = (h and h > 0) and h or 67
+    tuner.Values.r = right
+    tuner.Values.b = bottom
+
+    for _, key in ipairs({'Xoffset', 'Yoffset', 'Width', 'Height', 'TexCoordright', 'TexCoordbottom'}) do
+        local slider = _G['DragonflightUIFlashTune' .. key]
+        if slider then
+            local v = tuner.Values
+            slider:SetValue(({
+                Xoffset = v.x,
+                Yoffset = v.y,
+                Width = v.w,
+                Height = v.h,
+                TexCoordright = v.r,
+                TexCoordbottom = v.b
+            })[key])
+        end
+    end
+
+    tuner:Show()
+    tuner.Apply()
+    print(PREFIX .. 'tuning ' .. which .. '. Drag the sliders, then send me the line at the bottom.')
+end
+
 -- Returns true when the input was a log command and has been handled.
 function DF:HandleLogCommand(rest)
     rest = rest or ''

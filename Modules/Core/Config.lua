@@ -496,6 +496,12 @@ function Module:SlashCommand(input)
         return
     end
 
+    -- TEMP: live tuner for the target frame combat glow
+    if cmd == 'flashtune' and DF.FlashTune then
+        DF:FlashTune()
+        return
+    end
+
     Module:ToggleConfigFrame()
 end
 
