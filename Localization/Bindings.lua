@@ -48,3 +48,7 @@ _G['BINDING_HEADER_DFFRAMES'] = 'Frames'
 
 _G['BINDING_NAME_CLICK DragonflightUISpellbookProfessionFrameToggleButton:Keybind'] =
     BINDING_NAME_TOGGLEPROFESSIONBOOK or 'Toggle Profession Book'
+
+-- debug
+_G['BINDING_HEADER_DFDEBUG'] = 'Debug'
+_G['BINDING_NAME_DRAGONFLIGHTUI_CAPTUREFRAME'] = 'Capture frame under cursor to the debug log'

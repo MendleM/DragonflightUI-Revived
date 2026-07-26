@@ -180,4 +180,8 @@
 	<Binding name="CLICK DragonflightUISpellFlyoutCustom10ButtonSub12:Keybind" category="BINDING_CATEGORY_DFCUSTOMFLYOUT10" />
 	<!-- General -->
 	<Binding name="CLICK DragonflightUISpellbookProfessionFrameToggleButton:Keybind" category="BINDING_CATEGORY_DRAGONFLIGHTUI" header="BINDING_HEADER_DFFRAMES" />
+	<!-- Debug -->
+	<Binding name="DRAGONFLIGHTUI_CAPTUREFRAME" category="BINDING_CATEGORY_DRAGONFLIGHTUI" header="BINDING_HEADER_DFDEBUG">
+		if DragonflightUI_CaptureFrameUnderCursor then DragonflightUI_CaptureFrameUnderCursor() end
+	</Binding>
 </Bindings>

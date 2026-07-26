@@ -19,6 +19,12 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log all          the whole buffer in chat
 --     /df log copy [tag]   a window to select all and copy out of, for pasting
 --                          into a bug report; takes the same tag filter
+--
+-- There is also a keybinding, under DragonflightUI > Debug: hover whatever looks
+-- wrong, press the key, and the frame beneath the cursor is dumped and the copy
+-- window opens on it. That exists because 'mouse' below resolves when the
+-- command runs, and reaching the chat box to type one moves the cursor off the
+-- thing being reported.
 --     /df log echo         toggle live echo of every entry to chat
 --     /df log clear        empty the buffer
 --     /df log frame <name>   a frame's whole visibility chain
@@ -369,6 +375,45 @@ end
 -- with stack traces attached, and handing all of that to an EditBox at once can
 -- lock the client up for a while. The tail is the interesting end.
 local COPY_CHAR_LIMIT = 60000
+
+-- Capture whatever is under the cursor, then open the copy window on it.
+--
+-- Bound to a key rather than driven by a slash command on purpose: 'mouse'
+-- resolves at the moment the command runs, and typing into chat puts the cursor
+-- over the chat box rather than the thing that looks wrong. A key press does not
+-- move the mouse, so a reporter can hover the bug and hit one key.
+--
+-- Global because keybinding scripts are evaluated as their own chunk and cannot
+-- see our locals.
+function DragonflightUI_CaptureFrameUnderCursor()
+    local focus
+    if GetMouseFoci then
+        local foci = GetMouseFoci()
+        focus = foci and foci[1]
+    elseif GetMouseFocus then
+        focus = GetMouseFocus()
+    end
+
+    if not focus or focus == WorldFrame then
+        print(PREFIX .. 'nothing under the cursor - hover the frame that looks wrong and press the key again.')
+        return
+    end
+
+    local name = (focus.GetName and focus:GetName()) or '<anonymous>'
+    DF:Log('capture', '=== captured %s under cursor ===', name)
+    DF:LogFrame(focus, 'capture')
+    DF:LogRegions(focus, 'capture', 2)
+
+    -- and its parent, since the thing that looks wrong is often the container
+    -- rather than the piece the cursor happened to land on
+    local parent = focus.GetParent and focus:GetParent()
+    if parent and parent ~= UIParent then
+        DF:Log('capture', '=== parent: %s ===', (parent.GetName and parent:GetName()) or '<anonymous>')
+        DF:LogRegions(parent, 'capture', 1)
+    end
+
+    DF:LogCopy('capture')
+end
 
 function DF:LogCopy(filter)
     if filter == '' then filter = nil end
