@@ -18,6 +18,9 @@ function SubModuleMixin:SetDefaults()
     local defaults = {
         enabled = true,
         scale = 1,
+        showTopRoll = true,
+        showWinnerToast = true,
+        showItemName = true,
         anchorFrame = 'UIParent',
         customAnchorFrame = '',
         anchor = 'BOTTOM',
@@ -79,7 +82,6 @@ function SubModuleMixin:SetupOptions()
     }
     DF.Settings:AddPositionTable(Module, rollOptions, 'roll', 'GroupLootContainer', getDefaultStr, frameTable)
     -- DragonflightUIStateHandlerMixin:AddStateTable(Module, rollOptions, 'possess', 'PossessBar', getDefaultStr)
-    rollOptions.args.scale = nil;
     rollOptions.args.enabled = {
         type = 'toggle',
         name = 'Enable Dragonflight loot rolls',
@@ -87,6 +89,44 @@ function SubModuleMixin:SetupOptions()
             .. ' Turning this OFF requires a /reload to restore the classic look.'
             .. getDefaultStr('enabled', 'roll'),
         order = 0.5
+    }
+    rollOptions.args.preview = {
+        type = 'execute',
+        name = 'Preview',
+        btnName = 'Show',
+        desc = 'Show a sample loot roll where yours will appear, for a few seconds.',
+        func = function() self:ShowPreview() end,
+        order = 0.6
+    }
+    rollOptions.args.scale = {
+        type = 'range',
+        name = 'Scale',
+        desc = 'Size of the loot roll frames.' .. getDefaultStr('scale', 'roll'),
+        min = 0.5,
+        max = 2,
+        bigStep = 0.05,
+        order = 0.7,
+        editmode = true
+    }
+    rollOptions.args.showTopRoll = {
+        type = 'toggle',
+        name = 'Show current leading roll',
+        desc = 'Show who is currently winning (or the live tally of choices while rolling)'
+            .. ' in the corner of each roll frame.' .. getDefaultStr('showTopRoll', 'roll'),
+        order = 0.8
+    }
+    rollOptions.args.showWinnerToast = {
+        type = 'toggle',
+        name = 'Announce the winner',
+        desc = 'Show a short panel naming the winner, their roll and the item once a roll resolves.'
+            .. getDefaultStr('showWinnerToast', 'roll'),
+        order = 0.9
+    }
+    rollOptions.args.showItemName = {
+        type = 'toggle',
+        name = 'Show item name',
+        desc = 'Show the item name on the roll frame.' .. getDefaultStr('showItemName', 'roll'),
+        order = 1.0
     }
     local rollOptionsEditmode = {
         name = 'possess',
@@ -222,6 +262,11 @@ end
 function SubModuleMixin:UpdateTopRoll(f)
     local topRoll, rollIcon = f.DFTopRoll, f.DFTopRollIcon
     if not (topRoll and f.rollID and C_LootHistory and C_LootHistory.GetNumItems) then return end
+    if self.state and not self.state.showTopRoll then
+        topRoll:SetText('')
+        if rollIcon then rollIcon:Hide() end
+        return
+    end
 
     local itemIdx = FindItemIdxForRoll(f.rollID)
     if itemIdx then
@@ -268,6 +313,7 @@ end
 -- another instead of overwriting, and the history index is resolved at
 -- display time (indices shift as the history grows).
 function SubModuleMixin:QueueWinnerToast(rollID)
+    if self.state and not self.state.showWinnerToast then return end
     self.ToastQueue = self.ToastQueue or {}
     table.insert(self.ToastQueue, rollID)
     self:DrainToastQueue()
@@ -408,13 +454,45 @@ function SubModuleMixin:Update()
     local preview = self.PreviewRoll;
     preview:ClearAllPoints()
     preview:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
-    -- preview:SetScale(state.scale)
-    preview:SetScale(1)
+    local scale = state.scale or 1
+    preview:SetScale(scale)
 
     local f = _G['GroupLootContainer']
     f.ignoreFramePositionManager = true;
+    f:SetScale(scale)
     f:ClearAllPoints()
     f:SetPoint('BOTTOM', preview, 'BOTTOM', 0, 0)
+
+    -- toggled pieces on the live frames
+    for i = 1, 4 do
+        local roll = _G['GroupLootFrame' .. i]
+        if roll then
+            if roll.DFTopRoll and not state.showTopRoll then
+                roll.DFTopRoll:SetText('')
+                if roll.DFTopRollIcon then roll.DFTopRollIcon:Hide() end
+            end
+            if roll.Name then roll.Name:SetShown(state.showItemName ~= false) end
+        end
+    end
+    if not state.showWinnerToast and self.WinnerToast then self.WinnerToast:Hide() end
+end
+
+-- Pops the same dummy roll frame edit mode uses, so the settings page can
+-- show what the rolls will look like without entering edit mode.
+function SubModuleMixin:ShowPreview(seconds)
+    local fake = self.PreviewRoll and self.PreviewRoll.FakePreview
+    if not fake then return end
+
+    self:UpdateGroupLootFrameStyle(fake)
+    fake:Show()
+
+    if self.PreviewTimer then self.PreviewTimer:Cancel() end
+    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function()
+        -- edit mode owns the preview while it is open; do not yank it away
+        local editmode = DF:GetModule('Editmode', true)
+        if editmode and editmode.IsEditMode then return end
+        fake:Hide()
+    end)
 end
 
 function SubModuleMixin:CreateRollPreview()
