@@ -67,28 +67,102 @@ function Helper:IsCombatLocked()
     return InCombatLockdown() or UnitAffectingCombat('player')
 end
 
--- Combat gate for module enable chains. Everything the enable chains do to
--- protected frames (moving Blizzard's secure action bars, state drivers,
--- SetAttribute on secure handlers) is silently BLOCKED during combat
--- lockdown - no Lua error, the calls just don't happen. A /reload mid-fight
--- therefore used to run the whole setup under lockdown and leave the UI
--- half-built. Run immediately when safe, otherwise once combat drops.
+-- One shared gate for everything a combat /reload has to postpone.
+--
+-- The client refuses the protected half of this addon's setup while you are in
+-- combat: SetPoint, SetScale, Show, Hide, SetParent and SetAttribute on secure
+-- frames (the action bars, the unit frames, the pet and micro-menu holders),
+-- RegisterStateDriver, and any Blizzard edit-mode layout application. Almost
+-- none of it errors - the calls simply do nothing - which is why a /reload
+-- mid-fight leaves the UI half native. There is no way around that part: it is
+-- the engine's rule, and no addon can move a protected frame in combat.
+--
+-- What is ours to get right is the recovery. Work that cannot run yet is queued
+-- here rather than each caller growing its own gate, so combat ending drains it
+-- in one pass, with one message, followed by a full settings re-application:
+-- the modules that DID run during combat had their protected calls refused
+-- silently, and nothing else ever retries those.
+local pendingOutOfCombat = {}
+local pendingOrder = {}
+local combatGate
+local loadedInCombat = false
+
+local function DrainOutOfCombatQueue()
+    if #pendingOrder == 0 then return end
+
+    local labels = {}
+    for _, label in ipairs(pendingOrder) do
+        local fn = pendingOutOfCombat[label]
+        pendingOutOfCombat[label] = nil
+        if fn then
+            table.insert(labels, label)
+            local ok, err = pcall(fn)
+            if not ok then geterrorhandler()('DFUI deferred setup (' .. label .. '): ' .. tostring(err)) end
+        end
+    end
+    table.wipe(pendingOrder)
+
+    print('|cff0070ddDragonflightUI:|r combat ended - finishing setup (' .. table.concat(labels, ', ') .. ').')
+
+    -- The enable chains slice themselves across frames, so let them land before
+    -- re-applying settings on top.
+    C_Timer.After(1, Helper.ReapplyAfterCombat)
+end
+
+-- Everything the client refused during combat, asked for once more: every
+-- module re-applies its settings off RefreshConfig, so positions, scales and
+-- visibility that silently did nothing mid-fight land here.
+function Helper.ReapplyAfterCombat()
+    if Helper:IsCombatLocked() then
+        -- straight back into combat; catch the next lull
+        Helper:QueueOutOfCombat('settings re-apply', Helper.ReapplyAfterCombat)
+        return
+    end
+
+    if DF and DF.RefreshConfig then
+        local ok, err = pcall(DF.RefreshConfig, DF)
+        if not ok then geterrorhandler()('DFUI post-combat re-apply: ' .. tostring(err)) end
+    end
+end
+
+function Helper:QueueOutOfCombat(label, fn)
+    loadedInCombat = true
+
+    if not pendingOutOfCombat[label] then table.insert(pendingOrder, label) end
+    pendingOutOfCombat[label] = fn
+
+    if #perfLog < 400 then perfLog[#perfLog + 1] = 'deferred ' .. label .. ' to end of combat' end
+
+    if not combatGate then
+        combatGate = CreateFrame('Frame')
+        combatGate:RegisterEvent('PLAYER_REGEN_ENABLED')
+        combatGate:SetScript('OnEvent', function()
+            -- PLAYER_REGEN_ENABLED fires as lockdown lifts; the next frame is
+            -- safely out of it
+            C_Timer.After(0, DrainOutOfCombatQueue)
+        end)
+    end
+end
+
+-- Did this session start (or reload) mid-combat? Anything that wants to explain
+-- itself to the player can ask.
+function Helper:LoadedInCombat()
+    return loadedInCombat
+end
+
+-- Run now when it is safe, otherwise once combat drops.
 function Helper:RunOutOfCombat(label, fn)
     if not Helper:IsCombatLocked() then
         fn()
         return
     end
-    if #perfLog < 400 then
-        perfLog[#perfLog + 1] = 'deferred ' .. label .. ' to end of combat (combat reload)'
+
+    if not loadedInCombat then
+        print('|cff0070ddDragonflightUI:|r in combat - the parts of the UI the game will not let an addon touch'
+                  .. ' mid-fight will finish setting up the moment combat ends.')
     end
-    print('|cff0070ddDragonflightUI:|r reloaded during combat - ' .. label
-        .. ' will finish setting up when combat ends.')
-    local gate = CreateFrame('Frame')
-    gate:RegisterEvent('PLAYER_REGEN_ENABLED')
-    gate:SetScript('OnEvent', function(g)
-        g:UnregisterAllEvents()
-        fn()
-    end)
+
+    Helper:QueueOutOfCombat(label, fn)
 end
 
 function Helper:RunSteps(steps, moduleRef, chainLabel)
