@@ -21,7 +21,8 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log clear        empty the buffer
 --     /df log frame <name>   a frame's whole visibility chain
 --     /df log regions <name> every region and child of a frame
---     /df log <tag>        only entries carrying that tag
+--     /df log <tag>        only entries carrying that tag, e.g.
+--                          /df log error, /df log taint
 --
 -- The buffer is per session: it is reset on load, so the file on disk always
 -- holds the session that just ended. Copy anything worth keeping before a
@@ -44,6 +45,30 @@ end)
 
 local echoToChat = false
 local PREFIX = '|cff0070ddDFUI log:|r '
+
+-- Errors and taint blocks land here too, tagged 'error' and 'taint'. Taint
+-- blocks are the important half: they never reach an error handler and are
+-- invisible in combat, so an in-combat failure otherwise leaves no trace at
+-- all. Read them back with /df log error or /df log taint.
+local captureInstalled = false
+local function InstallCapture()
+    if captureInstalled then return end
+    captureInstalled = true
+
+    local origHandler = geterrorhandler()
+    seterrorhandler(function(err)
+        DF:Log('error', '%s | %s', tostring(err), tostring(debugstack(2, 12, 0)):gsub('\n', ' | '):sub(1, 900))
+        return origHandler(err)
+    end)
+
+    local watcher = CreateFrame('Frame')
+    watcher:RegisterEvent('ADDON_ACTION_BLOCKED')
+    watcher:RegisterEvent('ADDON_ACTION_FORBIDDEN')
+    watcher:SetScript('OnEvent', function(_, event, addon, func)
+        DF:Log('taint', '%s: %s -> %s | %s', event, tostring(addon), tostring(func),
+               tostring(debugstack(2, 12, 0)):gsub('\n', ' | '):sub(1, 900))
+    end)
+end
 
 function DF:Log(tag, msg, ...)
     local text
@@ -231,3 +256,5 @@ function DF:HandleLogCommand(rest)
     end
     return true
 end
+
+InstallCapture()

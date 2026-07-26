@@ -506,10 +506,6 @@ function SubModuleMixin:SetupModern()
             local ok, err = pcall(styleMember, pf)
             if not ok then geterrorhandler()('DFPartyModern: ' .. tostring(err)) end
         end
-        if DragonflightUIPerfLog and #DragonflightUIPerfLog < 400 then
-            DragonflightUIPerfLog[#DragonflightUIPerfLog + 1] =
-                string.format('0.0ms DFPartyModern:styleAll(%d)', count)
-        end
     end
 
     if PartyFrame and PartyFrame.InitializePartyMemberFrames then

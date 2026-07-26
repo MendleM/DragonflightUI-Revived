@@ -125,7 +125,6 @@ local function ApplyRollButtonArt(btn, key)
     end
 
     local useAtlas = art.atlas and btn.SetNormalAtlas and AtlasExists(art.atlas .. '-up')
-    if DF.Log then DF:Log('lootstyle', 'button %s art via %s', key, useAtlas and 'client atlas' or 'shipped sheet') end
 
     if useAtlas then
         btn:SetNormalAtlas(art.atlas .. '-up')
@@ -168,11 +167,17 @@ function SubModuleMixin:SetDefaults()
         showTopRoll = true,
         showWinnerToast = true,
         showItemName = true,
+        previewCount = 3,
+        -- tighter than retail's 33 (its reservedSize of 100 on a 67px frame)
+        rollSpacing = 15,
         anchorFrame = 'UIParent',
         customAnchorFrame = '',
         anchor = 'BOTTOM',
         anchorParent = 'BOTTOM',
-        x = 425, -- 0
+        -- retail's GroupLootContainer is a bottom managed frame (layoutIndex
+        -- 3), so it sits bottom-CENTRE above the action bars and stacks
+        -- upwards - not off to the right as this defaulted to (x = 425)
+        x = 0,
         y = 200 -- 152 = default blizz
     };
     self.Defaults = defaults;
@@ -245,11 +250,30 @@ function SubModuleMixin:SetupOptions()
         func = function()
             -- logged on the button side as well as inside ShowPreview: a
             -- missing entry here means the click never reached the option
-            DF:Log('rollpreview', 'Show button clicked')
-            local ok, err = pcall(function() self:ShowPreview() end)
-            if not ok then DF:Log('rollpreview', 'ShowPreview ERROR: %s', tostring(err)) end
+            self:ShowPreview()
         end,
         order = 0.6
+    }
+    rollOptions.args.previewCount = {
+        type = 'range',
+        name = 'Preview rolls',
+        desc = 'How many sample rolls the preview pops, so a whole drop can be judged'
+            .. ' rather than a single item.' .. getDefaultStr('previewCount', 'roll'),
+        min = 1,
+        max = 4,
+        bigStep = 1,
+        order = 0.65
+    }
+    rollOptions.args.rollSpacing = {
+        type = 'range',
+        name = 'Spacing between rolls',
+        desc = 'Vertical gap between stacked roll frames when several items drop at once.'
+            .. getDefaultStr('rollSpacing', 'roll'),
+        min = 0,
+        max = 100,
+        bigStep = 1,
+        order = 0.75,
+        editmode = true
     }
     rollOptions.args.scale = {
         type = 'range',
@@ -584,6 +608,16 @@ function SubModuleMixin:UpdateState(state)
     self:Update();
 end
 
+-- Vertical space one roll occupies in the stack: its own height plus the
+-- configured gap. Retail's reservedSize of 100 on a 67px frame works out to a
+-- 33px gap; the default here is tighter at 15.
+function SubModuleMixin:GetReservedSize()
+    local state = self.state or self.Defaults
+    local gap = state.rollSpacing
+    if type(gap) ~= 'number' then gap = self.Defaults.rollSpacing end
+    return RETAIL.height + math.max(0, math.min(150, gap))
+end
+
 function SubModuleMixin:Update()
     local state = self.state;
     if not state then return end
@@ -620,6 +654,12 @@ function SubModuleMixin:Update()
     f:ClearAllPoints()
     f:SetPoint('BOTTOM', preview, 'BOTTOM', 0, 0)
 
+    -- Spacing between stacked rolls. Blizzard drives the whole stack off
+    -- reservedSize (frame height + gap), so setting it and re-running the
+    -- container's own layout applies the change to rolls already on screen.
+    f.reservedSize = self:GetReservedSize()
+    if GroupLootContainer_Update then pcall(GroupLootContainer_Update, f) end
+
     -- toggled pieces on the live frames
     for i = 1, 4 do
         local roll = _G['GroupLootFrame' .. i]
@@ -644,24 +684,33 @@ function SubModuleMixin:GetSettingsPreview()
 
     local holder = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreview', UIParent)
     holder:SetSize(RETAIL.borderWidth, RETAIL.borderHeight)
-    -- the settings window is HIGH + toplevel, so anything below TOOLTIP can
-    -- end up behind it depending on where the rolls are configured to sit
-    holder:SetFrameStrata('TOOLTIP')
+    -- Above the settings window (HIGH + toplevel) but below TOOLTIP: at
+    -- TOOLTIP the sample rolls drew over their own button tooltips.
+    holder:SetFrameStrata('FULLSCREEN_DIALOG')
     holder:Hide()
+    holder.Rolls = {}
 
-    local fake = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreviewRoll', holder,
-                             'DFEditModePreviewGroupLootTemplate')
-    fake:SetPoint('CENTER')
-    DF:Log('rollpreview', 'created preview frames, template applied=%s', tostring(fake.IconFrame ~= nil))
-
-    self:PrepPreviewFrame(fake)
-
-    local ok, err = pcall(function() self:UpdateGroupLootFrameStyle(fake) end)
-    if not ok then DF:Log('rollpreview', 'style ERROR: %s', tostring(err)) end
-
-    holder.FakePreview = fake
     self.SettingsPreview = holder
     return holder
+end
+
+-- One sample roll frame, created on demand. Up to four, because that is how
+-- many roll frames the game itself keeps.
+function SubModuleMixin:GetPreviewRoll(index)
+    local holder = self:GetSettingsPreview()
+    if holder.Rolls[index] then return holder.Rolls[index] end
+
+    local roll = CreateFrame('Frame', 'DragonflightUIGroupLootSettingsPreviewRoll' .. index, holder,
+                             'DFEditModePreviewGroupLootTemplate')
+    self:PrepPreviewFrame(roll)
+
+    local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, roll)
+    if not ok then geterrorhandler()('DFUI loot roll preview restyle: ' .. tostring(err)) end
+
+    holder.Rolls[index] = roll
+    -- the first one keeps the old field name; the winner toast anchors to it
+    if index == 1 then holder.FakePreview = roll end
+    return roll
 end
 
 -- The preview template comes with a mixin that picks a random item AND
@@ -722,14 +771,8 @@ end
 -- Shows a sample roll where the real ones will appear, so the settings page
 -- can be judged without waiting for a group loot roll.
 function SubModuleMixin:ShowPreview(seconds)
-    DF:Log('rollpreview', 'ShowPreview() entered')
-
     local holder = self:GetSettingsPreview()
-    local fake = holder.FakePreview
     local state = self.state or self.Defaults
-    DF:Log('rollpreview', 'state source=%s anchor=%s/%s frame=%s x=%s y=%s scale=%s',
-           self.state and 'profile' or 'defaults', tostring(state.anchor), tostring(state.anchorParent),
-           tostring(state.anchorFrame), tostring(state.x), tostring(state.y), tostring(state.scale))
 
     local parent
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
@@ -745,26 +788,32 @@ function SubModuleMixin:ShowPreview(seconds)
     holder:SetAlpha(1)
     holder:Show()
 
-    -- a fresh item each time, so the quality art can be seen doing its job
-    SubModuleMixin.SetPreviewItem(fake, PREVIEW_ITEMS[fastrandom(1, #PREVIEW_ITEMS)])
+    -- A whole drop, not a single item: the rolls stack exactly the way
+    -- GroupLootContainer_Update stacks the real ones - each frame centred
+    -- reservedSize * (i - 0.5) above the container's bottom edge - so the
+    -- preview shows what four simultaneous rolls will actually cover.
+    local count = math.floor(math.max(1, math.min(4, state.previewCount or 3)))
+    local reserved = self:GetReservedSize()
+    local first
 
-    fake:SetAlpha(1)
-    fake:Show()
-
-    -- Say where it went. A preview that lands off-screen or behind another
-    -- frame is indistinguishable from a button that does nothing.
-    DF:Print(('loot roll preview: %s at %d,%d (%dx%d) - /df log rollpreview for details'):format(
-                 fake:IsVisible() and 'shown' or 'NOT VISIBLE', (holder:GetLeft() or -1), (holder:GetBottom() or -1),
-                 (fake:GetWidth() or 0), (fake:GetHeight() or 0)))
-
-    DF:LogFrame(holder, 'rollpreview')
-    DF:LogFrame(fake, 'rollpreview')
+    for i = 1, 4 do
+        local roll = (i <= count) and self:GetPreviewRoll(i) or holder.Rolls[i]
+        if roll and i <= count then
+            roll:ClearAllPoints()
+            roll:SetPoint('CENTER', holder, 'BOTTOM', 0, reserved * (i - 0.5))
+            -- a different item per roll, and different each time, so the
+            -- quality colouring can be seen doing its job
+            SubModuleMixin.SetPreviewItem(roll, PREVIEW_ITEMS[fastrandom(1, #PREVIEW_ITEMS)])
+            roll:SetAlpha(1)
+            roll:Show()
+            first = first or roll
+        elseif roll then
+            roll:Hide()
+        end
+    end
 
     if self.PreviewTimer then self.PreviewTimer:Cancel() end
-    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function()
-        DF:Log('rollpreview', 'preview timer expired, hiding (still visible=%s)', tostring(fake:IsVisible()))
-        holder:Hide()
-    end)
+    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function() holder:Hide() end)
 end
 
 function SubModuleMixin:CreateRollPreview()
@@ -781,7 +830,6 @@ function SubModuleMixin:CreateRollPreview()
     -- OnEnable - a throw here used to abort the rest of that setup
     local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, fakePreview)
     if not ok then
-        DF:Log('lootstyle', 'edit mode preview style ERROR: %s', tostring(err))
         geterrorhandler()('DFUI loot roll preview restyle: ' .. tostring(err))
     end
     SubModuleMixin.SetPreviewItem(fakePreview, PREVIEW_ITEMS[1])
@@ -792,9 +840,9 @@ end
 -- Restyles the REAL roll frames - destructive, so it only runs once the
 -- 'roll' state confirms the feature is enabled (see Update).
 function SubModuleMixin:StyleRollFrames()
-    -- Space per roll slot. Retail reserves 100 for a 67px frame, and the
-    -- frames are now retail-sized, so keep its spacing too.
-    if _G['GroupLootContainer'] then _G['GroupLootContainer'].reservedSize = RETAIL.reservedSize end
+    -- Space per roll slot: frame height plus the configured gap (retail
+    -- reserves 100 for a 67px frame, i.e. a 33px gap).
+    if _G['GroupLootContainer'] then _G['GroupLootContainer'].reservedSize = self:GetReservedSize() end
 
     for i = 1, 4 do
         local f = _G['GroupLootFrame' .. i]
@@ -804,7 +852,6 @@ function SubModuleMixin:StyleRollFrames()
         -- default look until a reload.
         local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, f)
         if not ok then
-            DF:Log('lootstyle', 'GroupLootFrame%d style ERROR: %s', i, tostring(err))
             geterrorhandler()('DFUI loot roll restyle: ' .. tostring(err))
         end
         -- Blizzard's GroupLootFrame_OnShow re-applies the classic dialog
@@ -1266,8 +1313,6 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
     f.DFTopRollIcon:Hide()
 
     SubModuleMixin.ApplyDFBackdrop(f)
-
-    if DF.Log then DF:Log('lootstyle', '%s styled', (f.GetName and f:GetName()) or '<anonymous>') end
 
     -- Refresh cycle for LIVE frames only: at setup time these are hidden,
     -- and an unconditional Hide/Show popped four empty roll frames on login.

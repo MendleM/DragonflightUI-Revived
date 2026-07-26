@@ -465,26 +465,6 @@ function Module:SlashCommand(input)
         return
     end
 
-    -- Runs the loot roll preview without going through the settings UI, so a
-    -- dead button can be told apart from a preview that never renders.
-    if cmd == 'lootpreview' then
-        local ui = DF:GetModule('UI', true)
-        local roll = ui and ui.SubGroupLootContainer
-        if roll and roll.ShowPreview then
-            roll:ShowPreview()
-        else
-            print('|cff0070ddDragonflightUI:|r loot roll submodule not set up (UI module enabled?)')
-        end
-        return
-    end
-
-    if cmd == 'partydump' then
-        -- TEMP: party bar color diagnostics
-        local unitframe = DF:GetModule('Unitframe', true)
-        local party = unitframe and unitframe.SubParty
-        if party and party.DumpBars then party:DumpBars() end
-        return
-    end
     Module:ToggleConfigFrame()
 end
 
