@@ -441,7 +441,10 @@ function SubModuleMixin:SetupModern()
         -- connected player; re-assert our own state right after it runs.
         if pf.UpdateOnlineStatus and not pf.DFOnlineHooked then
             pf.DFOnlineHooked = true
-            hooksecurefunc(pf, 'UpdateOnlineStatus', function(f) UpdateBars(f) end)
+            -- pcall: this runs INSIDE Blizzard's party frame update. An
+            -- error here aborts their loop, leaving the frame being
+            -- processed half-built and the remaining members never created.
+            hooksecurefunc(pf, 'UpdateOnlineStatus', function(f) pcall(UpdateBars, f) end)
         end
 
         -- Debuff row. We adopted retail's bar geometry (mana 74x7 at
@@ -577,7 +580,7 @@ function SubModuleMixin:SetupModern()
             if not (state and state.gradient) then return end
             if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
             for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
-                if pf.DFStyled and (pf.unit == unit or pf.unitToken == unit) then UpdateBars(pf) end
+                if pf.DFStyled and (pf.unit == unit or pf.unitToken == unit) then pcall(UpdateBars, pf) end
             end
         end)
     end
@@ -598,8 +601,8 @@ function SubModuleMixin:SetupModern()
         if barsOnly and not (unit and unit:find('party', 1, true)) then return end
         for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
             if pf.DFStyled then
-                if not barsOnly then UpdateRoleIcon(pf) end
-                UpdateBars(pf)
+                if not barsOnly then pcall(UpdateRoleIcon, pf) end
+                pcall(UpdateBars, pf)
             end
         end
     end)
