@@ -185,7 +185,12 @@ function Module:OnEnable()
     self:EnableAddonSpecific()
 
     -- Module.AddStateUpdater()
-    -- Module:AddEditMode()
+    -- The registration below was written but never called, which is why the
+    -- chat window could not be selected or moved in DFUI's edit mode.
+    if ChatFrame1 then
+        local ok, err = pcall(function() Module:AddEditMode() end)
+        if not ok then geterrorhandler()('DFUI Chat:AddEditMode: ' .. tostring(err)) end
+    end
 
     Module:ApplySettings()
     DF.ConfigModule:RegisterSettingsData('chat', 'misc', {name = 'Chat', options = options, default = setDefaultValues})
@@ -221,7 +226,9 @@ function Module:RefreshOptionScreens()
     end
 
     refreshCat('Chat')
-    -- ChatFrame1.DFEditModeSelection:RefreshOptionScreen();
+    if ChatFrame1 and ChatFrame1.DFEditModeSelection then
+        ChatFrame1.DFEditModeSelection:RefreshOptionScreen();
+    end
 end
 
 function Module:ApplySettings(sub, key)
