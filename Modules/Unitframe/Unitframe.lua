@@ -249,23 +249,33 @@ function Module:ApplySettings(sub, key)
     end, 0, self)
 end
 
+-- One submodule's error used to abort every submodule after it in this list -
+-- a broken party frame took the player, target and raid frames with it. Isolate
+-- each, and report rather than swallow.
+local function updateSub(name, sub, state)
+    if not sub then return end
+
+    local ok, err = pcall(sub.UpdateState, sub, state)
+    if not ok then geterrorhandler()('DFUI Unitframe ' .. name .. ': ' .. tostring(err)) end
+end
+
 function Module:ApplySettingsInternal(sub, key)
     local db = Module.db.profile
 
-    self.SubParty:UpdateState(db.party)
-    self.SubPlayer:UpdateState(db.player)
-    self.SubPlayerSecondaryRes:UpdateState(db.playerSecondaryRes)
-    self.SubPlayerTotemFrame:UpdateState(db.playerTotemFrame)
-    self.SubPet:UpdateState(db.pet)
-    self.SubTarget:UpdateState(db.target)
-    self.SubTargetOfTarget:UpdateState(db.tot)
-    self.SubRaid:UpdateState(db.raid)
+    updateSub('party', self.SubParty, db.party)
+    updateSub('player', self.SubPlayer, db.player)
+    updateSub('playerSecondaryRes', self.SubPlayerSecondaryRes, db.playerSecondaryRes)
+    updateSub('playerTotemFrame', self.SubPlayerTotemFrame, db.playerTotemFrame)
+    updateSub('pet', self.SubPet, db.pet)
+    updateSub('target', self.SubTarget, db.target)
+    updateSub('tot', self.SubTargetOfTarget, db.tot)
+    updateSub('raid', self.SubRaid, db.raid)
 
     if DF.Wrath or DF.API.Version.IsTBC then
-        self.SubFocus:UpdateState(db.focus)
-        self.SubFocusTarget:UpdateState(db.focusTarget)
+        updateSub('focus', self.SubFocus, db.focus)
+        updateSub('focusTarget', self.SubFocusTarget, db.focusTarget)
     end
-    if DF.Cata then self.SubAltPower:UpdateState(db.altpower) end
+    if DF.Cata then updateSub('altpower', self.SubAltPower, db.altpower) end
 end
 
 function Module:FixBlizzardBug()

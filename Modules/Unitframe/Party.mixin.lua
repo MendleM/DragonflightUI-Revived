@@ -312,6 +312,37 @@ function SubModuleMixin:SetupModern()
     local BARS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\'
     local UpdateRoleIcon, UpdateBars
 
+    -- The pooled PartyFrame anchors itself, so DFUI's position, scale and
+    -- anchor settings did nothing at all on 1.15.9 - only the classic path
+    -- had a move frame. Give the modern path the same one, and keep Blizzard
+    -- from wandering off it.
+    if not self.PartyMoveFrame then
+        local moveFrame = CreateFrame('Frame', 'DragonflightUIPartyMoveFrame', UIParent)
+        moveFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
+        moveFrame:SetFrameStrata('LOW')
+        moveFrame:SetFrameLevel(2)
+        moveFrame:SetSize(120, 53 * 4 + 3 * 10)
+        self.PartyMoveFrame = moveFrame
+    end
+
+    if PartyFrame then
+        PartyFrame:ClearAllPoints()
+        PartyFrame:SetParent(self.PartyMoveFrame)
+        PartyFrame:SetPoint('TOPLEFT', self.PartyMoveFrame, 'TOPLEFT', 0, 0)
+
+        if not self.PartyFrameAnchorHooked then
+            self.PartyFrameAnchorHooked = true
+            -- Blizzard re-anchors this frame from its own layout code; put it
+            -- back whenever it is anchored anywhere else.
+            hooksecurefunc(PartyFrame, 'SetPoint', function(frame, _, relativeTo)
+                if relativeTo ~= self.PartyMoveFrame then
+                    frame:ClearAllPoints()
+                    frame:SetPoint('TOPLEFT', self.PartyMoveFrame, 'TOPLEFT', 0, 0)
+                end
+            end)
+        end
+    end
+
     local POWER_BAR_ART = {
         MANA = 'Mana',
         RAGE = 'Rage',
@@ -621,14 +652,6 @@ function SubModuleMixin:SetupModern()
 end
 
 function SubModuleMixin:Setup()
-    -- Modern (Midnight-UI) clients pool anonymous PartyFrame member frames;
-    -- the classic PartyMemberFrame1-4 reskin cannot attach. Restyle the
-    -- pooled frames in place instead (era-1159).
-    if DF.API.Version.IsModern then
-        self:SetupModern()
-        return
-    end
-    if not _G['PartyMemberFrame1'] then return end
     local function setDefaultSubValues(sub)
         self.ModuleRef:SetDefaultSubValues(sub)
     end
@@ -641,9 +664,6 @@ function SubModuleMixin:Setup()
     })
     --
     self:RegisterEvent('CVAR_UPDATE')
-    --
-    self:ChangePartyFrame()
-    self:AddStateUpdater()
 
     -- editmode
     local EditModeModule = DF:GetModule('Editmode');
@@ -689,6 +709,21 @@ function SubModuleMixin:Setup()
         --     -- Module.PartyMoveFrame:Show()
         -- end
     });
+
+    -- Styling last, and per flavour. The settings page and the edit-mode
+    -- registration above are shared: this used to return early on modern
+    -- clients, straight after SetupModern, so on 1.15.9 the party page was
+    -- never registered at all and the frames could not be configured or
+    -- selected in edit mode.
+    if _G['PartyMemberFrame1'] then
+        self:ChangePartyFrame()
+        self:AddStateUpdater()
+    elseif DF.API.Version.IsModern then
+        -- Modern (Midnight-UI) clients pool anonymous PartyFrame member
+        -- frames; the classic PartyMemberFrame1-4 reskin cannot attach, so
+        -- restyle the pooled frames in place instead (era-1159).
+        self:SetupModern()
+    end
 end
 
 function SubModuleMixin:OnEvent(event, ...)
@@ -696,8 +731,10 @@ function SubModuleMixin:OnEvent(event, ...)
         local arg1 = ...;
         if arg1 == 'statusText' or arg1 == 'statusTextDisplay' then
             for i = 1, 4 do
-                self:UpdatePartyHPBar(i)
-                self:UpdatePartyManaBar(i)
+                if _G['PartyMemberFrame' .. i] then
+                    self:UpdatePartyHPBar(i)
+                    self:UpdatePartyManaBar(i)
+                end
             end
         end
     end
@@ -709,12 +746,12 @@ function SubModuleMixin:UpdateState(state)
 end
 
 function SubModuleMixin:Update()
-    if DF.API.Version.IsModern then return end -- modern party frames are pooled
+    if self.PreviewParty and self.state then self.PreviewParty:UpdateState(self.state) end
     if not self.PartyMoveFrame then return end
     local state = self.state;
     if not state then return end
 
-    local parent = _G[state.anchorFrame]
+    local parent = _G[state.anchorFrame] or UIParent
     self.PartyMoveFrame:ClearAllPoints();
     self.PartyMoveFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     self.PartyMoveFrame:SetScale(state.scale)
@@ -723,13 +760,20 @@ function SubModuleMixin:Update()
     -- party1:ClearAllPoints()
     -- party1:SetPoint('TOPLEFT', PartyMoveFrame, 'TOPLEFT', 0, 0)
 
-    local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+    -- pooled member frames are 120x53; only the classic ones can be measured
+    local sizeX, sizeY = 120, 53
+    if _G['PartyMemberFrame' .. 1] then sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize() end
 
     if state.orientation == 'vertical' then
         self.PartyMoveFrame:SetSize(sizeX, sizeY * 4 + 3 * state.padding)
     else
         self.PartyMoveFrame:SetSize(sizeX * 4 + 3 * state.padding, sizeY)
     end
+
+    -- Everything below belongs to the classic reskin: on pooled clients the
+    -- member frames are laid out by PartyFrame itself, and the move frame
+    -- above is what carries our position and scale.
+    if not _G['PartyMemberFrame1'] then return end
 
     for i = 2, 4 do
         local pf = _G['PartyMemberFrame' .. i]
@@ -759,16 +803,17 @@ function SubModuleMixin:Update()
         pf:UpdateStateHandler(state)
         PartyMemberFrame_UpdateMember(pf)
     end
-
-    self.PreviewParty:UpdateState(state)
 end
 
 function SubModuleMixin:ChangePartyFrame()
-    local PartyMoveFrame = CreateFrame('Frame', 'DragonflightUIPartyMoveFrame', UIParent)
-    PartyMoveFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
-    PartyMoveFrame:SetFrameStrata('LOW')
-    PartyMoveFrame:SetFrameLevel(2)
-    self.PartyMoveFrame = PartyMoveFrame
+    local PartyMoveFrame = self.PartyMoveFrame
+    if not PartyMoveFrame then
+        PartyMoveFrame = CreateFrame('Frame', 'DragonflightUIPartyMoveFrame', UIParent)
+        PartyMoveFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
+        PartyMoveFrame:SetFrameStrata('LOW')
+        PartyMoveFrame:SetFrameLevel(2)
+        self.PartyMoveFrame = PartyMoveFrame
+    end
 
     local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
     local gap = 10;
