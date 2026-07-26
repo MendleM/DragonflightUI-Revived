@@ -254,7 +254,14 @@ function SubModuleMixin:HookButtonUsable(btn)
 
     hooksecurefunc(btn, 'UpdateUsable', function(b)
         if not self.activate then return end
-        self:UpdateRangeAndUsable(b, b.checksRange or false, b.inRange or false)
+        -- Never let a repaint break the click that triggered it.
+        local ok, err = pcall(self.UpdateRangeAndUsable, self, b, b.checksRange or false, b.inRange or false)
+        if not ok and not self.DFUsableErrorLogged then
+            self.DFUsableErrorLogged = true
+            local log = DragonflightUIPerfLog
+            if log and #log < 400 then log[#log + 1] = 'USABLEERR ' .. tostring(err) end
+            geterrorhandler()('DFUI ActionbarRange:UpdateUsable: ' .. tostring(err))
+        end
     end)
 end
 
