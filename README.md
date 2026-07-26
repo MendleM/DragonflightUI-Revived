@@ -94,6 +94,7 @@ Configure in-game with `/df` (or `/dragonflight`), with full profile support, or
 
 ## Credits
 
+- **[MendleM](https://github.com/MendleM)** — maintainer of DragonflightUI Revived.
 - **[Karl-Heinz Schneider](https://github.com/Karl-HeinzSchneider)** — original author of DragonflightUI Classic. This project is his work continued; all of it stands on that foundation. If you got years of use out of the addon, he still has a [tip jar](https://www.buymeacoffee.com/karlheinzschneider).
 - **[@insanerage80](https://github.com/insanerage80)** — packaging and publishing the revived build on CurseForge, and running the Discord.
 - **[@icebreethe](https://github.com/icebreethe)** — TBC 2.5.6 / MoP 5.5.4 compatibility work.

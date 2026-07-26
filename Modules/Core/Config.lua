@@ -491,6 +491,11 @@ function Module:SlashCommand(input)
         return
     end
 
+    if (cmd == 'whatsnew' or cmd == 'changelog') and DF.Changelog then
+        DF.Changelog:Show()
+        return
+    end
+
     Module:ToggleConfigFrame()
 end
 

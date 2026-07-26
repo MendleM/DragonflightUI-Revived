@@ -376,7 +376,7 @@ function DragonFlightUIConfigMixin:AddToolbar()
     table.insert(t, {
         name = L["ConfigToolbarGithub"],
         tooltip = L["ConfigToolbarGithubTooltip"],
-        link = "https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI",
+        link = "https://github.com/MendleM/DragonflightUI-Revived",
         icon = 'github',
         sizeDelta = 4
     })
