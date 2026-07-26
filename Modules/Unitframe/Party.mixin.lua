@@ -477,7 +477,8 @@ function SubModuleMixin:SetupModern()
         local unit = pf.unit or pf.unitToken
         if not (unit and UnitExists(unit)) then return end
 
-        local shade = UnitIsConnected(unit) and 1 or 0.5
+        local connected = UnitIsConnected(unit)
+        local shade = connected and 1 or 0.5
 
         local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
 
@@ -505,6 +506,16 @@ function SubModuleMixin:SetupModern()
             elseif tex then
                 tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
             end
+            -- Blizzard desaturates this bar for disconnected members
+            -- (PartyMemberFrameMixin:UpdateOnlineStatus) and the flag could
+            -- stay stuck on afterwards, which is what made bars look washed
+            -- out. Drive it from the same connection check as the shade.
+            if healthbar.SetStatusBarDesaturated then
+                healthbar:SetStatusBarDesaturated(not connected)
+            elseif tex and tex.SetDesaturated then
+                tex:SetDesaturated(not connected)
+            end
+            if tex and tex.SetDesaturated then tex:SetDesaturated(not connected) end
             healthbar:SetStatusBarColor(r * shade, g * shade, b * shade, 1)
         end
 
@@ -515,6 +526,8 @@ function SubModuleMixin:SetupModern()
             local art = POWER_BAR_ART[powerToken] or 'Mana'
             local tex = manabar:GetStatusBarTexture()
             if tex then tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-' .. art) end
+            if manabar.SetStatusBarDesaturated then manabar:SetStatusBarDesaturated(false) end
+            if tex and tex.SetDesaturated then tex:SetDesaturated(false) end
             manabar:SetStatusBarColor(shade, shade, shade, 1)
         end
     end
