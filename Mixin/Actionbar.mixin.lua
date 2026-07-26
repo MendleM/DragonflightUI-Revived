@@ -191,21 +191,11 @@ function DragonflightUIActionbarMixin:IsAnchorframeLegal()
         parent = _G[state.anchorFrame]
     end
 
-    local loopStr = self:GetName();
-    local toCheck = parent;
-    local relativeTo;
-
-    while toCheck ~= UIParent do
-        --
-        loopStr = loopStr .. ' -> ' .. toCheck:GetName();
-        if toCheck == self then return false, loopStr; end
-        _, relativeTo, _, _, _ = toCheck:GetPoint(1)
-        toCheck = relativeTo;
-    end
-
-    loopStr = loopStr .. ' -> ' .. toCheck:GetName();
-    -- UIParent
-    return true, loopStr;
+    -- The walk lives in Helper now, nil-guarded at every step and shared with
+    -- the XP and reputation bars, which anchor the same way and had no check at
+    -- all.
+    local loops, loopStr = Helper:AnchorChainLoops(self, parent)
+    return not loops, loopStr
 end
 
 function DragonflightUIActionbarMixin:Update()
@@ -394,28 +384,11 @@ function DragonflightUIActionbarMixin:Update()
 
     self:SetIgnoreRange(not state.range)
 
-    local isLegal, loopStr = self:IsAnchorframeLegal();
-    local loopStrFixed, _ = gsub(loopStr, 'DragonflightUI', 'DF')
-    -- print(loopStrFixed)
-    if not isLegal then
-        local retOK, ret1 = xpcall(function()
-            local msg = self:GetName() ..
-                            ' AnchorFrame is forming an illegal anchor chain, please fix inside the DragonflightUI options! (A frame cant be anchored to another frame depending on it) \n LOOP: ' ..
-                            loopStrFixed
-            print('|cffFF0000ERROR! |r' .. msg);
-            -- print(loopStrFixed)
-            error(msg, 1)
-        end, geterrorhandler())
-
-        return
-    end
-
-    local parent;
-    if DF.Settings.ValidateFrame(state.customAnchorFrame) then
-        parent = _G[state.customAnchorFrame]
-    else
-        parent = _G[state.anchorFrame]
-    end
+    -- An illegal chain used to return here, before the SetPoint below - so the
+    -- bar kept whatever points it had, or none, and vanished. Anchor it to the
+    -- screen instead: the setting is wrong, the bar should still be usable.
+    local parent, anchorOK, chain = Helper:ResolveAnchorParent(self, state)
+    if not anchorOK then Helper:WarnIllegalAnchor(self, chain) end
 
     self:ClearAllPoints()
     self:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
@@ -2823,28 +2796,11 @@ function DragonflightUIStancebarMixinCode:Update()
     --     end
     -- end
 
-    local isLegal, loopStr = self:IsAnchorframeLegal();
-    local loopStrFixed, _ = gsub(loopStr, 'DragonflightUI', 'DF')
-    -- print(loopStrFixed)
-    if not isLegal then
-        local retOK, ret1 = xpcall(function()
-            local msg = self:GetName() ..
-                            ' AnchorFrame is forming an illegal anchor chain, please fix inside the DragonflightUI options! (A frame cant be anchored to another frame depending on it) \n LOOP: ' ..
-                            loopStrFixed
-            print('|cffFF0000ERROR! |r' .. msg);
-            -- print(loopStrFixed)
-            error(msg, 1)
-        end, geterrorhandler())
-
-        return
-    end
-
-    local parent;
-    if DF.Settings.ValidateFrame(state.customAnchorFrame) then
-        parent = _G[state.customAnchorFrame]
-    else
-        parent = _G[state.anchorFrame]
-    end
+    -- An illegal chain used to return here, before the SetPoint below - so the
+    -- bar kept whatever points it had, or none, and vanished. Anchor it to the
+    -- screen instead: the setting is wrong, the bar should still be usable.
+    local parent, anchorOK, chain = Helper:ResolveAnchorParent(self, state)
+    if not anchorOK then Helper:WarnIllegalAnchor(self, chain) end
 
     self:ClearAllPoints()
     self:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)

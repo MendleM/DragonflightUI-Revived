@@ -1,6 +1,8 @@
 ---@class DragonflightUI
 ---@diagnostic disable-next-line: assign-type-mismatch
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+-- this file gets no addonTable, so reach Helper through the global it exports
+local Helper = _G['DragonflightUI_Helper']
 
 DragonflightUIXPBarMixin = {}
 
@@ -210,7 +212,14 @@ function DragonflightUIXPBarMixin:Update()
     if InCombatLockdown() then
         -- print('XP-bar update after combat fades...')
     else
-        local parent = _G[state.anchorFrame]
+        -- These bars can be anchored to an action bar through the options, and
+        -- the action bars can be anchored back to them - the reputation bar
+        -- sits on the XP bar by default. Closing that loop is refused by the
+        -- client, and the failed SetPoint leaves the bar with no points at all
+        -- after ClearAllPoints, which is what the chain walker then died on.
+        local parent, anchorOK, chain = Helper:ResolveAnchorParent(self, state)
+        if not anchorOK then Helper:WarnIllegalAnchor(self, chain) end
+
         self:ClearAllPoints()
         self:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
@@ -437,7 +446,14 @@ function DragonflightUIRepBarMixin:Update()
             self.Text:SetDrawLayer('HIGHLIGHT')
         end
 
-        local parent = _G[state.anchorFrame]
+        -- These bars can be anchored to an action bar through the options, and
+        -- the action bars can be anchored back to them - the reputation bar
+        -- sits on the XP bar by default. Closing that loop is refused by the
+        -- client, and the failed SetPoint leaves the bar with no points at all
+        -- after ClearAllPoints, which is what the chain walker then died on.
+        local parent, anchorOK, chain = Helper:ResolveAnchorParent(self, state)
+        if not anchorOK then Helper:WarnIllegalAnchor(self, chain) end
+
         self:ClearAllPoints()
         self:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 

@@ -175,6 +175,80 @@ function Helper:RunOutOfCombat(label, fn)
     Helper:QueueOutOfCombat(label, fn)
 end
 
+-- Would anchoring `frame` to `parent` form a cycle?
+--
+-- Frames can be anchored to each other through the options - the XP bar to an
+-- action bar, the reputation bar to the XP bar - and the client refuses a
+-- SetPoint that would close a loop ("Cannot anchor to a region dependent on
+-- it"). So walk the prospective parent's own anchor chain and look for us in
+-- it.
+--
+-- Every step is nil-guarded, which the original of this was not. A frame in the
+-- chain can perfectly well have no points: it may be anchored to its parent
+-- implicitly, or - the case that actually bit - its own SetPoint may have just
+-- been refused, leaving it with none at all after ClearAllPoints. Walking into
+-- that threw, and because this runs inside ApplySettings, the throw took out
+-- the whole pass and every bar after it went unplaced. A loop check that
+-- crashes is worse than no loop check.
+--
+-- Returns: loops (boolean), chain (string, for the message).
+function Helper:AnchorChainLoops(frame, parent)
+    local chain = (frame and frame.GetName and frame:GetName()) or '?'
+    if not (frame and parent) then return false, chain end
+
+    local toCheck = parent
+    local depth = 0
+
+    -- A cycle is caught by finding ourselves; the cap is for chains that close
+    -- on each other without including us, which we have no business hanging on.
+    while toCheck and toCheck ~= UIParent and depth < 32 do
+        depth = depth + 1
+        chain = chain .. ' -> ' .. ((toCheck.GetName and toCheck:GetName()) or '?')
+
+        if toCheck == frame then return true, chain end
+
+        local _, relativeTo = toCheck:GetPoint(1)
+        toCheck = relativeTo
+    end
+
+    if toCheck == UIParent then chain = chain .. ' -> UIParent' end
+    return false, chain
+end
+
+-- The frame an element should anchor to, and whether that was the one asked
+-- for. Falls back to UIParent when the choice is missing or would form a loop,
+-- so the element still lands somewhere visible instead of being skipped.
+function Helper:ResolveAnchorParent(frame, state)
+    local parent
+    if DF.Settings.ValidateFrame(state.customAnchorFrame) then
+        parent = _G[state.customAnchorFrame]
+    else
+        parent = _G[state.anchorFrame]
+    end
+
+    if not parent then return UIParent, false, (frame:GetName() or '?') .. ' -> <missing frame>' end
+
+    local loops, chain = Helper:AnchorChainLoops(frame, parent)
+    if loops then return UIParent, false, chain end
+
+    return parent, true, chain
+end
+
+-- One complaint per frame per session. This runs on every settings pass, so
+-- erroring here - as it used to - produced the same message dozens of times in
+-- a log and drowned whatever else was wrong.
+local anchorWarned = {}
+
+function Helper:WarnIllegalAnchor(frame, chain)
+    local key = frame:GetName() or tostring(frame)
+    if anchorWarned[key] then return end
+    anchorWarned[key] = true
+
+    print('|cffFF0000DragonflightUI:|r ' .. key ..
+              ' cannot be anchored there - it would form a loop, so it has been anchored to the screen instead.' ..
+              ' Pick a different Anchor Frame in the options. Chain: ' .. (chain or '?'):gsub('DragonflightUI', 'DF'))
+end
+
 function Helper:RunSteps(steps, moduleRef, chainLabel)
     local index = 0
     -- Batch steps into ~100ms slices: one step per frame made the UI
