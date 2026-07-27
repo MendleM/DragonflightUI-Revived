@@ -209,6 +209,10 @@ function DragonflightUIXPBarMixin:Update()
         self.TextPercent:Hide()
     end
 
+    -- after the line above, because whether the percent is shown decides where
+    -- the centre of the whole line is
+    self:RecenterText()
+
     if InCombatLockdown() then
         -- print('XP-bar update after combat fades...')
     else
@@ -293,9 +297,31 @@ function DragonflightUIXPBarMixin:UpdateText()
     local textPercentText = ' = ' .. string.format('%.1f', playerPercent) .. '%'
 
     if restedPercent > 0 then
-        textPercentText = textPercentText .. ' (' .. string.format('%.1f', restedPercent) .. ' % Rested)'
+        textPercentText = textPercentText .. ' (' .. string.format('%.1f', restedPercent) .. '% Rested)'
     end
     self.TextPercent:SetText(textPercentText)
+
+    self:RecenterText()
+end
+
+-- Centre the whole line, not just the half of it that is a font string.
+--
+-- The text is two font strings: Text sits centred on the bar and TextPercent is
+-- glued to its right edge, so the pair always sat right of centre by half of
+-- whatever the percent came to. At ' = 24.0%' that is a few pixels and nobody
+-- noticed. Rested roughly triples it - ' = 24.0% (12.3% Rested)' - and the line
+-- visibly walks off to the right, which is what got reported.
+--
+-- Shifting Text left by half the percent's width puts the middle of the pair
+-- back on the middle of the bar. TextPercent is anchored to Text, so it comes
+-- along. Nothing to correct for when the percent is switched off, hence the
+-- IsShown check rather than measuring it regardless.
+function DragonflightUIXPBarMixin:RecenterText()
+    if not (self.Text and self.TextPercent) then return end
+
+    local trailing = self.TextPercent:IsShown() and self.TextPercent:GetStringWidth() or 0
+    self.Text:ClearAllPoints()
+    self.Text:SetPoint('CENTER', -trailing / 2, 1.5)
 end
 
 function DragonflightUIXPBarMixin:Collapse(collapse)
