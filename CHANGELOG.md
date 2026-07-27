@@ -11,86 +11,53 @@ Everything before v0.40.3 is in
 
 ### Blue shamans (new)
 
-- Vanilla gave shamans the paladin's pink, to the third decimal — the game's own
-  colour file puts both at `0.96, 0.55, 0.73`. It was never ambiguous at the
-  time, because shamans were Horde and paladins Alliance and the two could never
-  see each other. On Era they are still identical, which now reads as a bug
-- Settings → Misc → Utility → **Class Colors → Blue Shamans** draws them in the
-  blue TBC gave them, everywhere DragonflightUI colours by class — unit frames,
-  tooltips, loot rolls, the friends list
-- Off by default, and greyed out with an explanation on any client whose shamans
-  already have a colour of their own
-- Nameplates and the default chat are coloured by the game rather than by us, so
-  those stay pink. If you run a class colour addon, this setting steps aside and
-  lets it decide
+- New setting under Misc → Utility → **Class Colors**. Era gives shamans the
+  paladin's pink; this makes them TBC's blue
+- Off by default. Nameplates and default chat stay pink — the game colours
+  those, not us
 
-### The target frame lights up in combat
+### Target frame combat glow
 
-- The in-combat glow traces the frame now instead of sitting near it: it is
-  built from the frame's own art at the same cut and size, so it follows the
-  outline exactly, including the bulge around the portrait
-- The red ring replaces the gold one rather than hiding behind it
-- Each frame keeps its own glow — the target, the focus, every boss frame and
-  the edit mode preview no longer borrow the first one's position and shape
+- The glow traces the frame now instead of sitting beside it, and turns the ring
+  red rather than hiding behind it
+- Target, focus, boss frames and the edit mode preview each get their own
 
 ### Action bars
 
-- Fixed being unable to place or move spells on a bar with **Always show action
-  bar** turned off. The drag grid appeared and was taken away again in the same
-  breath, so there was nothing to drop onto. TBC only, which is what made it
-  hard to pin down
-- Fixed a stack count left behind on the slot an item was dragged out of — "80
-  charges" still showing on an empty button
-- Fixed the green *equipped* border staying on a trinket after you took it off.
-  Swapping two trinkets left both looking equipped
-- Fixed a renamed macro keeping its old name on the button
-- Scrolling the main bar skips bars that are already on screen again, the way
-  the game intends. It had started cycling all six pages, which laid a second
-  copy of a bar you could already see over the one you were using. Hide a bar
-  and its page returns to the cycle by itself
-- The **Paging** setting now says outright that *Smart* differs from *Default*
-  only for druids — on every other class the two are identical
+- Fixed placing and moving spells with **Always show action bar** off (TBC)
+- Fixed stack counts left behind on a slot you dragged an item out of
+- Fixed the green equipped border staying on a trinket after you unequip it
+- Fixed a renamed macro keeping its old name
+- Scrolling the main bar skips bars already on screen again
+- **Paging**: *Smart* only differs from *Default* on druids, and now says so
 
 ### Unit frames
 
-- Fixed an invisible frame that swallowed clicks where the target,
-  target-of-target, pet and focus frames sit. Opening edit mode once — changing
-  nothing — left their holders on screen and taking mouse input, so right-drag
-  to turn the camera stopped working anywhere near them until a reload
-- Fixed party frame settings not applying. Health and power bar changes, Class
-  Color included, only appeared when somebody joined or left the group
-- Fixed party members vanishing the moment a fight started and coming back when
-  it ended
-- The XP bar text is centred on the bar again. It never quite was, but rested XP
-  makes the line long enough to notice it drifting right
+- Fixed an invisible frame eating clicks around the target, target-of-target,
+  pet and focus frames after opening edit mode
+- Fixed party frame settings only applying when someone joined or left the group
+- Fixed party members vanishing when combat started
+- XP bar text is centred again when rested XP is showing
 
 ### Edit mode
 
-- The placeholder drawn for a frame with nothing to show keeps that frame's
-  shape now. A stance bar stacked into a column was being handed a box five
-  times wider than the bar it stood for
+- The *Empty* placeholder keeps the frame's shape — no more oversized box over a
+  narrow bar
 
 ### Elsewhere
 
-- Fixed guild and community list avatars silently failing to load. Nobody
-  reported this one — it turned up in a log sent in for something else
-- Fixed a blank gap where an out-of-range or offline player's name should be in
-  the tooltip
-- Aimed Shot gets a cast bar. The client does not report it the way it reports
-  every other cast, so it is filled in from the cast being sent
+- Fixed guild and community list avatars not loading
+- Fixed the blank gap where an out-of-range player's name goes in tooltips
+- Aimed Shot shows a cast bar
 
 ### For bug reports
 
-- `/df log blockers` lists everything taking mouse input over a spot — for
-  "something invisible here is eating my clicks", which hovering cannot answer
-- `/df log tot` reports every condition the game uses to decide whether the
-  target-of-target frame should be visible, and says which one is failing
-- A keybinding under **DragonflightUI → Debug** captures whatever is under the
-  cursor, and a window opens to copy any of it out of for pasting into a report
-- Repeated log lines are counted rather than repeated, so one noisy problem no
-  longer buries everything else
-- Builds installed from source now report their version with `-dev` on the end,
-  so a checkout of main can be told apart from a packaged release
+- `/df log blockers` — what is taking mouse input at a spot
+- `/df log tot` — why the target-of-target frame is hidden
+- Keybinding under **DragonflightUI → Debug** captures whatever is under the
+  cursor, with a window to copy it out of
+- Repeated log lines are counted, not repeated
+- Source builds report `-dev`, so they are not mistaken for a release
 
 ## Revived (26 July 2026)
 
