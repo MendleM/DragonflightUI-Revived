@@ -685,6 +685,12 @@ function SubModuleMixin:SetupModern()
     end
     styleAll()
 
+    -- Reachable from Update(), so changing a setting re-applies immediately.
+    -- Without this the only things that ever restyled a pooled member frame
+    -- were InitializePartyMemberFrames above and the roster watcher below -
+    -- both of which only fire when the group itself changes.
+    subModule.RestyleModernParty = styleAll
+
     -- Gradient coloring follows current health, so it needs health events.
     -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would
     -- fire for every unit in a raid.
@@ -842,6 +848,15 @@ function SubModuleMixin:Update()
     else
         self.PartyMoveFrame:SetSize(sizeX * 4 + 3 * state.padding, sizeY)
     end
+
+    -- On pooled clients this is the ONLY place a settings change can reach the
+    -- member frames, and it did not: everything below is the classic reskin,
+    -- and the early return under it meant Update() did the move frame and then
+    -- stopped. The bars were left to be restyled by whatever restyled them
+    -- next, and the only two things that do are the InitializePartyMemberFrames
+    -- hook and the roster watcher - so health colour, power art and Class Color
+    -- appeared to apply only when somebody joined or left the group.
+    if self.RestyleModernParty then self.RestyleModernParty() end
 
     -- Everything below belongs to the classic reskin: on pooled clients the
     -- member frames are laid out by PartyFrame itself, and the move frame
