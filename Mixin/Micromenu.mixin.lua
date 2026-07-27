@@ -1,6 +1,20 @@
 local addonName, addonTable = ...;
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 
+-- Does `frame` already inherit `ancestor`'s scale? Walked rather than assumed,
+-- because which frame owns the micro buttons differs by flavour and setting a
+-- scale that is already inherited squares it.
+local function IsInside(frame, ancestor)
+    local p = frame and frame.GetParent and frame:GetParent()
+    local guard = 0
+    while p and guard < 16 do
+        if p == ancestor then return true end
+        guard = guard + 1
+        p = p.GetParent and p:GetParent()
+    end
+    return false
+end
+
 DragonflightUIMicroMenuMixin = {}
 
 function DragonflightUIMicroMenuMixin:OnLoad()
@@ -200,24 +214,36 @@ function DragonflightUIMicroMenuMixin:Update()
     self:ClearAllPoints()
     self:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    if DF.API.Version.IsTBC then
-        local f = _G['MicroMenuContainer']
-        -- print('s', f:GetSize())
-        -- print('->', self:GetSize())
-        f:SetScale(state.scale)
-        -- addonTable:OverrideBlizzEditmode(f, state.anchor, parent, state.anchorParent, state.x, state.y)
-        -- addonTable:OverrideBlizzEditmode(f, 'TOPLEFT', self, 'TOPLEFT', 0, 0)
+    local container = _G['MicroMenuContainer']
 
-        local point, relativeTo, relativePoint, xOfs, yOfs = f:GetPoint(1)
+    -- The buttons are not ours to scale by proxy.
+    --
+    -- MicroMenuContainer is parent="UIParent" and MicroMenu hangs off it
+    -- (Blizzard_MicroMenu/Classic/MicroMenuContainer.xml), so nothing the
+    -- buttons live in inherits the scale set above - our slider was resizing a
+    -- holder they are anchored to but not parented under. This was gated on
+    -- IsTBC, which is exactly why scaling worked there and nowhere else, and why
+    -- the only thing that appeared to resize the micro menu on other flavours
+    -- was Blizzard's Edit Mode, which owns the container through
+    -- Enum.EditModeMicroMenuSetting.Size.
+    --
+    -- Keyed on where the container actually sits rather than on the flavour: if
+    -- it is inside our frame it has the scale already, and setting it again
+    -- would square it.
+    if container and not IsInside(container, self) then container:SetScale(state.scale) end
 
-        if not (relativeTo == self) then addonTable:OverrideBlizzEditmode(f, 'TOPLEFT', self, 'TOPLEFT', 0, 0) end
+    if DF.API.Version.IsTBC and container then
+        local point, relativeTo, relativePoint, xOfs, yOfs = container:GetPoint(1)
+
+        if not (relativeTo == self) then
+            addonTable:OverrideBlizzEditmode(container, 'TOPLEFT', self, 'TOPLEFT', 0, 0)
+        end
     end
 
     -- Our frame is the draggable/clamped one, but it was a fixed 100x100
     -- box that has nothing to do with the buttons: the extra width and
     -- height showed up as dead space, and screen clamping stopped at the
     -- box edge rather than the visible menu. Track the container's size.
-    local container = _G['MicroMenuContainer']
     if container then
         local w, h = container:GetSize()
         if w and w > 1 and h and h > 1 then self:SetSize(w, h) end
