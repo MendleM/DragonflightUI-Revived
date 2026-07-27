@@ -89,9 +89,16 @@ local function InstallCapture()
     local watcher = CreateFrame('Frame')
     watcher:RegisterEvent('ADDON_ACTION_BLOCKED')
     watcher:RegisterEvent('ADDON_ACTION_FORBIDDEN')
+    -- Deeper and longer than the error capture on purpose. A taint block names
+    -- the addon that tainted the execution, but what actually identifies the
+    -- route is the BOTTOM of the stack - the frame where our code entered it -
+    -- and twelve frames of Blizzard's scroll and layout machinery is enough to
+    -- cut exactly that off. It did: a blocked C_Club.SetAvatarTexture arrived
+    -- with everything above it and nothing below. Repeats are collapsed now, so
+    -- the extra length costs nothing.
     watcher:SetScript('OnEvent', function(_, event, addon, func)
         DF:Log('taint', '%s: %s -> %s | %s', event, tostring(addon), tostring(func),
-               tostring(debugstack(2, 12, 0)):gsub('\n', ' | '):sub(1, 900))
+               tostring(debugstack(2, 20, 0)):gsub('\n', ' | '):sub(1, 1600))
     end)
 end
 

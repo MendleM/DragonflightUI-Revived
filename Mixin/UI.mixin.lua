@@ -4885,17 +4885,23 @@ function DragonflightUIMixin:PortraitFrameTemplate(frame)
         local minBtn = frame.MaximizeMinimizeFrame
         DragonflightUIMixin:MaximizeMinimizeButtonFrameTemplate(minBtn)
 
-        local oldMaximizedCallback = minBtn.maximizedCallback
-        minBtn:SetOnMaximizedCallback(function()
-            oldMaximizedCallback(minBtn)
-            fixTop()
-        end)
-
-        local oldminimizedCallback = minBtn.minimizedCallback
-        minBtn:SetOnMinimizedCallback(function()
-            oldminimizedCallback(minBtn)
-            fixTop()
-        end)
+        -- Maximizing and minimizing both resize the frame, so OnSizeChanged
+        -- reaches the same moments the two callbacks did - and reaches them by
+        -- appending rather than by standing in front of Blizzard.
+        --
+        -- What was here replaced them: SetOnMaximizedCallback with a closure
+        -- that called Blizzard's own callback from inside ours
+        -- (MaximizeMinimizeButtonFrameMixin:Maximize just invokes whatever
+        -- maximizedCallback holds). So the whole of Blizzard's resize ran in our
+        -- call. Resizing this frame resizes the club list, the list re-runs its
+        -- row initializers, and those call C_Club.SetAvatarTexture - which the
+        -- API documents as HasRestrictions = true. Tainted, so refused: every
+        -- avatar in the guild and community list silently failed to load, once
+        -- per row per refresh, blamed on us in the taint log.
+        --
+        -- Same rule the action bar filter had to learn: never run Blizzard's own
+        -- update path from inside our stack.
+        frame:HookScript('OnSizeChanged', fixTop)
     elseif name == 'EncounterJournal' then
         local dung = _G[name .. 'DungeonTab']
         -- dung.DFFirst = true
