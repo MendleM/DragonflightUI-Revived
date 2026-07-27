@@ -11,6 +11,69 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- That is what decides whether the window opens by itself.
 DF.ChangelogData = {
     {
+        version = '0.41.0-revived2',
+        title = 'Revived 2',
+        date = '27 July 2026',
+        intro = 'A week of bug reports from the Discord, answered.',
+        sections = {
+            {
+                title = 'Blue shamans',
+                new = true,
+                items = {
+                    'Vanilla gave shamans the paladin\'s pink, to the third decimal - the game\'s own colour file puts both at 0.96, 0.55, 0.73. It was never ambiguous at the time, because shamans were Horde and paladins Alliance and the two could never see each other. On Era they are still identical, which now reads as a bug.',
+                    'Settings > Misc > Utility > Class Colors > Blue Shamans draws them in the blue TBC gave them, everywhere DragonflightUI colours by class - unit frames, tooltips, loot rolls, the friends list.',
+                    'Off by default, and greyed out with an explanation on any client whose shamans already have a colour of their own.',
+                    'Nameplates and the default chat are coloured by the game rather than by us, so those stay pink. If you run a class colour addon, this setting steps aside and lets it decide.'
+                }
+            }, {
+                title = 'The target frame lights up in combat',
+                items = {
+                    'The in-combat glow traces the frame now instead of sitting near it: it is built from the frame\'s own art at the same cut and size, so it follows the outline exactly, including the bulge around the portrait.',
+                    'The red ring replaces the gold one rather than hiding behind it.',
+                    'Each frame keeps its own glow - the target, the focus, every boss frame and the edit mode preview no longer borrow the first one\'s position and shape.'
+                }
+            }, {
+                title = 'Action bars',
+                items = {
+                    'Fixed being unable to place or move spells on a bar with Always show action bar turned off. The drag grid appeared and was taken away again in the same breath, so there was nothing to drop onto. TBC only, which is what made it hard to pin down.',
+                    'Fixed a stack count left behind on the slot an item was dragged out of - "80 charges" still showing on an empty button.',
+                    'Fixed the green equipped border staying on a trinket after you took it off. Swapping two trinkets left both looking equipped.',
+                    'Fixed a renamed macro keeping its old name on the button.',
+                    'Scrolling the main bar skips bars that are already on screen again, the way the game intends. It had started cycling all six pages, which laid a second copy of a bar you could already see over the one you were using. Hide a bar and its page returns to the cycle by itself.',
+                    'The Paging setting now says outright that Smart differs from Default only for druids - on every other class the two are identical.'
+                }
+            }, {
+                title = 'Unit frames',
+                items = {
+                    'Fixed an invisible frame that swallowed clicks where the target, target-of-target, pet and focus frames sit. Opening edit mode once - changing nothing - left their holders on screen and taking mouse input, so right-drag to turn the camera stopped working anywhere near them until a reload.',
+                    'Fixed party frame settings not applying. Health and power bar changes, Class Color included, only appeared when somebody joined or left the group.',
+                    'Fixed party members vanishing the moment a fight started and coming back when it ended.',
+                    'The XP bar text is centred on the bar again. It never quite was, but rested XP makes the line long enough to notice it drifting right.'
+                }
+            }, {
+                title = 'Edit mode',
+                items = {
+                    'The placeholder drawn for a frame with nothing to show keeps that frame\'s shape now. A stance bar stacked into a column was being handed a box five times wider than the bar it stood for.'
+                }
+            }, {
+                title = 'Elsewhere',
+                items = {
+                    'Fixed guild and community list avatars silently failing to load. Nobody reported this one - it turned up in a log sent in for something else.',
+                    'Fixed a blank gap where an out-of-range or offline player\'s name should be in the tooltip.',
+                    'Aimed Shot gets a cast bar. The client does not report it the way it reports every other cast, so it is filled in from the cast being sent.'
+                }
+            }, {
+                title = 'For bug reports',
+                items = {
+                    '/df log blockers lists everything taking mouse input over a spot - for "something invisible here is eating my clicks", which hovering cannot answer.',
+                    '/df log tot reports every condition the game uses to decide whether the target-of-target frame should be visible, and says which one is failing.',
+                    'A keybinding under DragonflightUI > Debug captures whatever is under the cursor, and a window opens to copy any of it out of for pasting into a report.',
+                    'Repeated log lines are counted rather than repeated, so one noisy problem no longer buries everything else.',
+                    'Builds installed from source now report their version with -dev on the end, so a checkout of main can be told apart from a packaged release.'
+                }
+            }
+        }
+    }, {
         version = '0.41.0-revived1',
         title = 'Revived',
         date = '26 July 2026',

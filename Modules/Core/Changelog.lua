@@ -226,15 +226,46 @@ function Changelog:Hide()
     if self.Frame then self.Frame:Hide() end
 end
 
--- Remember the version whose notes have been read, so they do not open again.
+-- The notes decide when the notes open.
+--
+-- This used to compare against DF:GetVersion(), the TOC's idea of the version,
+-- which meant a release had to remember to change two files in step: bump
+-- X-DFUI-Version and add the entry describing it. Forget the bump and the
+-- window never opens for the notes you just wrote, silently and with nothing to
+-- notice - the writing is the visible half of the job and the trigger is not.
+--
+-- Keying off the entry being displayed removes the coupling: adding notes is
+-- what makes them appear, because it is the same fact. It also stops a source
+-- build, whose reported version is deliberately not a release version, from
+-- reopening notes somebody has already dismissed.
+function Changelog:NotesVersion()
+    local newest = DF.ChangelogData and DF.ChangelogData[1]
+    return (newest and newest.version) or DF:GetVersion()
+end
+
+-- Remember the notes that have been read, so they do not open again.
 function Changelog:MarkSeen()
     if not (DF.db and DF.db.global) then return end
-    DF.db.global.lastSeenVersion = DF:GetVersion()
+    DF.db.global.lastSeenVersion = self:NotesVersion()
 end
 
 function Changelog:HasUnseen()
     if not (DF.db and DF.db.global) then return false end
-    return DF.db.global.lastSeenVersion ~= DF:GetVersion()
+    return DF.db.global.lastSeenVersion ~= self:NotesVersion()
+end
+
+-- The two are still meant to agree, and a release where they do not is a
+-- packaging slip worth catching. It no longer breaks anything, so this belongs
+-- in the log rather than in anyone's chat frame: read it back with /df log
+-- version before tagging.
+function Changelog:CheckVersionAgreement()
+    local toc = C_AddOns.GetAddOnMetadata('DragonflightUI', 'X-DFUI-Version')
+    local notes = self:NotesVersion()
+
+    if toc and notes and toc ~= notes then
+        DF:Log('version', 'X-DFUI-Version is %s but the newest notes describe %s - one of them is stale',
+               tostring(toc), tostring(notes))
+    end
 end
 
 -- Opened after login when the running version is not the one last read.
@@ -244,6 +275,8 @@ end
 -- though they were a fresh install would mean the notes never appeared for the
 -- people they were written for.
 function Changelog:ShowIfUnseen()
+    self:CheckVersionAgreement()
+
     if not (ALWAYS_SHOW or self:HasUnseen()) then return end
 
     self:Show()

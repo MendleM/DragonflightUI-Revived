@@ -72,14 +72,22 @@ function DF:Dump(value)
 end
 
 -- The Version field is only filled in by the release packager, so anyone
--- running a git checkout or a zip of the repo reported "@project-version@"
--- as their version - useless for triaging bug reports. Fall back to the
--- literal X-DFUI-Version, marked as a dev build.
+-- running a git checkout or a zip of the repo reported "@project-version@" as
+-- their version - useless for triaging bug reports. Fall back to the literal
+-- X-DFUI-Version.
+--
+-- And say which of the two it is. The comment here used to claim the fallback
+-- was "marked as a dev build" and nothing marked it, so a checkout of main and
+-- a packaged release reported the same string - which is the one distinction
+-- that matters when somebody reports a bug, because a release is a known
+-- quantity and a checkout is whatever main happened to be that day. Reporters
+-- are pointed at the repo often enough that this is the common case, not the
+-- rare one.
 function DF:GetVersion()
     local version = C_AddOns.GetAddOnMetadata('DragonflightUI', 'Version')
 
     if not version or version == '' or version:find('@', 1, true) then
-        version = C_AddOns.GetAddOnMetadata('DragonflightUI', 'X-DFUI-Version') or 'unknown'
+        return (C_AddOns.GetAddOnMetadata('DragonflightUI', 'X-DFUI-Version') or 'unknown') .. '-dev'
     end
 
     return version
