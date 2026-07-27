@@ -464,24 +464,16 @@ function DragonflightUIActionbarMixin:UpdateBlizzEditmodeState()
         -- print('same')
     end
 
-    for i = 1, btnCount do
-        local btn = buttonTable[i]
-        -- if btn and btn.UpdateAction then btn:UpdateAction(true) end -- @TODO:TAINT?!
-
-        if state.alwaysShow then
-            if not btn:IsVisible() then btn:Show(); end
-        else
-            if btn.action then
-                if HasAction(btn.action) then
-                    btn:Show()
-                else
-                    btn:Hide()
-                end
-            else
-                btn:Hide()
-            end
-        end
-    end
+    -- Button visibility belongs to UpdateGridState and nowhere else.
+    --
+    -- This used to end with its own show/hide loop keyed on state.alwaysShow
+    -- alone. UpdateGridState calls this function as its last step, so on TBC -
+    -- the only flavor that gets here - that loop ran immediately after the grid
+    -- had been applied and undid it: with "Always Show" off, every empty button
+    -- was hidden again the instant a drag showed them, so no empty slots
+    -- appeared while dragging a spell and nothing could be dropped on the bar.
+    -- It also knew nothing about combat lockdown, unlike the grid pass, so the
+    -- same loop tried to Show/Hide protected buttons mid-fight.
 end
 
 function DragonflightUIActionbarMixin:UpdateGridState()
