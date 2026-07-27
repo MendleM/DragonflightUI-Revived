@@ -271,6 +271,10 @@ function SubModuleMixin:Setup()
     f:SetClampedToScreen(true)
     f:SetMovable(true)
 
+    -- Only positions things; never take mouse input, or it swallows clicks
+    -- over the frame's spot while the frame is hidden. See Target.mixin.lua.
+    f:EnableMouse(false)
+
     if DF.API.Version.IsTBC then
         --
         -- addonTable:OverrideBlizzEditmode(TargetFrameToT, 'CENTER', f, 'CENTER', 0, 0)

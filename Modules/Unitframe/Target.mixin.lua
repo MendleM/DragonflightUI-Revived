@@ -618,6 +618,15 @@ function SubModuleMixin:Setup()
     f:SetMovable(true)
     f:SetFrameStrata('LOW')
 
+    -- A holder only positions things, so it must never take mouse input. It is
+    -- parented to UIParent and keeps its anchors when the unit frame is hidden,
+    -- so any input it accepts is input swallowed over an empty patch of screen
+    -- - no target, and the right-drag that should turn the camera does nothing.
+    -- The bar holders inherit the same secure templates and have disabled this
+    -- since day one (DragonflightUIActionbarMixin:Init); the unit frame holders
+    -- never did.
+    f:EnableMouse(false)
+
     f:Hide()
 
     if DF.API.Version.IsTBC then

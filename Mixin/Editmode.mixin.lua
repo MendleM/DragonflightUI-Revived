@@ -436,23 +436,33 @@ function DFEditModeSystemSelectionBaseMixin:ApplyEditModeState(editValue)
         end
     else
         self.parent.DFEditMode = false;
-        self.ParentWasShown = nil
 
         if self.parent.SetEditMode then
             self.parent:SetEditMode(false)
-        elseif self.PreviewOnly then
-            -- Leaving edit mode may only hide frames that exist solely as
-            -- edit-mode handles. Registrations are a mix: some are dummy
-            -- previews, but most are live containers - the pet frame's holder
-            -- (which the real PetFrame is parented to), the target and focus
-            -- holders, the durability frame, the LFG eye, the chat window.
-            -- Hiding those here is how they "disappeared until a reload":
+        elseif self.PreviewOnly or self.ParentWasShown == false then
+            -- Leaving edit mode may only hide two kinds of frame: ones that
+            -- exist solely as edit-mode handles, and ones we forced open
+            -- ourselves on the way in.
+            --
+            -- Registrations are a mix: some are dummy previews, but most are
+            -- live containers - the pet frame's holder (which the real
+            -- PetFrame is parented to), the target and focus holders, the
+            -- durability frame, the LFG eye, the chat window. Hiding those
+            -- unconditionally is how they "disappeared until a reload":
             -- nothing re-shows them, because a registration carrying a
             -- HideFunction never reaches the module's ApplySettings below.
             -- Their visibility belongs to their module and to the state
             -- handler, not to edit mode.
-            self.parent:Hide()
+            --
+            -- ParentWasShown is what tells the two apart, and it was already
+            -- being recorded just above - then dropped here without ever being
+            -- read. So a holder that was hidden before edit mode opened stayed
+            -- shown for the rest of the session. Restoring what we found puts
+            -- the forced-open ones back and leaves the live ones alone.
+            if not InCombatLockdown() then self.parent:Hide() end
         end
+
+        self.ParentWasShown = nil
 
         if self.ModuleRef then
             local db = self.ModuleRef.db.profile[self.ModuleSub]
