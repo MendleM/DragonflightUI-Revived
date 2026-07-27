@@ -26,6 +26,14 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          with a depth, recurses into what is visible
 --     /df log bars <name>  every status bar under a frame: bar colour, texture
 --                          vertex colour, desaturation, alpha, lockColor
+--     /df log blockers [name]  every frame taking mouse input over a frame's
+--                          rectangle - for "something invisible is eating my
+--                          clicks here". Defaults to the target frame's spot,
+--                          and works with no target, since a hidden frame keeps
+--                          its anchors
+--     /df log tot          every term of the client's target-of-target show
+--                          condition, plus the frame's own state, and a verdict
+--     /df log tot watch    toggle a watcher that logs each time that changes
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
 --
@@ -298,6 +306,211 @@ function DF:LogBars(frameOrName, tag, maxDepth)
     end
 end
 
+-- A frame's rectangle in UIParent coordinates, or nil if it has no position.
+-- Frames keep their anchors while hidden, so this answers "where would it be"
+-- as well as "where is it" - which is the whole point when the complaint is
+-- about the empty space a hidden frame leaves behind.
+local function ScreenRect(f)
+    if not (f and f.GetLeft) then return nil end
+    local left, bottom, w, h = f:GetLeft(), f:GetBottom(), f:GetWidth(), f:GetHeight()
+    if not (left and bottom and w and h) then return nil end
+    local k = ((f.GetEffectiveScale and f:GetEffectiveScale()) or 1) / UIParent:GetEffectiveScale()
+    return left * k, bottom * k, (left + w) * k, (bottom + h) * k
+end
+
+-- What is eating the mouse over this rectangle?
+--
+-- "There is an invisible frame here" is not something hovering can answer: the
+-- capture keybinding returns whatever the client decides is under the cursor,
+-- which is the blocker only when the blocker also happens to be the top hit.
+-- This asks the opposite question - of every frame in the UI, which ones are
+-- drawn, take mouse input, and overlap this spot - and reports them in the
+-- order the client would consider them.
+--
+-- A frame only steals a right-click-drag from the camera if it takes CLICKS.
+-- Motion-only frames (tooltips, hover regions) are listed but marked, because
+-- they are innocent of this particular crime.
+function DF:LogBlockers(frameOrName, tag)
+    tag = tag or 'blockers'
+
+    local anchorFrame = ResolveFrame(frameOrName)
+    if type(anchorFrame) ~= 'table' or not anchorFrame.GetObjectType then
+        anchorFrame = TargetFrame
+    end
+    if not anchorFrame then
+        DF:Log(tag, 'no frame to measure against')
+        return
+    end
+
+    local aLeft, aBottom, aRight, aTop = ScreenRect(anchorFrame)
+    if not aLeft then
+        -- an unanchored holder still tells us nothing; fall back to the one
+        -- frame that always keeps its points
+        anchorFrame = _G['DragonflightUITargetFrame'] or anchorFrame
+        aLeft, aBottom, aRight, aTop = ScreenRect(anchorFrame)
+    end
+    if not aLeft then
+        DF:Log(tag, '%s has no position to test', (anchorFrame:GetName() or '<anonymous>'))
+        return
+    end
+
+    DF:Log(tag, '=== frames taking mouse input over %s (%.0f,%.0f to %.0f,%.0f) ===',
+           (anchorFrame:GetName() or '<anonymous>'), aLeft, aBottom, aRight, aTop)
+    DF:Log(tag, 'anchor shown=%s visible=%s  target exists=%s', tostring(anchorFrame:IsShown()),
+           tostring(anchorFrame:IsVisible()), tostring(UnitExists('target')))
+
+    local found = {}
+    local frame = EnumerateFrames()
+    while frame do
+        if frame ~= UIParent and frame ~= WorldFrame and frame.IsVisible and frame:IsVisible() and frame.IsMouseEnabled and
+            frame:IsMouseEnabled() then
+            local ok, l, b, r, t = pcall(ScreenRect, frame)
+            if ok and l and l < aRight and r > aLeft and b < aTop and t > aBottom then
+                found[#found + 1] = frame
+            end
+        end
+        frame = EnumerateFrames(frame)
+    end
+
+    if #found == 0 then
+        DF:Log(tag, 'nothing mouse-enabled overlaps it - the block is not a frame of ours')
+        return
+    end
+
+    for i, f in ipairs(found) do
+        if i > 40 then
+            DF:Log(tag, '... %d more, listing stopped', #found - 40)
+            break
+        end
+
+        -- IsMouseClickEnabled is the modern split; on clients without it,
+        -- IsMouseEnabled covered both and the frame takes clicks.
+        local takesClicks = (f.IsMouseClickEnabled and f:IsMouseClickEnabled()) or (not f.IsMouseClickEnabled)
+        local propagates = f.GetPropagateMouseClicks and f:GetPropagateMouseClicks()
+        local l, b, r, t = ScreenRect(f)
+
+        DF:Log(tag, '%s%s (%s) strata=%s level=%s clicks=%s propagates=%s alpha=%.2f rect %.0f,%.0f to %.0f,%.0f',
+               (takesClicks and not propagates) and '|cffff2020BLOCKS|r ' or '', (f:GetName() or '<anonymous>'),
+               f:GetObjectType(), tostring(f:GetFrameStrata()), tostring(f:GetFrameLevel()), tostring(takesClicks),
+               tostring(propagates), (f.GetEffectiveAlpha and f:GetEffectiveAlpha()) or -1, l, b, r, t)
+
+        local parent = f:GetParent()
+        DF:Log(tag, '    parent=%s', (parent and parent.GetName and (parent:GetName() or '<anonymous>')) or 'none')
+    end
+end
+
+-- Every term of the client's own target-of-target show condition, plus what
+-- the frame is actually doing.
+--
+-- Blizzard's TargetOfTargetMixin:Update shows the frame when the CVar is on,
+-- the target exists, the target's target exists, the target is not the player,
+-- and the target is alive - and TargetFrameMixin:OnUpdate re-runs that check
+-- every frame, so a missing ToT means either one of those terms is false or
+-- something is hiding, unanchoring or blanking the frame after the fact. This
+-- prints both halves so the answer is in the paste rather than in a guess.
+function DF:LogToT(tag)
+    tag = tag or 'tot'
+
+    local tot = (TargetFrame and TargetFrame.totFrame) or _G['TargetFrameToT']
+    if not tot then
+        DF:Log(tag, 'no ToT frame exists at all (TargetFrame.totFrame is nil)')
+        return
+    end
+
+    local cvar
+    if CVarCallbackRegistry and CVarCallbackRegistry.GetCVarValueBool then
+        cvar = CVarCallbackRegistry:GetCVarValueBool('showTargetOfTarget')
+    else
+        cvar = GetCVarBool('showTargetOfTarget')
+    end
+    -- the cached read above is what the client actually tests; the raw one
+    -- catches a cache that has gone stale behind it
+    local rawCVar = GetCVar('showTargetOfTarget')
+
+    local unit = tot.unit or 'targettarget'
+    local targetExists = UnitExists('target') and true or false
+    local totExists = UnitExists(unit) and true or false
+    local targetIsPlayer = (PlayerFrame and PlayerFrame.unit and UnitIsUnit(PlayerFrame.unit, 'target')) and true or false
+    local alive = (UnitHealth('target') or 0) > 0
+
+    local expected = (cvar and targetExists and totExists and not targetIsPlayer and alive) and true or false
+
+    DF:Log(tag, '=== target-of-target ===')
+    DF:Log(tag, 'cvar=%s (raw "%s")  targetExists=%s  totExists=%s (unit=%s, name=%s)  targetIsSelf=%s  targetAlive=%s',
+           tostring(cvar), tostring(rawCVar), tostring(targetExists), tostring(totExists), tostring(unit),
+           tostring(UnitName(unit)), tostring(targetIsPlayer), tostring(alive))
+    DF:Log(tag, 'client should show it: %s   frame shown=%s visible=%s', tostring(expected), tostring(tot:IsShown()),
+           tostring(tot:IsVisible()))
+
+    -- is the safety net still installed? TargetFrameMixin:OnUpdate is what
+    -- re-shows the ToT every frame; if something replaced that script rather
+    -- than hooking it, nothing self-heals
+    DF:Log(tag, 'TargetFrame OnUpdate installed=%s   ToT OnUpdate installed=%s',
+           tostring((TargetFrame and TargetFrame:GetScript('OnUpdate')) ~= nil),
+           tostring(tot:GetScript('OnUpdate') ~= nil))
+
+    DF:LogFrame(tot, tag)
+
+    if not expected then
+        DF:Log(tag, 'VERDICT: the client is deliberately hiding it - see which term above is false')
+    elseif not tot:IsShown() then
+        DF:Log(tag, 'VERDICT: should be shown and is not. Something hid it, or Update() is erroring - check /df log error')
+    elseif not tot:IsVisible() then
+        DF:Log(tag, 'VERDICT: shown, but an ancestor is hidden - see the parent chain above')
+    elseif tot:GetNumPoints() == 0 then
+        DF:Log(tag, 'VERDICT: shown and visible but has NO anchor points - a SetPoint was refused, so it draws nowhere')
+    elseif ((tot.GetEffectiveAlpha and tot:GetEffectiveAlpha()) or 1) < 0.05 then
+        DF:Log(tag, 'VERDICT: shown and visible but transparent')
+    else
+        DF:Log(tag, 'VERDICT: the frame is up and drawable - if it is not on screen, check the screen rect above')
+    end
+end
+
+-- Arms a watcher that logs the moment any of those terms - or the frame's own
+-- state - changes. The reporter plays until it breaks; the transition that
+-- broke it is the last line.
+local totWatcher, totLast
+function DF:LogToTWatch(on)
+    if not on then
+        if totWatcher then
+            totWatcher:Cancel()
+            totWatcher = nil
+        end
+        totLast = nil
+        print(PREFIX .. 'ToT watch OFF')
+        return
+    end
+
+    if totWatcher then return end
+    totLast = nil
+
+    totWatcher = C_Timer.NewTicker(0.2, function()
+        local tot = (TargetFrame and TargetFrame.totFrame) or _G['TargetFrameToT']
+        if not tot then return end
+
+        local cvar = (CVarCallbackRegistry and CVarCallbackRegistry.GetCVarValueBool) and
+                         CVarCallbackRegistry:GetCVarValueBool('showTargetOfTarget') or GetCVarBool('showTargetOfTarget')
+        local unit = tot.unit or 'targettarget'
+        local expected = (cvar and UnitExists('target') and UnitExists(unit) and
+                             not (PlayerFrame and PlayerFrame.unit and UnitIsUnit(PlayerFrame.unit, 'target')) and
+                             (UnitHealth('target') or 0) > 0) and true or false
+
+        local key = string.format('%s|%s|%s|%d|%.2f', tostring(expected), tostring(tot:IsShown()),
+                                  tostring(tot:IsVisible()), tot:GetNumPoints(),
+                                  (tot.GetEffectiveAlpha and tot:GetEffectiveAlpha()) or 1)
+
+        if key ~= totLast then
+            totLast = key
+            DF:Log('totwatch', 'expected=%s shown=%s visible=%s points=%d alpha=%.2f | target=%s totUnit=%s',
+                   tostring(expected), tostring(tot:IsShown()), tostring(tot:IsVisible()), tot:GetNumPoints(),
+                   (tot.GetEffectiveAlpha and tot:GetEffectiveAlpha()) or 1, tostring(UnitName('target')),
+                   tostring(UnitName(unit)))
+        end
+    end)
+
+    print(PREFIX .. 'ToT watch ON - play until it breaks, then /df log copy totwatch')
+end
+
 local function Matching(filter)
     local matching = {}
     for _, entry in ipairs(log) do
@@ -502,6 +715,16 @@ function DF:HandleLogCommand(rest)
         else
             DF:LogRegions(ResolveFrame(frameName) or frameName, 'regiondump', depth)
             DF:LogDump('regiondump', 80)
+        end
+    elseif sub == 'blockers' then
+        DF:LogBlockers(arg ~= '' and arg or nil, 'blockers')
+        DF:LogDump('blockers', 60)
+    elseif sub == 'tot' then
+        if arg:lower() == 'watch' then
+            DF:LogToTWatch(not totWatcher)
+        else
+            DF:LogToT('totdump')
+            DF:LogDump('totdump', 40)
         end
     else
         DF:LogDump(rest, 60)
