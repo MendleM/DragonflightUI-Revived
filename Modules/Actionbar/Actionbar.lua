@@ -2770,6 +2770,15 @@ function Module.InstallSlotChangedFilter()
             end
         end
 
+        -- And the macro name, for the third time the same way. Renaming a macro
+        -- leaves it at the same index, so GetActionInfo returns what it did
+        -- before and the signature does not move - but the text on the button
+        -- has changed. Same evidence as the border, too: UsesActionText and
+        -- GetActionText are called from that one Update(), and UPDATE_MACROS is
+        -- registered by the macro window and nothing else, so no other path
+        -- exists to put the new name on the button.
+        if btn.Name then btn.Name:SetText(actionText(action)) end
+
         if deep then
             -- going empty <-> filled changes which events the button needs
             local aef = _G['ActionBarActionEventsFrame']
@@ -2788,9 +2797,12 @@ function Module.InstallSlotChangedFilter()
             if btn.UpdateProfessionQuality then btn:UpdateProfessionQuality() end
             if btn.UpdateTypeOverlay then btn:UpdateTypeOverlay() end
             if btn.UpdateFlyout then btn:UpdateFlyout() end
+            -- The reason the deep half still earns its keep: this one allocates
+            -- a table per call plus three more from the C_Spell lookups behind
+            -- it, which is the cost the filter exists to keep out of a mouseover
+            -- storm. Everything left here is genuinely tied to the slot holding
+            -- something else.
             if ActionButton_UpdateCooldown then ActionButton_UpdateCooldown(btn) end
-
-            if btn.Name then btn.Name:SetText(actionText(action)) end
         end
 
         if GameTooltip:GetOwner() == btn and btn.SetTooltip then btn:SetTooltip() end
