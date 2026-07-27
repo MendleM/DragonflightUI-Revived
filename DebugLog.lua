@@ -66,6 +66,9 @@ loadFrame:SetScript('OnEvent', function(self, _, name)
 end)
 
 local echoToChat = false
+
+-- last line written, so an identical one can be counted rather than repeated
+local lastKey, lastIndex, lastCount
 local PREFIX = '|cff0070ddDFUI log:|r '
 
 -- Errors and taint blocks land here too, tagged 'error' and 'taint'. Taint
@@ -101,13 +104,30 @@ function DF:Log(tag, msg, ...)
         text = tostring(msg)
     end
 
+    -- Collapse a line that repeats. One blocked call inside a list initializer
+    -- fires once per row per refresh, so a single misbehaving frame can put
+    -- dozens of byte-identical entries in here - and since the buffer is
+    -- capped, they push out the ones that were actually wanted. That happened:
+    -- a party-frame report came back with the party half nearly buried under
+    -- repeats of an unrelated taint. Counting them keeps the evidence and the
+    -- frequency, which is more than the copies were telling us anyway.
+    local key = tostring(tag) .. '\0' .. text
+    if key == lastKey and lastIndex and log[lastIndex] then
+        lastCount = lastCount + 1
+        log[lastIndex] = string.format('%7.2f [%s] %s  (x%d)', GetTime() % 100000, tostring(tag), text, lastCount)
+        if echoToChat then print(PREFIX .. log[lastIndex]) end
+        return log[lastIndex]
+    end
+
     local entry = string.format('%7.2f [%s] %s', GetTime() % 100000, tostring(tag), text)
 
     if #log < MAX_ENTRIES then
         log[#log + 1] = entry
+        lastKey, lastIndex, lastCount = key, #log, 1
     elseif not log.truncated then
         log.truncated = true
         log[MAX_ENTRIES] = '... log full, later entries dropped'
+        lastKey, lastIndex, lastCount = nil, nil, nil
     end
 
     if echoToChat then print(PREFIX .. entry) end
@@ -674,6 +694,7 @@ end
 function DF:LogClear()
     for i = #log, 1, -1 do log[i] = nil end
     log.truncated = nil
+    lastKey, lastIndex, lastCount = nil, nil, nil
     print(PREFIX .. 'cleared')
 end
 
