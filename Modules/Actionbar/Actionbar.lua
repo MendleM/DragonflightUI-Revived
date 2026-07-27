@@ -2747,6 +2747,29 @@ function Module.InstallSlotChangedFilter()
         -- what left buttons grey until the cursor touched them.
         if btn.UpdateUsable then btn:UpdateUsable() end
 
+        -- The equipped border belongs out here for the same reason, and it is
+        -- the one thing below that never depended on the signature at all.
+        -- 'deep' means the slot holds something else now; this asks whether the
+        -- item in it is worn, which changes while the slot sits perfectly
+        -- still. Swap two trinkets and both keep their action slots, so the
+        -- signature never moves, so the border was never re-evaluated and the
+        -- green stayed on a trinket that had come off.
+        --
+        -- Worth knowing if this is ever refactored: C_ActionBar.IsEquippedAction
+        -- is called from exactly one place in the whole client, inside
+        -- ActionBarActionButtonMixin:Update(). There is no separate event for
+        -- it. Intercepting ACTIONBAR_SLOT_CHANGED takes over the only refresh
+        -- this border has.
+        local border = btn.Border
+        if border then
+            if isEquipped(action) then
+                border:SetVertexColor(0, 1.0, 0, 0.5)
+                border:Show()
+            else
+                border:Hide()
+            end
+        end
+
         if deep then
             -- going empty <-> filled changes which events the button needs
             local aef = _G['ActionBarActionEventsFrame']
@@ -2766,16 +2789,6 @@ function Module.InstallSlotChangedFilter()
             if btn.UpdateTypeOverlay then btn:UpdateTypeOverlay() end
             if btn.UpdateFlyout then btn:UpdateFlyout() end
             if ActionButton_UpdateCooldown then ActionButton_UpdateCooldown(btn) end
-
-            local border = btn.Border
-            if border then
-                if isEquipped(action) then
-                    border:SetVertexColor(0, 1.0, 0, 0.5)
-                    border:Show()
-                else
-                    border:Hide()
-                end
-            end
 
             if btn.Name then btn.Name:SetText(actionText(action)) end
         end
