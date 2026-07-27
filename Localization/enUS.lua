@@ -246,7 +246,7 @@ do
     -- stateDriver
     L['ActionbarDriverName'] = "Paging"
     L['ActionbarDriverNameDesc'] =
-        "Changes the paging behaviour of the main action bar, e.g. when changing stance or stealth.\n'Default' - no change\n'Smart' - adds custom page for Druid cat stealth\n'No Paging' - disables all paging"
+        "Changes the paging behaviour of the main action bar, e.g. when changing stance or stealth.\n'Default' - no change\n'Smart' - adds a page for Druid cat stealth. |cffffd100On any other class this is identical to Default.|r\n'No Paging' - disables all paging"
 
     -- targetStateDriver
     L["ActionbarTargetDriverConditionalFormat"] = "\n\n(This is equivalent to the macro conditional: |cff8080ff%s|r)\n"

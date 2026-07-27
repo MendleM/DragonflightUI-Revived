@@ -711,12 +711,11 @@ function DragonflightUIActionbarMixin:UpdatePagingStateDriver(state)
     -- print('DragonflightUIActionbarMixin:UpdatePagingStateDriver(state)', mode)
 
     local localizedClass, englishClass, classIndex = UnitClass("player");
-    if mode == 'SMART' then
-        local shouldChange = (englishClass == 'DRUID')
-        -- if not shouldChange then mode = 'DEFAULT' end
-    end
 
-    -- print('~>', mode)
+    -- Smart differs from Default by exactly one driver entry, the druid cat
+    -- stealth page below, so on every other class the two settings genuinely do
+    -- the same thing. That is worth knowing before chasing it as a bug; the
+    -- option's description says so too.
 
     if mode == 'DEFAULT' then
         if self.DriverCache then
@@ -1307,13 +1306,44 @@ function DragonflightUIActionbarMixin:SetupPageNumberFrame()
     -- buttons. type='actionbar' pages through the protected path even in
     -- combat, a [bar:N] state driver keeps each arrow's target page current
     -- (state drivers stay live in combat), and the textures are ours alone.
-    -- Blizzard's secure increment/decrement is unusable here: it honors
-    -- VIEWABLE_ACTION_BAR_PAGES, which the always-shown multibars collapse
-    -- to a 1<->2 cycle.
     local modernFallback = (not _G['ActionBarUpButton'] and C_ActionBar
         and C_ActionBar.SetActionBarPage) and true or false
 
     local numPages = NUM_ACTIONBAR_PAGES or 6
+
+    -- Which pages the cycle is allowed to land on.
+    --
+    -- Blizzard drops a page out of VIEWABLE_ACTION_BAR_PAGES the moment its bar
+    -- is on screen (MultiActionBars.lua, UpdateMultiActionBar) and both
+    -- ActionBar_PageUp and ActionBar_PageDown skip what is not in there. That
+    -- is deliberate, not a limitation: a bar you can already see and click is
+    -- not somewhere worth paging to. This code used to read the resulting
+    -- 1<->2 cycle as a bug and route around it, which meant paging laid a
+    -- second copy of bar 4 over bar 1 while hiding the page you were actually
+    -- using - reported, correctly, as scrolling through "6 action bars that
+    -- shouldn't be there, since they're already open in my UI".
+    local function isViewablePage(page)
+        local viewable = VIEWABLE_ACTION_BAR_PAGES
+        if not viewable then return true end
+        -- page 1 has no bar of its own to be visible, so it is always in
+        return page == 1 or viewable[page] ~= nil
+    end
+
+    local function nextViewablePage(from, delta)
+        local page = from
+        for _ = 1, numPages do
+            page = page + delta
+            if page > numPages then
+                page = 1
+            elseif page < 1 then
+                page = numPages
+            end
+            if isViewablePage(page) then return page end
+        end
+        return from -- nothing else to page to; sit still rather than flicker
+    end
+
+    local pageArrows = {}
     local function createSecurePageArrow(name, delta)
         local btn = CreateFrame('Button', name, f,
                                 'SecureActionButtonTemplate,SecureHandlerStateTemplate')
@@ -1330,14 +1360,28 @@ function DragonflightUIActionbarMixin:SetupPageNumberFrame()
         -- shown) and immediately wrapped the page back: the 1->2->1 flicker.
         btn:RegisterForClicks('LeftButtonDown', 'LeftButtonUp')
         btn:SetAttribute('type', 'actionbar')
-        btn:SetAttribute('_onstate-page', ([[
-            local page = (tonumber(newstate) or 1) + (%d)
-            if page > %d then page = 1 elseif page < 1 then page = %d end
-            self:SetAttribute('action', page)
-        ]]):format(delta, numPages, numPages))
-        local drive = {}
-        for i = 1, numPages do drive[#drive + 1] = '[bar:' .. i .. ']' .. i end
-        RegisterStateDriver(btn, 'page', table.concat(drive, ';') .. ';1')
+        -- The snippet only copies across the target the driver hands it. The
+        -- skipping is decided out here, where VIEWABLE_ACTION_BAR_PAGES can
+        -- actually be read - a restricted environment cannot see it - and baked
+        -- into the driver string as "from this page, go to that one". State
+        -- drivers stay live under lockdown, so the arrow still pages in combat;
+        -- only the string needs rebuilding, and only when a bar is shown or
+        -- hidden, which is not something that happens mid-fight.
+        btn:SetAttribute('_onstate-page', [[
+            self:SetAttribute('action', tonumber(newstate) or 1)
+        ]])
+
+        btn.DFRefreshPages = function()
+            if InCombatLockdown() then return end
+            local drive = {}
+            for i = 1, numPages do
+                drive[#drive + 1] = '[bar:' .. i .. ']' .. nextViewablePage(i, delta)
+            end
+            RegisterStateDriver(btn, 'page',
+                                table.concat(drive, ';') .. ';' .. nextViewablePage(1, delta))
+        end
+        btn.DFRefreshPages()
+        pageArrows[#pageArrows + 1] = btn
         btn:SetScript('PostClick', function(_, _, down)
             -- Both click edges reach PostClick; only voice the one that acted.
             local useDown = GetCVarBool and GetCVarBool('ActionButtonUseKeyDown')
@@ -1358,15 +1402,17 @@ function DragonflightUIActionbarMixin:SetupPageNumberFrame()
         ActionBarDownButton = createSecurePageArrow('DragonflightUIActionBarDownButton', -1)
         MainMenuBarPageNumber = MainActionBar.ActionBarPageNumber.Text
 
-        -- Route the page-cycling BINDINGS through the secure arrows as well.
-        -- NEXTACTIONPAGE/PREVIOUSACTIONPAGE (shift-mousewheel by default)
-        -- call ActionBar_PageUp/Down, which cycle only
-        -- VIEWABLE_ACTION_BAR_PAGES - {1,2} with the multibars shown - and a
-        -- single scroll gesture delivers a burst of wheel ticks (measured
-        -- ~40 over 1.3s), so the page just strobed 1<->2 and could never
-        -- reach bars 3-6. Overriding every key bound to those commands with
-        -- a click on our arrows gives the same full 1..6 cycle as clicking,
-        -- combat-safe, one page step per tick.
+        -- Route the page-cycling BINDINGS through the secure arrows as well, so
+        -- shift-mousewheel and a click on the arrow do the same thing and both
+        -- go through the protected path that keeps working in combat.
+        --
+        -- Not, as this once said, to escape VIEWABLE_ACTION_BAR_PAGES: the
+        -- arrows honour it now, so the cycle here matches ActionBar_PageUp's
+        -- again. Widening it was the wrong answer to the wheel burst - a single
+        -- scroll gesture delivers a lot of ticks (measured ~40 over 1.3s) and
+        -- every one of them steps a page, so a wider cycle only changed what
+        -- the strobe looked like. If that resurfaces it wants a throttle, not a
+        -- longer loop to run around.
         local BINDING_TO_ARROW = {
             NEXTACTIONPAGE = 'DragonflightUIActionBarUpButton',
             PREVIOUSACTIONPAGE = 'DragonflightUIActionBarDownButton',
@@ -1381,11 +1427,29 @@ function DragonflightUIActionbarMixin:SetupPageNumberFrame()
                 end
             end
         end
+        -- Showing or hiding a bar changes which pages are worth going to, so
+        -- the baked-in driver has to be rebuilt when it does.
+        local function refreshPageArrows()
+            for _, arrow in ipairs(pageArrows) do arrow.DFRefreshPages() end
+        end
+
         local bindingWatcher = CreateFrame('Frame')
         bindingWatcher:RegisterEvent('UPDATE_BINDINGS')
         bindingWatcher:RegisterEvent('PLAYER_REGEN_ENABLED')
-        bindingWatcher:SetScript('OnEvent', applyPagingBindingOverrides)
+        bindingWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+        bindingWatcher:SetScript('OnEvent', function()
+            applyPagingBindingOverrides()
+            refreshPageArrows()
+        end)
         applyPagingBindingOverrides()
+
+        -- MultiActionBar_Update is where VIEWABLE_ACTION_BAR_PAGES is written,
+        -- so it is the one place that always knows the answer has changed.
+        -- Checked for rather than assumed: a global that does not exist on this
+        -- client would take the hook, and us, down with it.
+        if type(_G['MultiActionBar_Update']) == 'function' then
+            hooksecurefunc('MultiActionBar_Update', refreshPageArrows)
+        end
     else
         ActionBarUpButton = _G['ActionBarUpButton']
         ActionBarDownButton = _G['ActionBarDownButton']
