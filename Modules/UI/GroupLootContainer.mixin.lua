@@ -455,8 +455,7 @@ function SubModuleMixin:UpdateTopRoll(f)
         if isDone and winnerIdx then
             local name, class, rollType, roll = C_LootHistory.GetPlayerInfo(itemIdx, winnerIdx)
             if name then
-                local color = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-                if color and color.colorStr then name = '|c' .. color.colorStr .. name .. '|r' end
+                if class then name = DF:GetClassColoredText(name, class) end
                 if roll then
                     topRoll:SetFormattedText('%s (%d)', name, roll)
                 else
@@ -535,8 +534,7 @@ function SubModuleMixin:ShowWinnerToast(itemIdx)
     toast:ClearAllPoints()
     toast:SetPoint('BOTTOM', self.PreviewRoll, 'BOTTOM', 0, -34)
 
-    local color = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-    local coloredName = (color and color.colorStr) and ('|c' .. color.colorStr .. name .. '|r') or name
+    local coloredName = class and DF:GetClassColoredText(name, class) or name
     local typeTag = ROLL_TYPE_INLINE[rollType] and (' ' .. ROLL_TYPE_INLINE[rollType]) or ''
     local rollTag = roll and (' (' .. roll .. ')') or ''
     toast.Text:SetFormattedText('%s%s%s  %s', coloredName, typeTag, rollTag, itemLink or '')

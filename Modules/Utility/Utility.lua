@@ -9,7 +9,7 @@ Module.Tmp = {}
 
 Mixin(Module, DragonflightUIModulesMixin)
 
-local defaults = {profile = {scale = 1, first = {friendsColor = true}}}
+local defaults = {profile = {scale = 1, first = {friendsColor = true, blueShamans = false}}}
 Module:SetDefaults(defaults)
 
 local function getDefaultStr(key, sub)
@@ -32,6 +32,11 @@ local function setOption(info, value)
     Module:SetOption(info, value)
 end
 
+-- Resolved once here rather than per-draw: RAID_CLASS_COLORS is populated by
+-- SharedXML long before any addon loads, and Core.lua sits above this file in
+-- the TOC, so both are ready. Nothing about it can change during a session.
+local shamanIsPink = DF:ShamanSharesPaladinColor()
+
 local utilityOptions = {
     type = 'group',
     name = 'Utility',
@@ -44,6 +49,26 @@ local utilityOptions = {
             name = 'Class Color',
             desc = '' .. getDefaultStr('friendsColor', 'first'),
             order = 11
+        },
+        classColorHeader = {type = 'header', name = 'Class Colors', order = 20},
+        blueShamans = {
+            type = 'toggle',
+            name = 'Blue Shamans',
+            -- Plain values, not functions: the settings list hands desc
+            -- straight to SetTooltip without calling it, and tests disabled for
+            -- truth - so a function there would read as permanently disabled.
+            desc = shamanIsPink and
+                ('Vanilla gave shamans the same pink as paladins - the game\'s own colours put both at ' ..
+                    '0.96, 0.55, 0.73 - because the two factions could never see each other\'s class. This ' ..
+                    'draws them in the blue TBC gave them instead, everywhere DragonflightUI colours by class.' ..
+                    '\n\n|cffffd100Nameplates and the default chat are coloured by the game itself rather than ' ..
+                    'by us, so those stay pink. A class colour addon changes them everywhere at once - and if ' ..
+                    'you run one, this setting steps aside and lets it decide.|r' ..
+                    getDefaultStr('blueShamans', 'first')) or
+                'This client already gives shamans a blue of their own, so there is nothing here to correct.',
+            disabled = (not shamanIsPink) or nil,
+            order = 21,
+            new = true
         }
     }
 }
@@ -126,6 +151,19 @@ function Module:ApplySettingsInternal(sub, key)
     local db = Module.db.profile
 
     Module:HookFriendsColor(db.first.friendsColor)
+
+    -- A plain flag on DF rather than a db read, because Core's GetClassColor
+    -- runs on every bar and every name it draws and has no business doing a
+    -- module lookup to answer this.
+    local wanted = (db.first.blueShamans and DF:ShamanSharesPaladinColor()) and true or false
+    if DF.BlueShamans ~= wanted then
+        DF.BlueShamans = wanted
+        -- Colours are read when something redraws, and unit frames only redraw
+        -- when asked, so toggling this has to ask. Only on a real change - this
+        -- function runs for every settings change there is.
+        local unitframe = DF:GetModule('Unitframe', true)
+        if unitframe and unitframe.ApplySettings then unitframe:ApplySettings() end
+    end
 end
 
 function Module:SetupLookupTable()
@@ -185,15 +223,17 @@ function Module:HookFriendsColor(hook)
 
                 if (characterName) then
                     local classFixed = Module.LocalClassTable[class]
-                    local classColors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
-                    local color = classColors[classFixed]
 
-                    if not color then return end
+                    if not classFixed then return end
+
+                    -- through DF's resolver, not the raw table, so the Blue
+                    -- Shamans setting reaches the friends list too
+                    local _, _, _, _, colorStr = DF:GetClassColor(classFixed)
 
                     local englishFaction, localizedFaction = UnitFactionGroup('player')
 
-                    local nameText = accountName .. " " .. "|c" .. color.colorStr .. "(" .. characterName .. ': ' ..
-                                         level .. ")" .. FONT_COLOR_CODE_CLOSE;
+                    local nameText = accountName .. " " .. "|c" .. colorStr .. "(" .. characterName .. ': ' .. level ..
+                                         ")" .. FONT_COLOR_CODE_CLOSE;
 
                     if faction ~= localizedFaction then
                         nameText = nameText .. ' (' .. faction .. ') '

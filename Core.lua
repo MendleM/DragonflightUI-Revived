@@ -89,14 +89,48 @@ function DF:ShowStartMessage()
     self:Print(DF:GetVersion() .. " loaded! Type '/dragonflight' or '/df' to open the options menu.")
 end
 
+-- Vanilla gave shamans the paladin's pink, to the third decimal:
+-- Blizzard_SharedXML/Vanilla/ClassColors.lua has both at 0.96, 0.55, 0.73. It
+-- was never ambiguous at the time, because shamans were Horde and paladins
+-- Alliance and the two could not see each other. TBC is where shaman becomes
+-- blue. On Era they are still indistinguishable, which reads as a bug.
+--
+-- The obvious fix - write RAID_CLASS_COLORS.SHAMAN - is the one to avoid.
+-- Blizzard_UnitFrame/Shared/CompactUnitFrame.lua reads that table on every
+-- health update, and the raid frames it drives do protected work, so tainting
+-- it risks blocking them in combat. That is the exact failure we have spent
+-- this week fixing in other people's addons. So the swap happens here instead,
+-- in the one function every colour DFUI draws already comes through.
+local SHAMAN_BLUE_R, SHAMAN_BLUE_G, SHAMAN_BLUE_B = 0.0, 0.44, 0.87 -- TBC's own values
+local SHAMAN_BLUE_HEX = (CreateColor and CreateColor(SHAMAN_BLUE_R, SHAMAN_BLUE_G, SHAMAN_BLUE_B):GenerateHexColor()) or
+                            'ff0070dd'
+
 -- BLIZZ:
 local function GetClassColor(classFilename)
-    local classColors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS -- change for 'WeWantBlueShamans'
+    local classColors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
+
+    -- Only ever override the client's own table. Somebody running a class
+    -- colour addon has said what they want their colours to be, and it is not
+    -- our place to argue with it.
+    if DF.BlueShamans and classFilename == 'SHAMAN' and not CUSTOM_CLASS_COLORS then
+        return SHAMAN_BLUE_R, SHAMAN_BLUE_G, SHAMAN_BLUE_B, SHAMAN_BLUE_HEX
+    end
 
     local color = classColors[classFilename];
     if color then return color.r, color.g, color.b, color.colorStr; end
 
     return 1, 1, 1, "ffffffff";
+end
+
+-- True when the client cannot tell the two apart, which is what makes the
+-- option worth offering. Feature-detected rather than keyed to a flavour, so it
+-- stays right if Blizzard ever changes the Era table.
+function DF:ShamanSharesPaladinColor()
+    local colors = RAID_CLASS_COLORS
+    local shaman, paladin = colors and colors.SHAMAN, colors and colors.PALADIN
+    if not (shaman and paladin) then return false end
+    return math.abs(shaman.r - paladin.r) < 0.01 and math.abs(shaman.g - paladin.g) < 0.01 and
+               math.abs(shaman.b - paladin.b) < 0.01
 end
 
 function DF:GetClassColor(class, alpha)
