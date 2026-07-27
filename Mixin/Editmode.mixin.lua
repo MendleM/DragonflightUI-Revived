@@ -503,7 +503,16 @@ end
 -- this for themselves; everything else gets a labelled placeholder at a size
 -- big enough to grab - a pet bar with no pet, a boss frame out of a raid, a
 -- castbar that is not casting.
+--
+-- The placeholder size is only a floor for a frame that has nothing usable to
+-- aim at, though. A frame is easy enough to hit long before it is 150x40: a
+-- stance bar stacked into a column is thirty pixels wide and three hundred
+-- tall, needs no help being clicked, and applying the label width to it drew a
+-- placeholder five times wider than the bar it stood for. So GRAB is the real
+-- "can I click this" threshold, and the bigger numbers only come into play for
+-- the dimension that has genuinely run out of room.
 local GHOST_MIN_WIDTH, GHOST_MIN_HEIGHT = 150, 40
+local GHOST_MIN_GRAB = 24
 
 function DFEditModeSystemSelectionBaseMixin:UpdateGhost(shown)
     if not shown then
@@ -514,7 +523,14 @@ function DFEditModeSystemSelectionBaseMixin:UpdateGhost(shown)
 
     local parent = self.parent
     local width, height = parent:GetWidth() or 0, parent:GetHeight() or 0
-    local tooSmallToGrab = width < GHOST_MIN_WIDTH or height < GHOST_MIN_HEIGHT
+
+    -- A dimension that still has room in the other direction only has to stay
+    -- clickable; one with no room anywhere is what the label-sized floor is
+    -- for. This is what keeps a long thin bar the shape of a long thin bar.
+    local minW = (height >= GHOST_MIN_HEIGHT) and GHOST_MIN_GRAB or GHOST_MIN_WIDTH
+    local minH = (width >= GHOST_MIN_WIDTH) and GHOST_MIN_GRAB or GHOST_MIN_HEIGHT
+    local tooSmallToGrab = width < minW or height < minH
+
     local empty = not HasVisibleContent(parent, self)
 
     if not empty then
@@ -529,7 +545,7 @@ function DFEditModeSystemSelectionBaseMixin:UpdateGhost(shown)
     if tooSmallToGrab then
         self:ClearAllPoints()
         self:SetPoint('CENTER', parent, 'CENTER', 0, 0)
-        self:SetSize(math.max(width, GHOST_MIN_WIDTH), math.max(height, GHOST_MIN_HEIGHT))
+        self:SetSize(math.max(width, minW), math.max(height, minH))
         self.SelectionAnchorsFloated = true
     end
 
