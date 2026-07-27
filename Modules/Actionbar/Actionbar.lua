@@ -2721,16 +2721,27 @@ function Module.InstallSlotChangedFilter()
 
         local icon = btn.icon
         local texture = actionTexture(action)
-        if icon then
-            if texture then
+        if texture then
+            if icon then
                 icon:SetTexture(texture)
                 icon:Show()
-            else
-                icon:Hide()
+            end
+            if btn.UpdateCount then btn:UpdateCount() end
+        else
+            if icon then icon:Hide() end
+            -- Blizzard's Update() clears the stack count itself on the empty
+            -- branch rather than going through UpdateCount, because
+            -- GetActionDisplayCount has nothing to return for a slot with no
+            -- action and so cannot clear anything. Calling UpdateCount on both
+            -- branches, as this did, left the old number sitting on the slot an
+            -- item had just been dragged out of - "80 charges" still showing
+            -- where the stack used to be.
+            if btn.Count then btn.Count:SetText('') end
+            if btn.cooldown and ClearActionButtonCooldowns then
+                ClearActionButtonCooldowns(btn.cooldown, btn.chargeCooldown, btn.lossOfControlCooldown)
             end
         end
 
-        if btn.UpdateCount then btn:UpdateCount() end
         -- A macro keeps its slot while resolving to a different spell, so
         -- usability can change under an unchanged signature. Skipping this is
         -- what left buttons grey until the cursor touched them.
