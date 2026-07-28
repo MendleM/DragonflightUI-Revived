@@ -8,16 +8,24 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- the top entry is the one a player sees after updating.
 --
 -- The top entry's `version` is what decides whether the window opens by itself:
--- adding notes is what makes them appear. Keep it matching X-DFUI-Version in
--- the TOC anyway - they describe the same release - and a mismatch is written
--- to the debug log at login, readable with /df log version before tagging.
+-- adding notes is what makes them appear. Keep it matching the TOC's Version
+-- anyway - they describe the same release - and a mismatch is written to the
+-- debug log at login, readable with /df log version before packaging.
 --
 -- Keep the bullets to a line each. These are read in a window in the middle of
 -- a game, not a post-mortem: what changed, not why it broke.
+--
+-- Versions are plain x.y.z and nothing else. The earlier "0.41.0-revived1" and
+-- "Revived 2" tried to make the version carry the fact that the project has new
+-- maintainers, which it announced once and then repeated forever, and left the
+-- number unable to say the only thing a version is for: which build is newer.
+-- The `title` is where a release gets a name, and it should describe the
+-- release rather than number it - "Revived" was the launch, "Revived 2" was
+-- just the one after it.
 DF.ChangelogData = {
     {
-        version = '0.41.0-revived2',
-        title = 'Revived 2',
+        version = '0.42.0',
+        title = 'Bug reports, answered',
         date = '27 July 2026',
         intro = 'A week of bug reports from the Discord, answered.',
         sections = {
@@ -45,8 +53,27 @@ DF.ChangelogData = {
                     'Paging: Smart only differs from Default on druids, and now says so.'
                 }
             }, {
+                title = 'Request Stop button',
+                items = {
+                    'Can be turned off - there was no setting for it at all.',
+                    'Preview button in the settings, since the real one only appears on a taxi or in a vehicle.',
+                    'The button frame and the active glow can each be turned off.',
+                    'Sits above the top action bar, flush with the left edge of the bars, at button size, with the same frame the other buttons wear.',
+                    'Lights up with the same corner glow an autocasting pet ability gets, so you can see when it is live.',
+                    'Fixed Pet Bar doing nothing when picked as an anchor for any bar.'
+                }
+            }, {
+                title = 'Loot rolls',
+                items = {
+                    'Fixed hovering Need, Greed or Pass no longer naming who chose it.',
+                    'The number on each roll button is back, in the corner of the button it counts.',
+                    'The line under the item name no longer repeats those numbers - it says how many have yet to answer.',
+                    'The settings preview shows a roll in progress, tooltips included.'
+                }
+            }, {
                 title = 'Unit frames',
                 items = {
+                    'Fixed a burst of Lua errors at login about frames not being movable, from settings being applied before the frames were built.',
                     'Fixed an invisible frame eating clicks around the target, target-of-target, pet and focus frames after opening edit mode.',
                     'Fixed party frame settings only applying when someone joined or left the group.',
                     'Fixed party members vanishing when combat started.',
@@ -60,6 +87,7 @@ DF.ChangelogData = {
             }, {
                 title = 'Elsewhere',
                 items = {
+                    'Fixed an error at login with Clique installed, which also cost Clique mouse handling on some frames.',
                     'Fixed guild and community list avatars not loading.',
                     'Fixed the blank gap where an out-of-range player\'s name goes in tooltips.',
                     'Aimed Shot shows a cast bar.'
@@ -70,13 +98,12 @@ DF.ChangelogData = {
                     '/df log blockers - what is taking mouse input at a spot.',
                     '/df log tot - why the target-of-target frame is hidden.',
                     'Keybinding under DragonflightUI > Debug captures whatever is under the cursor, with a window to copy it out of.',
-                    'Repeated log lines are counted, not repeated.',
-                    'Source builds report -dev, so they are not mistaken for a release.'
+                    'Repeated log lines are counted, not repeated.'
                 }
             }
         }
     }, {
-        version = '0.41.0-revived1',
+        version = '0.41.1',
         title = 'Revived',
         date = '26 July 2026',
         intro = 'The community-maintained continuation of DragonflightUI Classic, picking up where the original left off.',

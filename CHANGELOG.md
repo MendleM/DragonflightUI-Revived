@@ -2,12 +2,12 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.41.0-revived2`.
+May 2026). Current builds report version `0.42.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
 
-## Revived 2 (27 July 2026)
+## 0.42.0 — Bug reports, answered (27 July 2026)
 
 ### Blue shamans (new)
 
@@ -31,8 +31,40 @@ Everything before v0.40.3 is in
 - Scrolling the main bar skips bars already on screen again
 - **Paging**: *Smart* only differs from *Default* on druids, and now says so
 
+### Request Stop / vehicle exit button
+
+- Can be turned off — there was no setting for it at all
+- **Preview** button in the settings, since the real one only exists on a taxi
+  or in a vehicle and could not otherwise be placed without catching a flight
+- The button frame and the active glow can each be turned off
+- Sits above the top action bar by default, flush with the left edge of the
+  bars, at button size rather than oversized, and wears the same frame as every
+  other action and pet button
+- Lights up with the same corner glow a pet ability gets when it is set to
+  autocast, so you can see when it is live — it had no state artwork at all
+  before, and looked identical whether or not it would do anything
+- Fixed **Pet Bar** doing nothing when picked as an anchor for any bar: the
+  setting named a frame that does not exist, and a missing anchor silently fell
+  back to the parent instead of saying so
+
+### Loot rolls
+
+- Fixed hovering **Need**, **Greed** or **Pass** no longer naming who chose it —
+  the retail restyle left the count and the tooltip behind, so all that was left
+  was the tally
+- The number on each roll button is back, sitting in the corner of the button
+  it counts; an empty Pass now reads `0` instead of `*`
+- The line under the item name no longer repeats those same three numbers — it
+  says how many people have yet to answer, then names the winner
+- The settings preview shows a roll in progress — counts, hover tooltips and
+  all — so the whole frame can be judged without waiting for a drop
+
 ### Unit frames
 
+- Fixed a burst of Lua errors at login — `SetUserPlaced(): Frame is not movable
+  or resizable` for the player, target, target-of-target and pet frames, and an
+  `attempt to index local 'f'` from the secondary resource bar. Settings were
+  being applied to the unit frames before they had been built
 - Fixed an invisible frame eating clicks around the target, target-of-target,
   pet and focus frames after opening edit mode
 - Fixed party frame settings only applying when someone joined or left the group
@@ -46,6 +78,10 @@ Everything before v0.40.3 is in
 
 ### Elsewhere
 
+- Fixed an error at login with **Clique** installed — the party half of the
+  compatibility fix expected the old named party frames, which Era 1.15.9 does
+  not have. It threw before finishing, so Clique lost mouse handling on the
+  frames it had not reached yet
 - Fixed guild and community list avatars not loading
 - Fixed the blank gap where an out-of-range player's name goes in tooltips
 - Aimed Shot shows a cast bar
@@ -57,9 +93,8 @@ Everything before v0.40.3 is in
 - Keybinding under **DragonflightUI → Debug** captures whatever is under the
   cursor, with a window to copy it out of
 - Repeated log lines are counted, not repeated
-- Source builds report `-dev`, so they are not mistaken for a release
 
-## Revived (26 July 2026)
+## 0.41.1 — Revived (26 July 2026)
 
 ### Undo and redo in edit mode (new)
 
@@ -200,7 +235,7 @@ Everything before v0.40.3 is in
 - New `/df log` debug log, which records errors and blocked actions to disk so
   bug reports can include a real log
 
-## Classic Era 1.15.9 support (22–25 July 2026)
+## 0.41.0 — Classic Era 1.15.9 support (22–25 July 2026)
 
 The 1.15.9 patch replaced the Classic Era interface with a backport of the
 modern one — Blizzard Edit Mode, retail-style action bars, pooled party
