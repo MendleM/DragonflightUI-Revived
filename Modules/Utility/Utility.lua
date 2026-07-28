@@ -156,8 +156,15 @@ function Module:ApplySettingsInternal(sub, key)
     -- runs on every bar and every name it draws and has no business doing a
     -- module lookup to answer this.
     local wanted = (db.first.blueShamans and DF:ShamanSharesPaladinColor()) and true or false
-    if DF.BlueShamans ~= wanted then
-        DF.BlueShamans = wanted
+
+    -- `or false` because the flag starts out nil, and nil ~= false: without it
+    -- the "only on a real change" test below passed on the very first run of
+    -- every session, with the setting off and nothing changed, and dragged the
+    -- whole unit frame module through a re-apply at Utility's enable time.
+    local current = DF.BlueShamans or false
+    DF.BlueShamans = wanted
+
+    if current ~= wanted then
         -- Colours are read when something redraws, and unit frames only redraw
         -- when asked, so toggling this has to ask. Only on a real change - this
         -- function runs for every settings change there is.

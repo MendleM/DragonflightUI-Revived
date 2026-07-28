@@ -103,6 +103,10 @@ function Module:EnableOutOfCombat()
 
     self:EnableAddonSpecific()
 
+    -- The submodules are built; settings may now be applied to them. Set before
+    -- the ApplySettings below, which is the first legitimate application.
+    Module.SubmodulesReady = true
+
     Module:ApplySettings()
     Module:SaveLocalSettings()
 
@@ -260,6 +264,22 @@ local function updateSub(name, sub, state)
 end
 
 function Module:ApplySettingsInternal(sub, key)
+    -- Nothing below can run before EnableAddonSpecific has built the
+    -- submodules. The frames exist from XML, but SetMovable lives in each
+    -- submodule's Setup, and SetUserPlaced on a frame that is not movable
+    -- throws "Frame is not movable or resizable"; PlayerSecondaryRes has no
+    -- preview frame at all until Setup creates it.
+    --
+    -- Callers do arrive early, and it is not a caller bug: unit frame setup is
+    -- deferred out of combat (see OnEnable), and other modules enable before
+    -- this one, so Utility's blue-shamans hook reaches ApplySettings while the
+    -- frames are still raw. That produced one error per frame, on every login,
+    -- for anyone whose module enable order or combat state got there first.
+    --
+    -- EnableOutOfCombat applies settings itself the moment setup finishes, so
+    -- an early call has nothing to do rather than something to fail at.
+    if not Module.SubmodulesReady then return end
+
     local db = Module.db.profile
 
     updateSub('party', self.SubParty, db.party)

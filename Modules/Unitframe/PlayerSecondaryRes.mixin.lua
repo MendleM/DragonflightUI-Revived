@@ -232,7 +232,11 @@ function SubModuleMixin:Update()
     local state = self.state;
     if not state then return end
 
+    -- Setup builds this. A settings apply that lands before Setup has nothing
+    -- to position, and every line below dereferences it - "attempt to index
+    -- local 'f' (a nil value)" was the whole of that bug.
     local f = self.PreviewFrame
+    if not f then return end
 
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
