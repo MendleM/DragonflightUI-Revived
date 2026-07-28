@@ -775,7 +775,11 @@ local frameTable = {
     {value = 'UIParent', text = 'UIParent', tooltip = 'descr', label = 'label'},
     {value = 'DragonflightUIXPBar', text = L["XPBar"], tooltip = 'descr', label = 'label'},
     {value = 'DragonflightUIRepBar', text = L["ReputationBar"], tooltip = 'descr', label = 'label'},
-    {value = 'DragonflightUIPetBar', text = L["PetBar"], tooltip = 'descr', label = 'label'},
+    -- lowercase 'bar': the frame is created as DragonflightUIPetbar. The
+    -- capitalised spelling here matched nothing, and an anchorFrame that
+    -- resolves to nil does not error - SetPoint falls back to the parent - so
+    -- picking Pet Bar as an anchor silently did nothing.
+    {value = 'DragonflightUIPetbar', text = L["PetBar"], tooltip = 'descr', label = 'label'},
     {value = 'DragonflightUIStancebar', text = L["StanceBar"], tooltip = 'descr', label = 'label'},
     {value = 'PossessBarFrame', text = L["PossessBar"], tooltip = 'descr', label = 'label'},
     {value = 'DragonflightUIMicroMenuBar', text = L["MicroMenu"], tooltip = 'descr', label = 'label'}
@@ -1363,7 +1367,7 @@ local petOptions = {
 }
 AddButtonTable(petOptions, 'pet')
 DF.Settings:AddPositionTable(Module, petOptions, 'pet', 'Pet Bar', getDefaultStr,
-                             frameTableWithout('DragonflightUIPetBar'))
+                             frameTableWithout('DragonflightUIPetbar'))
 petOptions.args.scale = nil;
 petOptions.args.hideMacro = nil;
 petOptions.args.macroFontSize = nil;
@@ -1464,8 +1468,13 @@ local xpOptions = {
 -- The default chain is bar1 -> RepBar -> XPBar, so moving the XP bar takes the
 -- reputation bar and the main action bar with it. These three get a Detach
 -- button so any of them can be stood on its own without jumping.
+-- Spelled to match the renamed pet bar value so this keeps excluding exactly
+-- what it excluded before. It excludes the PET bar from the XP bar's anchor
+-- list, which reads like a copy-paste of the pet options above - every other
+-- caller excludes the frame being positioned, which here would be
+-- DragonflightUIXPBar. Left as-is rather than changed under an unrelated fix.
 DF.Settings:AddPositionTable(Module, xpOptions, 'xp', 'XP Bar', getDefaultStr,
-                             frameTableWithout('DragonflightUIPetBar'), function()
+                             frameTableWithout('DragonflightUIPetbar'), function()
     return Module.xpbar
 end)
 DragonflightUIStateHandlerMixin:AddStateTable(Module, xpOptions, 'xp', 'XPBar', getDefaultStr)
