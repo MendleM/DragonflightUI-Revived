@@ -71,24 +71,22 @@ function DF:Dump(value)
     if showDebug then DevTools_Dump(value) end
 end
 
--- The Version field is only filled in by the release packager, so anyone
--- running a git checkout or a zip of the repo reported "@project-version@" as
--- their version - useless for triaging bug reports. Fall back to the literal
--- X-DFUI-Version.
+-- One version field, written out in full in the TOC.
 --
--- And say which of the two it is. The comment here used to claim the fallback
--- was "marked as a dev build" and nothing marked it, so a checkout of main and
--- a packaged release reported the same string - which is the one distinction
--- that matters when somebody reports a bug, because a release is a known
--- quantity and a checkout is whatever main happened to be that day. Reporters
--- are pointed at the repo often enough that this is the common case, not the
--- rare one.
+-- It used to be "@project-version@", a token the release packager substitutes,
+-- backed by a literal X-DFUI-Version for the builds it never reached. Nothing
+-- runs that packager here - builds are packaged and uploaded by hand - so the
+-- token was never substituted for anybody, and the shadow field was carrying
+-- the whole job while the real one reported "@project-version@" to the addon
+-- list. Two fields, one of them always wrong.
+--
+-- So: the TOC says the version, and this reads it. Bumping a release means
+-- editing Version and Title in the TOC and adding the ChangelogData entry;
+-- Changelog:CheckVersionAgreement logs it at login if those disagree.
 function DF:GetVersion()
     local version = C_AddOns.GetAddOnMetadata('DragonflightUI', 'Version')
 
-    if not version or version == '' or version:find('@', 1, true) then
-        return (C_AddOns.GetAddOnMetadata('DragonflightUI', 'X-DFUI-Version') or 'unknown') .. '-dev'
-    end
+    if not version or version == '' then return 'unknown' end
 
     return version
 end

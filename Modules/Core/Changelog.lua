@@ -229,15 +229,13 @@ end
 -- The notes decide when the notes open.
 --
 -- This used to compare against DF:GetVersion(), the TOC's idea of the version,
--- which meant a release had to remember to change two files in step: bump
--- X-DFUI-Version and add the entry describing it. Forget the bump and the
--- window never opens for the notes you just wrote, silently and with nothing to
--- notice - the writing is the visible half of the job and the trigger is not.
+-- which meant a release had to remember to change two files in step: bump the
+-- TOC and add the entry describing it. Forget the bump and the window never
+-- opens for the notes you just wrote, silently and with nothing to notice - the
+-- writing is the visible half of the job and the trigger is not.
 --
 -- Keying off the entry being displayed removes the coupling: adding notes is
--- what makes them appear, because it is the same fact. It also stops a source
--- build, whose reported version is deliberately not a release version, from
--- reopening notes somebody has already dismissed.
+-- what makes them appear, because it is the same fact.
 function Changelog:NotesVersion()
     local newest = DF.ChangelogData and DF.ChangelogData[1]
     return (newest and newest.version) or DF:GetVersion()
@@ -259,12 +257,12 @@ end
 -- in the log rather than in anyone's chat frame: read it back with /df log
 -- version before tagging.
 function Changelog:CheckVersionAgreement()
-    local toc = C_AddOns.GetAddOnMetadata('DragonflightUI', 'X-DFUI-Version')
+    local toc = DF:GetVersion()
     local notes = self:NotesVersion()
 
     if toc and notes and toc ~= notes then
-        DF:Log('version', 'X-DFUI-Version is %s but the newest notes describe %s - one of them is stale',
-               tostring(toc), tostring(notes))
+        DF:Log('version', 'TOC version is %s but the newest notes describe %s - one of them is stale', tostring(toc),
+               tostring(notes))
     end
 end
 
