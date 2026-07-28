@@ -109,6 +109,44 @@ end
 -- borders and name colour can be judged
 local PREVIEW_ITEMS = {19019, 19431, 22691, 12640, 13262, 7075, 4306}
 
+-- Sample rollers, so the preview can show the parts of a roll that only exist
+-- mid-roll: the count on each button, the tally line, and the tooltip naming
+-- who chose what. Those read from C_LootHistory, which has nothing to say
+-- about a roll that is not happening, so the preview brings its own group.
+-- Spread across classes because the names are class-coloured.
+local PREVIEW_ROLLERS = {
+    {name = 'Aldwin', class = 'PALADIN'}, {name = 'Brynja', class = 'SHAMAN'},
+    {name = 'Corvin', class = 'ROGUE'}, {name = 'Dhalia', class = 'DRUID'},
+    {name = 'Ereth', class = 'MAGE'}, {name = 'Faldric', class = 'WARRIOR'},
+    {name = 'Gwenna', class = 'PRIEST'}, {name = 'Hakkon', class = 'HUNTER'}
+}
+
+-- A different split per roll frame, fixed rather than random: the tooltip is
+-- rebuilt on every hover, and a random deal would reshuffle the group under
+-- the cursor each time. need/greed/pass/undecided.
+local PREVIEW_SPLIT = {{2, 3, 1, 2}, {1, 2, 3, 0}, {3, 1, 2, 1}, {0, 4, 2, 1}}
+
+local function BuildPreviewRolls(index)
+    local split = PREVIEW_SPLIT[((index - 1) % #PREVIEW_SPLIT) + 1]
+    local rolls = {need = {}, greed = {}, pass = {}, diss = {}, none = {}}
+    local order = {rolls.need, rolls.greed, rolls.pass, rolls.none}
+
+    local dealt = 1
+    for bucket, count in ipairs(split) do
+        for _ = 1, count do
+            local roller = PREVIEW_ROLLERS[((dealt - 1) % #PREVIEW_ROLLERS) + 1]
+            table.insert(order[bucket], {name = roller.name, class = roller.class, id = dealt})
+            dealt = dealt + 1
+        end
+    end
+
+    return rolls
+end
+
+-- A frame with a roll to describe, real or sampled. Declared up here because
+-- the display code that asks runs earlier in the file than the roll tables do.
+local function HasRollData(f) return (f ~= nil) and (f.rollID ~= nil or f.DFPreviewRolls ~= nil) end
+
 local function ApplyRollButtonArt(btn, key)
     local art = MODERN_ICONS[key]
     if not (btn and art) then return end
@@ -442,49 +480,55 @@ end
 -- roll is done; until then show the live choice tally.
 function SubModuleMixin:UpdateTopRoll(f)
     local topRoll, rollIcon = f.DFTopRoll, f.DFTopRollIcon
-    if not (topRoll and f.rollID and C_LootHistory and C_LootHistory.GetNumItems) then return end
+    if not (topRoll and HasRollData(f)) then return end
     if self.state and not self.state.showTopRoll then
         topRoll:SetText('')
         if rollIcon then rollIcon:Hide() end
         return
     end
 
-    local itemIdx = FindItemIdxForRoll(f.rollID)
-    if itemIdx then
-        local _, _, _, isDone, winnerIdx = C_LootHistory.GetItem(itemIdx)
-        if isDone and winnerIdx then
-            local name, class, rollType, roll = C_LootHistory.GetPlayerInfo(itemIdx, winnerIdx)
-            if name then
-                if class then name = DF:GetClassColoredText(name, class) end
-                if roll then
-                    topRoll:SetFormattedText('%s (%d)', name, roll)
-                else
-                    topRoll:SetText(name)
+    -- A winner is a thing only a real roll has; a preview goes straight to the
+    -- tally, which is the state the frame spends its life in anyway.
+    if f.rollID and C_LootHistory and C_LootHistory.GetNumItems then
+        local itemIdx = FindItemIdxForRoll(f.rollID)
+        if itemIdx then
+            local _, _, _, isDone, winnerIdx = C_LootHistory.GetItem(itemIdx)
+            if isDone and winnerIdx then
+                local name, class, rollType, roll = C_LootHistory.GetPlayerInfo(itemIdx, winnerIdx)
+                if name then
+                    if class then name = DF:GetClassColoredText(name, class) end
+                    if roll then
+                        topRoll:SetFormattedText('%s (%d)', name, roll)
+                    else
+                        topRoll:SetText(name)
+                    end
+                    if ApplyRollTypeIcon(rollIcon, rollType) then
+                        rollIcon:Show()
+                    else
+                        rollIcon:Hide()
+                    end
+                    return
                 end
-                if ApplyRollTypeIcon(rollIcon, rollType) then
-                    rollIcon:Show()
-                else
-                    rollIcon:Hide()
-                end
-                return
             end
         end
     end
 
-    -- live tally of choices + players still deciding
-    rollIcon:Hide()
-    local tableNeed, tableGreed, tablePass, tableDiss, tableNone = self:CreateTableForRollID(f.rollID)
-    local parts = {}
-    local function addPart(icon, t)
-        if t and #t > 0 then parts[#parts + 1] = ('|T%s:11:11|t%d'):format(icon, #t) end
-    end
-    addPart('Interface\\Buttons\\UI-GroupLoot-Dice-Up', tableNeed)
-    addPart('Interface\\Buttons\\UI-GroupLoot-Coin-Up', tableGreed)
-    addPart('Interface\\Buttons\\UI-GroupLoot-Pass-Up', tablePass)
+    -- Until the roll resolves, the only thing here worth saying is how many
+    -- people have not answered yet.
+    --
+    -- This line used to carry a dice/coin/slash tally as well, and it was only
+    -- ever standing in: the restyle had silently dropped the counts off the
+    -- roll buttons an hour earlier, so the numbers were rebuilt over here where
+    -- there was room. With the buttons showing their own counts again that made
+    -- the frame state everything twice, in two different notations, on a frame
+    -- 67 pixels tall.
+    if rollIcon then rollIcon:Hide() end
+    local _, _, _, _, tableNone = self:GetRollTables(f)
     if tableNone and #tableNone > 0 then
-        parts[#parts + 1] = ('|cff999999%d left|r'):format(#tableNone)
+        topRoll:SetFormattedText('|cff999999%d left|r', #tableNone)
+    else
+        topRoll:SetText('')
     end
-    topRoll:SetText(table.concat(parts, '  '))
 end
 
 -- Winner toast: the roll frame disappears exactly when the result exists,
@@ -702,6 +746,12 @@ function SubModuleMixin:GetPreviewRoll(index)
                              'DFEditModePreviewGroupLootTemplate')
     self:PrepPreviewFrame(roll)
 
+    -- Sample rollers, so this frame answers the same questions a real one
+    -- does: the button counts, the tally line, and the hover tooltip all read
+    -- from here instead of from C_LootHistory. A different split per frame, so
+    -- a four-roll preview does not show the same numbers four times.
+    roll.DFPreviewRolls = BuildPreviewRolls(index)
+
     local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, roll)
     if not ok then geterrorhandler()('DFUI loot roll preview restyle: ' .. tostring(err)) end
 
@@ -726,17 +776,16 @@ function SubModuleMixin:PrepPreviewFrame(fake)
         fake.SetBackdrop = function() end
     end
 
-    local name = fake.GetName and fake:GetName()
-    if name then
-        for _, suffix in ipairs({'Corner', 'Decoration', 'SlotTexture', 'NameFrame'}) do
-            local region = _G[name .. suffix]
-            if region then
-                region:SetTexture('')
-                region:Hide()
-                -- the same callback re-textures and re-shows these
-                region.Show = function() end
-                region.SetTexture = function() end
-            end
+    -- Clear the borrowed art, then nail it shut: the template's mixin
+    -- re-textures and re-shows it from an item-load callback that lands after
+    -- any restyle, so hiding it once is not enough. Only our own textures exist
+    -- after this point, and they are created later by the styler, so nothing of
+    -- ours gets stubbed. FontStrings are skipped, so the item name survives.
+    SubModuleMixin.StripBorrowedArt(fake)
+    for _, region in ipairs({fake:GetRegions()}) do
+        if region.GetObjectType and region:GetObjectType() == 'Texture' then
+            region.Show = function() end
+            region.SetTexture = function() end
         end
     end
 
@@ -802,6 +851,10 @@ function SubModuleMixin:ShowPreview(seconds)
             -- a different item per roll, and different each time, so the
             -- quality colouring can be seen doing its job
             SubModuleMixin.SetPreviewItem(roll, PREVIEW_ITEMS[fastrandom(1, #PREVIEW_ITEMS)])
+            -- the roll-dependent half of the frame: button counts and the
+            -- tally line, both driven by the sample group on the frame
+            self:UpdateAllButtons(roll)
+            self:UpdateTopRoll(roll)
             roll:SetAlpha(1)
             roll:Show()
             first = first or roll
@@ -810,8 +863,20 @@ function SubModuleMixin:ShowPreview(seconds)
         end
     end
 
+    self.PreviewDuration = seconds or 6
+    self:RestartPreviewTimer()
+end
+
+-- The preview hides itself after a few seconds. That is long enough to judge
+-- where the rolls sit and too short to read a tooltip in, and reading the
+-- tooltip is half of what there is to preview - so hovering a sample roll
+-- starts the clock over rather than racing it.
+function SubModuleMixin:RestartPreviewTimer()
+    local holder = self.SettingsPreview
+    if not holder then return end
+
     if self.PreviewTimer then self.PreviewTimer:Cancel() end
-    self.PreviewTimer = C_Timer.NewTimer(seconds or 6, function() holder:Hide() end)
+    self.PreviewTimer = C_Timer.NewTimer(self.PreviewDuration or 6, function() holder:Hide() end)
 end
 
 function SubModuleMixin:CreateRollPreview()
@@ -824,6 +889,9 @@ function SubModuleMixin:CreateRollPreview()
                                     'DFEditModePreviewGroupLootTemplate')
     fakePreview:SetPoint('CENTER')
     self:PrepPreviewFrame(fakePreview)
+    -- same sample group the settings preview uses, so the edit mode box shows
+    -- the frame with its counts and tally on rather than an empty one
+    fakePreview.DFPreviewRolls = BuildPreviewRolls(1)
     -- pcall: this call site is inside Setup, which runs from the UI module's
     -- OnEnable - a throw here used to abort the rest of that setup
     local ok, err = pcall(self.UpdateGroupLootFrameStyle, self, fakePreview)
@@ -831,6 +899,8 @@ function SubModuleMixin:CreateRollPreview()
         geterrorhandler()('DFUI loot roll preview restyle: ' .. tostring(err))
     end
     SubModuleMixin.SetPreviewItem(fakePreview, PREVIEW_ITEMS[1])
+    self:UpdateAllButtons(fakePreview)
+    self:UpdateTopRoll(fakePreview)
 
     fakeRoll.FakePreview = fakePreview
 end
@@ -915,39 +985,22 @@ end
 --     end
 -- end
 
+local function SetButtonCount(btn, t)
+    local fs = btn and btn.DFText
+    if not fs then return end
+    -- '*' means the roll exists but its numbers have not arrived yet
+    fs:SetText(t and tostring(#t) or '*')
+end
+
 function SubModuleMixin:UpdateAllButtons(f)
-    if not f then return end
-    local rollID = f.rollID
-    if not rollID then return end
+    if not HasRollData(f) then return end
 
-    local tableNeed, tableGreed, tablePass, tableDiss, tableNone, tableData = self:CreateTableForRollID(rollID)
+    local tableNeed, tableGreed, tablePass, tableDiss, tableNone, tableData = self:GetRollTables(f)
 
-    local needText = f.NeedButton.DFText
-    if needText then
-        if tableNeed then
-            needText:SetText(tostring(#tableNeed))
-        else
-            needText:SetText('*')
-        end
-    end
-
-    local greedText = f.GreedButton.DFText
-    if greedText then
-        if tableGreed then
-            greedText:SetText(tostring(#tableGreed))
-        else
-            greedText:SetText('*')
-        end
-    end
-
-    local passText = f.PassButton.DFText
-    if passText then
-        if tableGreed then
-            passText:SetText(tostring(#tablePass))
-        else
-            passText:SetText('*')
-        end
-    end
+    SetButtonCount(f.NeedButton, tableNeed)
+    SetButtonCount(f.GreedButton, tableGreed)
+    -- this one tested tableGreed, so an empty pass list read as '*'
+    SetButtonCount(f.PassButton, tablePass)
 
     if tableData then
         local link = tableData[2]
@@ -1010,6 +1063,22 @@ function SubModuleMixin:CreateTableForRollID(rollID)
     return tableNeed, tableGreed, tablePass, tableDiss, tableNone, tableData;
 end
 
+-- Who chose what on this frame's roll. The single place either kind of frame
+-- is asked that question: a real roll answers from C_LootHistory, a preview
+-- frame from the sample group hung on it. Everything that displays roll
+-- membership - the button counts, the tally line, the hover tooltip - goes
+-- through here, which is what makes the settings preview show the real thing
+-- rather than a mock-up of it.
+function SubModuleMixin:GetRollTables(f)
+    if not f then return nil end
+
+    local preview = f.DFPreviewRolls
+    if preview then return preview.need, preview.greed, preview.pass, preview.diss, preview.none end
+
+    if not (f.rollID and C_LootHistory and C_LootHistory.GetNumItems) then return nil end
+    return self:CreateTableForRollID(f.rollID)
+end
+
 local function AddRollLines(t)
     if #t < 1 then return end
     for k, v in ipairs(t) do
@@ -1020,10 +1089,7 @@ local function AddRollLines(t)
 end
 
 function SubModuleMixin:AddTooltipLines(f, btnType, showAll)
-    local rollID = f:GetParent().rollID
-    if not rollID then return end
-
-    local tableNeed, tableGreed, tablePass, tableDiss, tableNone = self:CreateTableForRollID(rollID)
+    local tableNeed, tableGreed, tablePass, tableDiss, tableNone = self:GetRollTables(f:GetParent())
     if not tableNeed then return end
 
     GameTooltip:AddLine('    ')
@@ -1052,13 +1118,44 @@ function SubModuleMixin:AddTooltipLines(f, btnType, showAll)
         AddRollLines(tablePass)
     end
 
-    if showAll or true then
-        --
+    -- Only when somebody actually is: this used to be `showAll or true`, which
+    -- put an "Undecided" heading with nothing under it on every tooltip.
+    if tableNone and #tableNone > 0 then
         GameTooltip:AddLine('Undecided')
         AddRollLines(tableNone)
     end
 
     GameTooltip:Show()
+end
+
+-- Every texture on the frame that is not one of ours, gone.
+--
+-- The classic frame brings four: the empty-slot square, the recessed
+-- merchant-label plate behind the item name, the gold dragon and the corner.
+-- This used to hide them by building their global names - frameName ..
+-- 'NameFrame' and so on - which only works while every one of those regions is
+-- named exactly that on every flavour and on every frame we style, the preview
+-- copies included. A sweep does not have to be right about their names.
+--
+-- Textures only: the item name and the summary line are FontStrings on this
+-- same frame, and they stay.
+function SubModuleMixin.StripBorrowedArt(frame)
+    if not frame.GetRegions then return end
+
+    -- Built one at a time rather than by iterating a list of the three: the
+    -- styler creates them in order, so mid-build the list has a hole in it and
+    -- ipairs would stop at the hole and whitelist nothing after it.
+    local ours = {}
+    if frame.DFRetailBackground then ours[frame.DFRetailBackground] = true end
+    if frame.DFRetailBorder then ours[frame.DFRetailBorder] = true end
+    if frame.DFTopRollIcon then ours[frame.DFTopRollIcon] = true end
+
+    for _, region in ipairs({frame:GetRegions()}) do
+        if region and not ours[region] and region.GetObjectType and region:GetObjectType() == 'Texture' then
+            if region.SetTexture then region:SetTexture('') end
+            region:Hide()
+        end
+    end
 end
 
 -- era-1159: Blizzard's GroupLootFrame_OnShow re-applies the classic
@@ -1083,16 +1180,7 @@ function SubModuleMixin.ApplyDFBackdrop(frame)
 
     -- Blizzard's OnShow re-shows the gold dragon Decoration for BoP items
     -- and re-textures the Corner on every popup - keep them gone.
-    local frameName = frame.GetName and frame:GetName()
-    if frameName then
-        for _, suffix in ipairs({'Corner', 'Decoration', 'SlotTexture', 'NameFrame'}) do
-            local region = _G[frameName .. suffix]
-            if region then
-                if region.SetTexture then region:SetTexture('') end
-                region:Hide()
-            end
-        end
-    end
+    SubModuleMixin.StripBorrowedArt(frame)
 end
 
 function SubModuleMixin.ApplyQuality(frame, quality)
@@ -1117,6 +1205,59 @@ function SubModuleMixin.ApplyQuality(frame, quality)
     if frame.Name and color then frame.Name:SetVertexColor(color.r, color.g, color.b) end
 end
 
+local ROLL_TYPE_LABEL = {[0] = PASS, [1] = NEED, [2] = GREED, [3] = ROLL_DISENCHANT}
+
+-- The count on a roll button and the tooltip naming who chose it.
+--
+-- Both are DFUI's, not Blizzard's, and both used to be installed by
+-- UpdateGroupLootFrameStyleSimple. When the restyle moved to the retail-shaped
+-- UpdateGroupLootFrameStyle they were left behind with it: the buttons kept
+-- Blizzard's own OnEnter, which names the roll type and stops there, and
+-- UpdateAllButtons went on running against DFText fontstrings that no longer
+-- existed. Hence "it only shows how many rolled" - the tally line survived
+-- because it hangs off the frame, not off the buttons.
+function SubModuleMixin:WireRollButton(btn, rollType)
+    if not btn then return end
+    local module = self
+
+    if not btn.DFText then
+        local fontFile = GameFontHighlight:GetFont()
+        local text = btn:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
+        text:SetFont(fontFile, 13, 'OUTLINE')
+        btn.DFText = text
+    end
+    -- Inside the button's bottom-right corner, not hanging off it. The roll
+    -- icons are round in a square button, so the corner is empty art and the
+    -- number can sit in it without covering the dice, coin or slash.
+    btn.DFText:ClearAllPoints()
+    btn.DFText:SetPoint('BOTTOMRIGHT', btn, 'BOTTOMRIGHT', -1, 1)
+
+    -- Scripts survive a restyle, so install them once. Re-running SetScript
+    -- would be harmless but the guard keeps a re-style from being able to
+    -- stack behaviour on a button.
+    if btn.DFTooltipWired then return end
+    btn.DFTooltipWired = true
+
+    -- Without this a button that is disabled - already rolled, or not eligible
+    -- - stops sending OnEnter, and the names disappear exactly when they are
+    -- most worth reading.
+    if btn.SetMotionScriptsWhileDisabled then btn:SetMotionScriptsWhileDisabled(true) end
+
+    btn:SetScript('OnEnter', function(button)
+        GameTooltip:SetOwner(button, 'ANCHOR_RIGHT')
+        GameTooltip:SetText(ROLL_TYPE_LABEL[rollType] or '')
+        if button.IsEnabled and not button:IsEnabled() and button.reason then
+            GameTooltip:AddLine(button.reason, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)
+        end
+        module:AddTooltipLines(button, rollType, false)
+        GameTooltip:Show()
+
+        local parent = button.GetParent and button:GetParent()
+        if parent and parent.DFPreviewRolls then module:RestartPreviewTimer() end
+    end)
+    btn:SetScript('OnLeave', function() GameTooltip:Hide() end)
+end
+
 function SubModuleMixin:UpdateGroupLootFrameStyle(f)
     if not f then return end
 
@@ -1126,18 +1267,7 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
     -- classic art out of the way. Their anchors stay put: the classic pass
     -- button hangs off Corner and the classic timer off SlotTexture, so
     -- clearing their points strands anything still anchored to them.
-    do
-        local name = f.GetName and f:GetName()
-        if name then
-            for _, suffix in ipairs({'SlotTexture', 'NameFrame', 'Corner', 'Decoration'}) do
-                local region = _G[name .. suffix]
-                if region then
-                    if region.SetTexture then region:SetTexture('') end
-                    region:Hide()
-                end
-            end
-        end
-    end
+    SubModuleMixin.StripBorrowedArt(f)
 
     -- panel + quality-tinted border
     if not f.DFRetailBackground then
@@ -1215,6 +1345,7 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
             need:ClearAllPoints()
             need:SetPoint('TOPRIGHT', f, 'TOPRIGHT', RETAIL.needX, RETAIL.needY)
             ApplyRollButtonArt(need, 'need')
+            self:WireRollButton(need, 1)
         end
 
         local pass = f.PassButton
@@ -1227,6 +1358,7 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
                 pass:SetPoint('TOPRIGHT', f, 'TOPRIGHT', -6, -6)
             end
             ApplyRollButtonArt(pass, 'pass')
+            self:WireRollButton(pass, 0)
         end
 
         local greed = f.GreedButton
@@ -1239,6 +1371,7 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
                 greed:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', RETAIL.needX, 6)
             end
             ApplyRollButtonArt(greed, 'greed')
+            self:WireRollButton(greed, 2)
         end
 
         -- classic has no disenchant roll; era's frames carry the button on
@@ -1251,6 +1384,7 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
                 diss:SetPoint('CENTER', greed, 'CENTER', 0, 0)
             end
             ApplyRollButtonArt(diss, 'disenchant')
+            self:WireRollButton(diss, 3)
         end
     end
 
@@ -1303,8 +1437,12 @@ function SubModuleMixin:UpdateGroupLootFrameStyle(f)
         rollIcon:SetSize(11, 11)
         f.DFTopRollIcon = rollIcon
     end
+    -- Flush with the item name above it, so the two read as one column. The
+    -- old anchor indented it 14px to reserve room for the winner icon, which
+    -- put the line under nothing in particular; the icon now hangs in the gap
+    -- between the item icon and the name, where there is already space.
     f.DFTopRoll:ClearAllPoints()
-    f.DFTopRoll:SetPoint('BOTTOMLEFT', f, 'BOTTOMLEFT', RETAIL.nameX + 14, RETAIL.timerY + RETAIL.timerHeight + 3)
+    f.DFTopRoll:SetPoint('BOTTOMLEFT', f, 'BOTTOMLEFT', RETAIL.nameX, RETAIL.timerY + RETAIL.timerHeight + 3)
     f.DFTopRollIcon:ClearAllPoints()
     f.DFTopRollIcon:SetPoint('RIGHT', f.DFTopRoll, 'LEFT', -2, 0)
     f.DFTopRoll:SetText('')
