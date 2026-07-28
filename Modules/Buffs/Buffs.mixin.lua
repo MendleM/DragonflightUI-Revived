@@ -136,53 +136,10 @@ function SubModuleMixin:SetupOptions()
             }
         }
     }
-    -- -- blizz options buffs
-    -- if DF.Cata then
-    --     local moreOptions = {
-    --         consolidate = {
-    --             type = 'toggle',
-    --             name = CONSOLIDATE_BUFFS_TEXT,
-    --             desc = OPTION_TOOLTIP_CONSOLIDATE_BUFFS,
-    --             group = 'headerStyling',
-    --             order = 13,
-    --             blizzard = true,
-    --             editmode = true
-    --         }
-    --     }
-
-    --     for k, v in pairs(moreOptions) do options.args[k] = v end
-
-    --     options.get = function(info)
-    --         local key = info[1]
-    --         local sub = info[2]
-
-    --         if sub == 'consolidate' then
-    --             return C_CVar.GetCVarBool("consolidateBuffs")
-    --         else
-    --             return getOption(info)
-    --         end
-    --     end
-
-    --     local function CVarChangedCB()
-    --         BuffFrame_Update();
-    --     end
-
-    --     options.set = function(info, value)
-    --         local key = info[1]
-    --         local sub = info[2]
-
-    --         if sub == 'consolidate' then
-    --             if value then
-    --                 C_CVar.SetCVar("consolidateBuffs", 1)
-    --             else
-    --                 C_CVar.SetCVar("consolidateBuffs", 0)
-    --             end
-    --             CVarChangedCB()
-    --         else
-    --             setOption(info, value)
-    --         end
-    --     end
-    -- end
+    -- A commented-out Consolidate Buffs toggle used to sit here, mirroring the
+    -- game's CVar into DFUI's own settings. Removed rather than finished: it
+    -- would have offered a switch that changes nothing for these buffs, which
+    -- is worse than not offering it. consolidateNote above says so instead.
 
     DF.Settings:AddPositionTable(Module, options, 'buffs', 'Buffs', getDefaultStr, frameTable)
     DragonflightUIStateHandlerMixin:AddStateTable(Module, options, 'buffs', 'Buffs', getDefaultStr)

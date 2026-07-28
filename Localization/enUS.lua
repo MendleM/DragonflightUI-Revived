@@ -469,7 +469,11 @@ do
     L["BuffsOptionsName"] = "Buffs"
     L["DebuffsOptionsName"] = "Debuffs"
     L["BuffsOptionsStyle"] = L["ButtonTableStyle"]
-    L["BuffsOptionsStyleDesc"] = ""
+    -- The settings list renders header, toggle, range, execute, select and
+    -- little else - there is no prose widget - so the one thing people keep
+    -- asking about this page lives in the section's tooltip.
+    L["BuffsOptionsStyleDesc"] =
+        "|cffbbbbbbThe game's |cffffffffConsolidate Buffs|r|cffbbbbbb option has no effect here. It is read by Blizzard's buff frame, and DragonflightUI draws your buffs with its own, which does not support consolidation.|r"
 
     L["BuffsOptionsExpanded"] = "Expanded"
     L["BuffsOptionsExpandedDesc"] = ""

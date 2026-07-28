@@ -396,13 +396,23 @@ function DragonflightUIBuffFrameContainerTemplateMixin:OnLoad()
     header:SetAttribute("sortMethod", "INDEX"); -- INDEX or NAME or TIME
     header:SetAttribute("sortDirection", "-"); -- - to reverse
 
-    -- consolidate
-    -- header:SetAttribute("consolidateTo", 1);
-    -- header:SetAttribute("consolidateDuration", 30);
-    -- header:SetAttribute("consolidateThreshold", 10);
-    -- header:SetAttribute("consolidateFraction", 0.1);
-    -- header:SetAttribute("consolidateProxy", "DragonflightUIConsolidatedBuffsTemplate");
-    -- header:SetAttribute("consolidateHeader", "DragonflightUIConsolidateBuffsProxyHeaderTemplate"); -- ??
+    -- No consolidation here, and there cannot be. A commented-out
+    -- consolidateTo/consolidateProxy/consolidateHeader block used to sit at
+    -- this spot waiting to be finished; it was removed because finishing it
+    -- would have achieved nothing. SecureGroupHeaders.lua on 1.15.9 sets
+    -- `aura.shouldConsolidate = false` unconditionally, commented "Deprecated",
+    -- and that flag is the only thing that can route an aura into the
+    -- consolidate table - so the whole attribute family is unreachable code
+    -- inside the restricted environment.
+    --
+    -- The game's Consolidate Buffs option (CVar consolidateBuffs) is real, but
+    -- Blizzard's own BuffFrame implements it by hand rather than through the
+    -- header: it counts auras with no duration or more than
+    -- BUFF_DURATION_WARNING_TIME remaining, hides them, and shows one button
+    -- with the count. Doing the same here means keeping specific auras out of
+    -- a layout the secure header owns, which is what consolidation existed to
+    -- do. Anyone picking this up should start from BuffFrameMixin, not from
+    -- the header attributes.
 
     header:Show()
 
@@ -678,13 +688,13 @@ function DragonflightUIAuraButtonTemplateMixin:OnLoad()
 end
 
 function DragonflightUIAuraButtonTemplateMixin:UpdateStyle()
+    -- The trailing shouldConsolidate return is not captured: the client sets
+    -- it false unconditionally now (SecureGroupHeaders.lua, marked
+    -- "Deprecated"), so reading it only implied a decision that is not there.
     local name, icon, count, dispelType, duration, expirationTime, source, isStealable, nameplateShowPersonal, spellId,
-          canApplyAura, isBossDebuff, castByPlayer, nameplateShowAll, timeMod, shouldConsolidate = UnitAura(self.DFUnit,
-                                                                                                            self:GetID(),
-                                                                                                            self.DFFilter);
+          canApplyAura, isBossDebuff, castByPlayer, nameplateShowAll, timeMod = UnitAura(self.DFUnit, self:GetID(),
+                                                                                        self.DFFilter);
     -- print('UpdateStyle~', name, icon, count, duration, expirationTime)
-    -- local auraData = C_UnitAuras.GetAuraDataByIndex('player', self:GetID(), 'HELPFUL');
-    -- print('~', name, shouldConsolidate, #auraData.points > 0)
 
     if name and addonTable.CorrectAuraExpiration then
         expirationTime = addonTable.CorrectAuraExpiration(self.DFUnit, spellId, duration, expirationTime)
@@ -984,170 +994,3 @@ function DragonflightUIAuraButtonTemplateMixin:UpdateTempAuraDuration(elapsed)
         self:SetAlpha(1.0);
     end
 end
-
--- DragonflightUIConsolidatedBuffsTemplateMixin = {}
-
--- function DragonflightUIConsolidatedBuffsTemplateMixin:OnLoad()
---     -- print('ON LOADS')
---     local icon = _G[self:GetName() .. 'Icon']
---     icon:SetTexture("Interface\\Buttons\\BuffConsolidation");
---     icon:SetTexCoord(0, 0.5, 0, 1);
---     icon:ClearAllPoints();
---     icon:SetPoint("CENTER");
---     icon:SetWidth(64);
---     icon:SetHeight(64);
-
---     if not self.Tooltip then
---         --
---         self.Tooltip = CreateFrame('Frame', 'DragonflightUIConsolidatedBuffsTooltip', self,
---                                    'DragonflightUIConsolidatedBuffsTooltip')
---     end
--- end
-
--- function DragonflightUIConsolidatedBuffsTemplateMixin:OnUpdate()
---     if (self.mousedOver and not self:IsMouseOver(1, -1, -1, 1)) then
---         self.mousedOver = nil;
---         if (not self.Tooltip:IsMouseOver()) then self.Tooltip:Hide(); end
---     end
-
---     -- 	-- check exit times
---     -- if ( not ConsolidatedBuffs.pauseUpdate ) then
---     -- 	local needUpdate = false;
---     -- 	local timeNow = GetTime();
---     -- 	for buffIndex, buff in pairs(consolidatedBuffs) do
---     -- 		if ( buff.exitTime and buff.exitTime < timeNow ) then
---     -- 			buff.consolidated = false;
---     -- 			buff.timeLeft = buff.expirationTime - timeNow;
---     -- 			tremove(consolidatedBuffs, buffIndex);
---     -- 			needUpdate = true;
---     -- 		end
---     -- 	end
---     -- 	if ( needUpdate ) then			
---     -- 		if ( #consolidatedBuffs == 0 ) then
---     -- 			BuffFrame.numConsolidated = 0;
---     -- 			ConsolidatedBuffs:Hide();
---     -- 		else
---     -- 			BuffFrame_UpdateAllBuffAnchors();
---     -- 			ConsolidatedBuffsCount:SetText(#consolidatedBuffs);
---     -- 		end			
---     -- 	end
---     -- end
--- end
-
--- function DragonflightUIConsolidatedBuffsTemplateMixin:OnEnter()
---     self.Tooltip:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, 0);
---     -- check expiration times
---     local timeNow = GetTime();
---     -- for buffIndex, buff in pairs(consolidatedBuffs) do
---     -- 	if ( buff.timeLeft ) then
---     -- 		buff.timeLeft = buff.expirationTime - timeNow;
---     -- 	end
---     -- end
---     -- ConsolidatedBuffs_UpdateAllAnchors();
-
---     local header = self:GetAttribute('header')
---     local handle = self:GetAttribute('frameref-header')
-
---     -- local ref = _G[handle:GetName()]
---     -- DevTools_Dump(handle:GetName())
-
---     -- print(ref:GetAttribute('template'))
---     -- ref:SetPoint('TOPLEFT', self.Tooltip.Container, 'TOPLEFT', 0, 0)
---     -- ref:Show()
---     -- ref:UpdateStyle()
---     -- DevTools_Dump(f)
---     -- print('~~f:', f:GetName())
---     -- f:ClearAllPoints()
---     -- self.Tooltip:Show();
---     -- ref:SetPoint('TOPLEFT', self.Tooltip.Container, 'TOPLEFT', 0, 0)
---     -- ref:SetPoint('BOTTOMRIGHT', self.Tooltip.Container, 'BOTTOMRIGHT', 0, 0)
---     -- ref:SetPoint('TOPLEFT', UIParent, 'CENTER', -50, 50)
---     -- ref:SetPoint('BOTTOMRIGHT', UIParent, 'CENTER', 50, -50)
---     self.mousedOver = true;
--- end
-
--- function DragonflightUIConsolidatedBuffsTemplateMixin:OnShow()
---     -- ConsolidatedBuffsCount:SetText(BuffFrame.numConsolidated);
---     -- TemporaryEnchantFrame:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0);
---     -- BuffFrame_UpdateAllBuffAnchors();
--- end
-
--- function DragonflightUIConsolidatedBuffsTemplateMixin:OnHide()
---     self.mousedOver = nil;
---     self.Tooltip:Hide();
---     -- TemporaryEnchantFrame:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0);
---     -- BuffFrame_UpdateAllBuffAnchors();
--- end
-
--- -- 
--- DragonflightUIConsolidateBuffsProxyHeaderTemplateMixin = {}
-
--- function DragonflightUIConsolidateBuffsProxyHeaderTemplateMixin:OnLoad()
---     print('PROXY LOAAAAAD')
---     print(self:GetSize())
---     print(self:GetPoint(1))
-
---     self:SetAttribute("template", "DragonflightUIAuraButtonBuffTemplate");
-
---     self:SetAttribute("minWidth", 30);
---     self:SetAttribute("minHeight", 30);
-
---     self:SetAttribute("point", "TOPLEFT");
---     self:SetAttribute("xOffset", 30 + 5);
---     self:SetAttribute("yOffset", 0);
---     self:SetAttribute("wrapAfter", 10);
---     self:SetAttribute("wrapXOffset", 0);
---     self:SetAttribute("wrapYOffset", -30 - 5);
---     self:SetAttribute("maxWraps", 2);
-
---     -- sorting
---     -- self:SetAttribute("filter", 'HELPFUL');
---     -- self:SetAttribute("separateOwn", "0");
-
---     -- self:SetAttribute("sortMethod", "INDEX"); -- INDEX or NAME or TIME
---     -- self:SetAttribute("sortDirection", "-"); -- - to reverse
-
---     -- self:SetAttribute("consolidateTo", 0);
---     self:SetAttribute("groupBy", 'HELPFUL');
-
---     -- self:SetAttribute("consolidateDuration", 30);
---     -- self:SetAttribute("consolidateThreshold", 10);
---     -- self:SetAttribute("consolidateFraction", 0.1);
-
---     self.BuffFrameUpdateTime = 0;
---     self.BuffFrameFlashTime = 0;
---     self.BuffFrameFlashState = 1;
---     self.BuffAlphaValue = 1;
-
---     -- provide a simple iterator to the header
---     local function siter_active_children(h, i)
---         i = i + 1;
---         local child = h:GetAttribute("child" .. i);
---         if child and child:IsShown() then return i, child, child:GetAttribute("index"); end
---     end
-
---     function self:ActiveChildren()
---         return siter_active_children, self, 0;
---     end
-
---     function self:UpdateStyle()
---         print('proxy UpdateStyle()')
---         local point, relativeTo, relativePoint, xOfs, yOfs = self:GetPoint(1)
---         -- print('....', point, relativeTo:GetName(), relativePoint, xOfs, yOfs)
-
---         for _, frame in self:ActiveChildren() do
---             --
---             print('~', frame:GetName())
---             local point, relativeTo, relativePoint, xOfs, yOfs = frame:GetPoint(1)
---             print('~~', point, relativeTo:GetName(), relativePoint, xOfs, yOfs)
---             frame:UpdateStyle()
---         end
---     end
-
---     self:HookScript('OnEvent', function(event, ...)
---         --
---         -- print('OnEvent:', event, ...)
---         self:UpdateStyle()
---     end)
---     self:UpdateStyle()
--- end
