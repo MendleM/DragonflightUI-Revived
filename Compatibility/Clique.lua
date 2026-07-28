@@ -1,28 +1,64 @@
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 
+-- Clique needs mouse motion to reach the unit frame underneath its bars and
+-- text, so every region layered over a frame gets SetPropagateMouseMotion.
+--
+-- Every frame named here belongs to somebody else: Blizzard's unit frames
+-- across four flavours, or DFUI's own reskin, and any one of them can be
+-- absent on any given client. Unguarded that was fatal rather than untidy -
+-- FuncOrWaitframe calls this bare, with no pcall, so a single missing frame
+-- threw and every frame after the gap silently never got its propagation, and
+-- Clique quietly stopped working on those. Skip what is not there instead.
+local function propagate(obj)
+    if obj and obj.SetPropagateMouseMotion then obj:SetPropagateMouseMotion(true) end
+    return obj
+end
+
+local function propagateNamed(name) return propagate(_G[name]) end
+
+-- A bar plus whichever of its text regions this client happens to use. The
+-- classic reskin hangs DF-prefixed strings on the bar; the modern template
+-- carries its own.
+local function propagateBar(bar)
+    if not propagate(bar) then return end
+
+    propagate(bar.DFTextString)
+    propagate(bar.DFLeftText)
+    propagate(bar.DFRightText)
+    propagate(bar.TextString)
+    propagate(bar.LeftText)
+    propagate(bar.RightText)
+end
+
+local function propagateMemberFrame(f)
+    if not f then return end
+    propagateBar(f.HealthBar)
+    propagateBar(f.ManaBar)
+end
+
 function DF.Compatibility:Clique()
     -- print('DF.Compatibility:Clique()')
     local module = DF.API.Modules:GetModule('Unitframe')
 
     -- player
     local fixPlayer = function()
-        _G['PlayerFrameHealthBar']:SetPropagateMouseMotion(true);
-        _G['PlayerFrameManaBar']:SetPropagateMouseMotion(true);
+        propagateNamed('PlayerFrameHealthBar')
+        propagateNamed('PlayerFrameManaBar')
 
         -- pet
         -- _G['PetName']:SetPropagateMouseMotion(true);
         -- _G['PetFrameMyHealPredictionBar']:SetPropagateMouseMotion(true);
         -- _G['PetFrameOtherHealPredictionBar']:SetPropagateMouseMotion(true);
 
-        _G['PetFrameHealthBar']:SetPropagateMouseMotion(true);
-        _G['PetFrameHealthBarText']:SetPropagateMouseMotion(true);
-        _G['PetFrameHealthBarTextLeft']:SetPropagateMouseMotion(true);
-        _G['PetFrameHealthBarTextRight']:SetPropagateMouseMotion(true);
+        propagateNamed('PetFrameHealthBar')
+        propagateNamed('PetFrameHealthBarText')
+        propagateNamed('PetFrameHealthBarTextLeft')
+        propagateNamed('PetFrameHealthBarTextRight')
 
-        _G['PetFrameManaBar']:SetPropagateMouseMotion(true);
-        _G['PetFrameManaBarText']:SetPropagateMouseMotion(true);
-        _G['PetFrameManaBarTextLeft']:SetPropagateMouseMotion(true);
-        _G['PetFrameManaBarTextRight']:SetPropagateMouseMotion(true);
+        propagateNamed('PetFrameManaBar')
+        propagateNamed('PetFrameManaBarText')
+        propagateNamed('PetFrameManaBarTextLeft')
+        propagateNamed('PetFrameManaBarTextRight')
     end
     fixPlayer()
 
@@ -30,22 +66,24 @@ function DF.Compatibility:Clique()
     local fixTarget = function()
         -- _G['TargetFrameShower']:SetPropagateMouseMotion(true);
 
-        _G['TargetFrameTextureFrame']:SetPropagateMouseMotion(true);
-        _G['TargetFrameTextureFrameName']:SetPropagateMouseMotion(true);
-        _G['TargetFrameTextureFrameLevelText']:SetPropagateMouseMotion(true);
-        _G['TargetFrameTextureFrameUnconsciousText']:SetPropagateMouseMotion(true);
+        local textureFrame = propagateNamed('TargetFrameTextureFrame')
+        propagateNamed('TargetFrameTextureFrameName')
+        propagateNamed('TargetFrameTextureFrameLevelText')
+        propagateNamed('TargetFrameTextureFrameUnconsciousText')
 
-        _G['DragonflightUITargetFrameBackground']:SetPropagateMouseMotion(true);
+        propagateNamed('DragonflightUITargetFrameBackground')
         -- _G['DragonflightUITargetFrameBorder']:SetPropagateMouseMotion(true);
 
-        _G['TargetFrameHealthBar']:SetPropagateMouseMotion(true);
-        _G['TargetFrameTextureFrame'].HealthBarTextLeft:SetPropagateMouseMotion(true);
-        _G['TargetFrameTextureFrame'].HealthBarTextRight:SetPropagateMouseMotion(true);
+        propagateNamed('TargetFrameHealthBar')
+        if textureFrame then
+            propagate(textureFrame.HealthBarTextLeft)
+            propagate(textureFrame.HealthBarTextRight)
+        end
 
-        _G['TargetFrameManaBar']:SetPropagateMouseMotion(true);
+        propagateNamed('TargetFrameManaBar')
 
-        _G['TargetFrameToTHealthBar']:SetPropagateMouseMotion(true);
-        _G['TargetFrameToTManaBar']:SetPropagateMouseMotion(true);
+        propagateNamed('TargetFrameToTHealthBar')
+        propagateNamed('TargetFrameToTManaBar')
     end
     fixTarget()
 
@@ -54,16 +92,16 @@ function DF.Compatibility:Clique()
     -- focus
     local fixFocus = function()
         if not _G['FocusFrame'] then return end
-        _G['FocusFrameHealthBarDummy']:SetPropagateMouseMotion(true);
-        _G['FocusFrameManaBarDummy']:SetPropagateMouseMotion(true);
+        propagateNamed('FocusFrameHealthBarDummy')
+        propagateNamed('FocusFrameManaBarDummy')
 
-        _G['FocusFrameToTHealthBar']:SetPropagateMouseMotion(true);
-        _G['FocusFrameToTManaBar']:SetPropagateMouseMotion(true);
+        propagateNamed('FocusFrameToTHealthBar')
+        propagateNamed('FocusFrameToTManaBar')
     end
 
     if _G['FocusFrameHealthBarDummy'] and _G['FocusFrameManaBarDummy'] then
         fixFocus();
-    else
+    elseif module and module.SubFocus and module.SubFocus.ChangeFocusFrame then
         -- DF.API.Modules:HookModuleFunction('Unitframe', 'ChangeFocusFrame', function()
         --     fixFocus();
         -- end)
@@ -73,53 +111,36 @@ function DF.Compatibility:Clique()
     end
 
     -- party
-    if DF.API.Version.IsTBC then
-        local function fixParty()
-            if not PartyFrame or not PartyFrame.MemberFrame1 then return end
-
+    --
+    -- Which frames exist is decided the same way SubModuleMixin:ChangePartyFrame
+    -- decides it (Modules/Unitframe/Party.mixin.lua): classic named frames if
+    -- they are there, otherwise the modern pooled ones. This used to branch on
+    -- IsTBC, which put Era 1.15.9 down the classic path even though the
+    -- Midnight-UI backport pools its party frames - so PartyMemberFrame1HealthBar
+    -- was nil and the whole compatibility fix died on the first member.
+    local fixParty = function()
+        if _G['PartyMemberFrame1'] then
             for i = 1, 4 do
-                local f = PartyFrame["MemberFrame" .. i]
-                if f and f.HealthBar and f.ManaBar then
-                    local healthbar = f.HealthBar
-                    local manabar = f.ManaBar
-
-                    healthbar:SetPropagateMouseMotion(true)
-                    manabar:SetPropagateMouseMotion(true)
-
-                    if healthbar.TextString then healthbar.TextString:SetPropagateMouseMotion(true) end
-                    if manabar.TextString then manabar.TextString:SetPropagateMouseMotion(true) end
-
-                    for _, bar in pairs({healthbar, manabar}) do
-                        if bar.LeftText then bar.LeftText:SetPropagateMouseMotion(true) end
-                        if bar.RightText then bar.RightText:SetPropagateMouseMotion(true) end
-                    end
-                end
+                propagateBar(_G['PartyMemberFrame' .. i .. 'HealthBar'])
+                propagateBar(_G['PartyMemberFrame' .. i .. 'ManaBar'])
             end
+            return
         end
 
-        -- Defer until frames exist
-        if PartyFrame and PartyFrame.MemberFrame1 then
-            fixParty()
-        else
-            C_Timer.After(0, fixParty)
-        end
-    else
-        local fixParty = function()
-            for i = 1, 4 do
-                local f = _G['PartyFrame' .. i]
-                local healthbar = _G['PartyMemberFrame' .. i .. 'HealthBar']
-                healthbar:SetPropagateMouseMotion(true)
-                healthbar.DFTextString:SetPropagateMouseMotion(true)
-                healthbar.DFLeftText:SetPropagateMouseMotion(true)
-                healthbar.DFRightText:SetPropagateMouseMotion(true)
+        -- TBC prepatch names them; the pool is anonymous
+        for i = 1, 4 do propagateMemberFrame(PartyFrame and PartyFrame['MemberFrame' .. i]) end
 
-                local manabar = _G['PartyMemberFrame' .. i .. 'ManaBar']
-                manabar:SetPropagateMouseMotion(true)
-                manabar.DFTextString:SetPropagateMouseMotion(true)
-                manabar.DFLeftText:SetPropagateMouseMotion(true)
-                manabar.DFRightText:SetPropagateMouseMotion(true)
-            end
+        if PartyFrame and PartyFrame.PartyMemberFramePool then
+            for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do propagateMemberFrame(pf) end
         end
-        fixParty()
+    end
+
+    fixParty()
+
+    -- Pooled frames are handed out and taken back as people join and leave, so
+    -- a member who arrives later gets a frame that never had this applied.
+    -- Same hook the party reskin uses to restyle them.
+    if PartyFrame and PartyFrame.InitializePartyMemberFrames then
+        hooksecurefunc(PartyFrame, 'InitializePartyMemberFrames', fixParty)
     end
 end
