@@ -637,6 +637,14 @@ function Module:InitEditmodeOverride()
             return
         end
 
+        -- ApplyChanges saves before it applies, so it writes the cached layout
+        -- table like any other write. This one matters most: it is debounced,
+        -- and BlizzApplyPending above deliberately holds it until the player
+        -- leaves Blizzard's Edit Mode - which means it ran immediately after
+        -- they had finished changing something, with a copy that predated the
+        -- change.
+        addonTable:RefreshBlizzEditmodeLayouts()
+
         -- Our own application fires Blizzard's EditMode.Enter and .Exit as a
         -- side effect of that show/hide. Flag it, so the handlers that react to
         -- the player opening the native edit mode do not react to us.
@@ -686,7 +694,31 @@ function Module:InitEditmodeOverride()
         end)
     end
 
+    -- LibEditModeOverride reads every layout once, in LoadLayouts, and keeps
+    -- that table; SaveOnly writes the whole of it back with
+    -- C_EditMode.SaveLayouts. So the copy we save is the one we read at login,
+    -- and anything the player changed in Blizzard's Edit Mode since then is not
+    -- in it - saving quietly replaces their change with our stale value.
+    --
+    -- That is what "Use Raid-Style Party Frames turns itself back off" was.
+    -- The setting is not a CVar; it lives in the layout
+    -- (Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames on the Party unit
+    -- frame system), so ticking the box edits the same table we are holding a
+    -- stale copy of. The next re-anchor - entering a dungeon, a module
+    -- re-applying - wrote our copy over it, and the frames reverted at the next
+    -- layout application, which is why it looked like a reload did it.
+    --
+    -- Re-read immediately before touching the table. Every writer here saves
+    -- straight after mutating, so there is never an unsaved change of ours to
+    -- lose by refreshing.
+    function addonTable:RefreshBlizzEditmodeLayouts()
+        if LibEditModeOverride and LibEditModeOverride.LoadLayouts and LibEditModeOverride:IsReady() then
+            LibEditModeOverride:LoadLayouts()
+        end
+    end
+
     function addonTable:OverrideBlizzEditmode(f, ...)
+        addonTable:RefreshBlizzEditmodeLayouts()
         if not (LibEditModeOverride:GetActiveLayout() == DFLayoutName) then
             print('Wrong EditMode layout detected - please use ' .. DFLayoutName .. ' and /reload .')
             return;
@@ -738,6 +770,7 @@ function Module:InitEditmodeOverride()
     end
 
     function addonTable:SetBlizzEditmodeFrameSetting(f, setting, value, saveOnly)
+        addonTable:RefreshBlizzEditmodeLayouts()
         LibEditModeOverride:SetFrameSetting(f, setting, value)
         LibEditModeOverride:SaveOnly()
 

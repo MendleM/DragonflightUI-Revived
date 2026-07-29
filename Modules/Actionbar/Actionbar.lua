@@ -3566,6 +3566,11 @@ function Module:ForceMoveBlizzEditModeGhosts()
     -- ChangeActionbar phase (~260ms of watchdog budget).
     local lib = addonTable.LibEditModeOverride
     if lib then
+        -- The library's layout table is the one it read at login, and SaveOnly
+        -- writes all of it back; re-read first or this overwrites whatever the
+        -- player has changed in Blizzard's Edit Mode since.
+        if addonTable.RefreshBlizzEditmodeLayouts then addonTable:RefreshBlizzEditmodeLayouts() end
+
         for k, v in ipairs(t) do
             v:SetClampedToScreen(false)
             lib:ReanchorFrame(v, 'BOTTOM', UIParent, 'TOP', 0, 0 + 500)

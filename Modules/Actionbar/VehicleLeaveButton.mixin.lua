@@ -568,6 +568,11 @@ function SubModuleMixin:CreateVehicleLeaveButton()
         -- ApplyChanges on every following login).
         local lib = addonTable.LibEditModeOverride
         if lib then
+            -- Re-read before writing: SaveOnly puts back the whole layout
+            -- table the library read at login, so a stale copy silently undoes
+            -- anything the player changed in Blizzard's Edit Mode since then.
+            if addonTable.RefreshBlizzEditmodeLayouts then addonTable:RefreshBlizzEditmodeLayouts() end
+
             lib:ReanchorFrame(btn, 'CENTER', f, 'CENTER', 0, 0)
             lib:SaveOnly()
         end

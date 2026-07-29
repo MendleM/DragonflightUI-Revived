@@ -82,6 +82,7 @@ DF.ChangelogData = {
             }, {
                 title = 'Edit mode',
                 items = {
+                    'Fixed Use Raid-Style Party Frames turning itself back off after a dungeon or a reload - DFUI was saving a copy of the Edit Mode layout it read at login, over anything you had changed since.',
                     'The Empty placeholder keeps the frame\'s shape - no more oversized box over a narrow bar.'
                 }
             }, {

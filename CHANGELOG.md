@@ -73,6 +73,10 @@ Everything before v0.40.3 is in
 
 ### Edit mode
 
+- Fixed changes made in Blizzard's Edit Mode being undone by DragonflightUI —
+  most visibly **Use Raid-Style Party Frames**, which turned itself back off on
+  entering a dungeon or reloading. That setting lives in the Edit Mode layout,
+  and DFUI was saving a copy of the layout it had read at login
 - The *Empty* placeholder keeps the frame's shape — no more oversized box over a
   narrow bar
 
