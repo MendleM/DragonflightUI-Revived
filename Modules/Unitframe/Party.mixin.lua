@@ -18,13 +18,57 @@ local function TextStatusBar_UpdateTextString(f)
 end
 
 -- The health and mana readouts that sit INSIDE the bars (Interface -> Status
--- Text, off by default). Both Blizzard's own strings on the pooled frames and
--- the ones the classic reskin creates inherit TextStatusBarText, which is sized
--- for Blizzard's bars - ours are 10 and 7 pixels tall, so the numbers spilled
--- out of them. Nothing else is needed: the pooled bars inherit TextStatusBar
--- and call InitializeTextStatusBar with cvar = 'statusText', so the client
--- already fills them in and shows them on mouseover.
+-- Text, off by default). The ones the classic reskin creates inherit
+-- TextStatusBarText, which is sized for Blizzard's bars - ours are 10 and 7
+-- pixels tall, so the numbers spilled out of them.
+--
+-- "Blizzard's own strings on the pooled frames" used to be the other half of
+-- that sentence, and there are none. See EnsureBarStatusText.
 local STATUS_TEXT_KEYS = {'TextString', 'LeftText', 'RightText', 'DFTextString', 'DFLeftText', 'DFRightText'}
+
+-- The pooled bars have every part of the status text machinery except somewhere
+-- to put it. They inherit TextStatusBar, call InitializeTextStatusBar, set
+-- `cvar = "statusText"` and `textLockable = 1`, and the mixin re-runs
+-- UpdateTextString on every value change, on CVAR_UPDATE and on mouseover. But
+-- UpdateTextString opens with
+--
+--     local textString = self.TextString;
+--     if (textString) then
+--
+-- and on 1.15.9 no unit frame has one. The TextStatusBar template carries only
+-- scripts and a mixin - no FontStrings - and in the whole client only
+-- Blizzard_PetBattleUI and the personal resource display declare a TextString.
+-- Player, target and party bars all inherit the behaviour and none of them
+-- supply the string, so the readouts were never being hidden or mis-sized:
+-- there was nothing for the numbers to land in.
+--
+-- That is why the earlier pass here did not fix it. FitBarStatusText resizes
+-- the strings, and on a pooled frame all six keys are nil, so it had nothing to
+-- resize and reported no error.
+--
+-- Supplying the three strings is the entire fix. Blizzard's own code then fills
+-- them on every value change, shows and hides them from the Status Text option,
+-- switches between numeric, percentage and both, and reveals them on mouseover
+-- through lockShow. LeftText and RightText matter: the "both" display mode
+-- writes the percentage and the value into them rather than into TextString.
+local function EnsureBarStatusText(bar)
+    if not (bar and bar.CreateFontString) or bar.TextString then return end
+
+    local function make(point, x)
+        local fs = bar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
+        fs:SetPoint(point, bar, point, x, 0)
+        fs:Hide()
+        return fs
+    end
+
+    bar.TextString = make('CENTER', 0)
+    bar.LeftText = make('LEFT', 2)
+    bar.RightText = make('RIGHT', -2)
+
+    -- Nothing has changed value yet, so ask for the first fill rather than
+    -- waiting for the member to take damage.
+    if bar.UpdateTextString then bar:UpdateTextString() end
+end
 
 local function FitBarStatusText(bar)
     if not bar or not bar.GetHeight then return end
@@ -546,6 +590,10 @@ function SubModuleMixin:SetupModern()
             manaMask:SetSize(74, 7)
             manabar:GetStatusBarTexture():AddMaskTexture(manaMask)
         end
+
+        -- Create before fitting: there is nothing to size until these exist.
+        EnsureBarStatusText(pf.HealthBar)
+        EnsureBarStatusText(pf.ManaBar)
 
         FitBarStatusText(pf.HealthBar)
         FitBarStatusText(pf.ManaBar)

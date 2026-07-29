@@ -75,6 +75,7 @@ DF.ChangelogData = {
                 items = {
                     'Fixed a burst of Lua errors at login about frames not being movable, from settings being applied before the frames were built.',
                     'Fixed an invisible frame eating clicks around the target, target-of-target, pet and focus frames after opening edit mode.',
+                    'Health and mana numbers show on party frames again with Status Text on - on Era the frames had no text to fill in at all.',
                     'Fixed party frame settings only applying when someone joined or left the group.',
                     'Fixed party members vanishing when combat started.',
                     'XP bar text is centred again when rested XP is showing.'
