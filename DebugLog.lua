@@ -34,6 +34,13 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log tot          every term of the client's target-of-target show
 --                          condition, plus the frame's own state, and a verdict
 --     /df log tot watch    toggle a watcher that logs each time that changes
+--     /df log watch [name] snapshot the frames that get re-anchored behind our
+--                          back - keyring and bag slots, chat, micro menu - plus
+--                          the friend counts. Run it, reproduce the problem, run
+--                          it again: the second run prints only what moved, and
+--                          names the frame it moved to. An optional name (or
+--                          'mouse') adds a frame the list does not cover
+--     /df log watch reset  drop the baseline and start again
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
 --
@@ -538,6 +545,188 @@ function DF:LogToTWatch(on)
     print(PREFIX .. 'ToT watch ON - play until it breaks, then /df log copy totwatch')
 end
 
+-- /df log watch - snapshot now, reproduce, snapshot again, read what moved.
+--
+-- Three open reports all come down to "something re-anchored my frame and I do
+-- not know what": the keyring landing over a bag slot after opening and closing
+-- the bags, the chat window jumping after the settings window has been open,
+-- and a friends count reading 0. Asking each reporter to describe positions
+-- does not answer any of them, and asking for a separate dump per report is
+-- three round trips. This takes one.
+--
+-- The frames are grouped by the report they belong to, so a dump stays readable
+-- when only one of them is interesting.
+local WATCH_GROUPS = {
+    {
+        label = 'keyring',
+        frames = {'KeyRingButton', 'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot',
+                  'CharacterBag2Slot', 'CharacterBag3Slot', 'DragonflightUIBagBar'}
+    }, {
+        label = 'chat',
+        frames = {'ChatFrame1', 'ChatFrame1Tab', 'ChatFrame1EditBox', 'GeneralDockManager',
+                  'DragonflightUIChatFrame'}
+    }, {label = 'micromenu', frames = {'MicroMenuContainer', 'MicroMenu', 'SocialsMicroButton', 'QuickJoinToastButton'}}
+}
+
+-- Everything about a frame that a re-anchor would change. Points are the point
+-- of it: "who moved it" is answered by relativeTo changing, not by the pixels.
+local function SnapshotFrame(f)
+    if type(f) ~= 'table' or not f.GetObjectType then return nil end
+
+    local snap = {
+        shown = tostring(f:IsShown()),
+        visible = tostring(f:IsVisible()),
+        alpha = string.format('%.2f', f:GetAlpha() or -1),
+        scale = string.format('%.2f', (f.GetScale and f:GetScale()) or -1),
+        strata = tostring(f.GetFrameStrata and f:GetFrameStrata()),
+        level = tostring(f.GetFrameLevel and f:GetFrameLevel()),
+        parent = (f.GetParent and f:GetParent() and f:GetParent().GetName and (f:GetParent():GetName() or '<anon>')) or
+            'nil',
+        size = string.format('%.0fx%.0f', f:GetWidth() or -1, f:GetHeight() or -1),
+        points = {}
+    }
+
+    local left, bottom = f:GetLeft(), f:GetBottom()
+    snap.pos = (left and bottom) and string.format('%.0f,%.0f', left, bottom) or 'unplaced'
+
+    for i = 1, ((f.GetNumPoints and f:GetNumPoints()) or 0) do
+        local point, relativeTo, relativePoint, x, y = f:GetPoint(i)
+        snap.points[i] = string.format('%s -> %s %s (%.0f,%.0f)', tostring(point),
+                                       (relativeTo and relativeTo.GetName and (relativeTo:GetName() or '<anon>')) or
+                                           tostring(relativeTo), tostring(relativePoint), x or 0, y or 0)
+    end
+
+    return snap
+end
+
+local function DiffSnapshots(tag, name, before, after)
+    if not before and not after then return false end
+
+    if not before then
+        DF:Log(tag, '%s: APPEARED', name)
+        return true
+    end
+    if not after then
+        DF:Log(tag, '%s: GONE', name)
+        return true
+    end
+
+    local changed = false
+    for _, key in ipairs({'shown', 'visible', 'alpha', 'scale', 'strata', 'level', 'parent', 'size', 'pos'}) do
+        if before[key] ~= after[key] then
+            DF:Log(tag, '%s: %s %s => %s', name, key, tostring(before[key]), tostring(after[key]))
+            changed = true
+        end
+    end
+
+    local most = math.max(#before.points, #after.points)
+    for i = 1, most do
+        if before.points[i] ~= after.points[i] then
+            DF:Log(tag, '%s: point%d %s => %s', name, i, tostring(before.points[i]) or 'none',
+                   tostring(after.points[i]) or 'none')
+            changed = true
+        end
+    end
+
+    return changed
+end
+
+-- The friends count, from the API rather than from the screen. Answers the one
+-- question the screenshot cannot: whether the client itself thinks 0, or
+-- whether something is failing to draw a number it does have.
+local function LogFriendFacts(tag)
+    local parts = {}
+
+    if C_FriendList and C_FriendList.GetNumFriends then
+        parts[#parts + 1] = 'friends=' .. tostring(C_FriendList.GetNumFriends())
+    end
+    if C_FriendList and C_FriendList.GetNumOnlineFriends then
+        parts[#parts + 1] = 'online=' .. tostring(C_FriendList.GetNumOnlineFriends())
+    end
+    if BNGetNumFriends then
+        local total, numOnline = BNGetNumFriends()
+        parts[#parts + 1] = 'bnet=' .. tostring(total) .. '/' .. tostring(numOnline) .. ' online'
+    end
+    if C_Club and C_Club.GetSubscribedClubs then
+        local ok, clubs = pcall(C_Club.GetSubscribedClubs)
+        if ok and clubs then parts[#parts + 1] = 'clubs=' .. tostring(#clubs) end
+    end
+
+    DF:Log(tag, 'friend counts: %s', (#parts > 0 and table.concat(parts, ' ')) or 'no API available')
+end
+
+local watchBaseline
+
+function DF:LogWatch(extraName)
+    local tag = 'watch'
+    local taking = {}
+
+    for _, group in ipairs(WATCH_GROUPS) do
+        for _, name in ipairs(group.frames) do taking[#taking + 1] = {label = group.label, name = name} end
+    end
+
+    -- An extra frame for whatever the report is about that this list does not
+    -- already cover - '/df log watch mouse' while hovering it.
+    if extraName and extraName ~= '' then
+        local resolved = ResolveFrame(extraName)
+        local resolvedName = (type(resolved) == 'table' and resolved.GetName and resolved:GetName()) or extraName
+        taking[#taking + 1] = {label = 'extra', name = resolvedName, frame = resolved}
+    end
+
+    local snapshot = {}
+    for _, entry in ipairs(taking) do
+        local f = entry.frame or _G[entry.name]
+        snapshot[entry.label .. '/' .. entry.name] = SnapshotFrame(f)
+    end
+
+    LogFriendFacts(tag)
+
+    if not watchBaseline then
+        watchBaseline = snapshot
+
+        local present, absent = 0, {}
+        for _, entry in ipairs(taking) do
+            local key = entry.label .. '/' .. entry.name
+            if snapshot[key] then
+                present = present + 1
+                DF:Log(tag, 'baseline %s: %s | %s | shown=%s parent=%s', key, snapshot[key].pos, snapshot[key].size,
+                       snapshot[key].shown, snapshot[key].parent)
+                for i, p in ipairs(snapshot[key].points) do DF:Log(tag, '   point%d %s', i, p) end
+            else
+                absent[#absent + 1] = entry.name
+            end
+        end
+
+        DF:Log(tag, 'baseline taken: %d frames, %d absent (%s)', present, #absent,
+               (#absent > 0 and table.concat(absent, ', ')) or 'none')
+        print(PREFIX .. 'baseline taken. Now reproduce the problem, then run /df log watch again.')
+        return
+    end
+
+    local changed = 0
+    for key, after in pairs(snapshot) do
+        if DiffSnapshots(tag, key, watchBaseline[key], after) then changed = changed + 1 end
+    end
+    for key, before in pairs(watchBaseline) do
+        if snapshot[key] == nil and before ~= nil then
+            DF:Log(tag, '%s: GONE', key)
+            changed = changed + 1
+        end
+    end
+
+    DF:Log(tag, '=== %d frame(s) changed since the baseline ===', changed)
+    watchBaseline = snapshot
+
+    print(PREFIX .. changed .. ' frame(s) changed. /df log copy watch to read it, then /reload to save it.')
+end
+
+-- Start over without a reload, for a reporter who wants a second attempt at the
+-- same thing.
+function DF:LogWatchReset()
+    watchBaseline = nil
+    print(PREFIX .. 'watch baseline cleared - the next /df log watch takes a fresh one.')
+end
+
 local function Matching(filter)
     local matching = {}
     for _, entry in ipairs(log) do
@@ -743,6 +932,12 @@ function DF:HandleLogCommand(rest)
         else
             DF:LogRegions(ResolveFrame(frameName) or frameName, 'regiondump', depth)
             DF:LogDump('regiondump', 80)
+        end
+    elseif sub == 'watch' then
+        if arg:lower() == 'reset' then
+            DF:LogWatchReset()
+        else
+            DF:LogWatch(arg)
         end
     elseif sub == 'blockers' then
         DF:LogBlockers(arg ~= '' and arg or nil, 'blockers')
