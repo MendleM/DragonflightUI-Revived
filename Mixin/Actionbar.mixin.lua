@@ -1322,11 +1322,41 @@ function DragonflightUIActionbarMixin:SetupPageNumberFrame()
     -- second copy of bar 4 over bar 1 while hiding the page you were actually
     -- using - reported, correctly, as scrolling through "6 action bars that
     -- shouldn't be there, since they're already open in my UI".
+    -- ...but Blizzard decides "on screen" from its own settings, not from what
+    -- is actually drawn: IsMultibarVisible reads
+    -- Settings.GetValue("PROXY_SHOW_ACTIONBAR_n"), and UpdateMultiActionBar
+    -- takes the page out of VIEWABLE_ACTION_BAR_PAGES from that alone
+    -- (MultiActionBars.lua). DFUI hides Blizzard's multibars and draws its own,
+    -- so those settings sit off while the bars are plainly visible, every page
+    -- stays viewable, and the cycle runs all six anyway. That is why this read
+    -- as fixed on TBC and not on Era or MoP - the TBC path leaves Blizzard's
+    -- bars in place, so its settings still describe the screen.
+    --
+    -- Ask our own bars, and fall back to Blizzard's table for any page we do
+    -- not draw. Page numbers are Blizzard's: bottom-left is 6, not 2.
+    local PAGE_TO_DF_BAR = {
+        [BOTTOMLEFT_ACTIONBAR_PAGE or 6] = 2,
+        [BOTTOMRIGHT_ACTIONBAR_PAGE or 5] = 3,
+        [LEFT_ACTIONBAR_PAGE or 4] = 4,
+        [RIGHT_ACTIONBAR_PAGE or 3] = 5
+    }
+
     local function isViewablePage(page)
+        -- page 1 has no bar of its own to be visible, so it is always in
+        if page == 1 then return true end
+
+        local barIndex = PAGE_TO_DF_BAR[page]
+        if barIndex then
+            local module = DF:GetModule('Actionbar', true)
+            local bar = module and module['bar' .. barIndex]
+            -- Viewable means "not already on screen", which is exactly the
+            -- sense Blizzard stores: the page is cleared when the bar shows.
+            if bar and bar.IsShown then return not bar:IsShown() end
+        end
+
         local viewable = VIEWABLE_ACTION_BAR_PAGES
         if not viewable then return true end
-        -- page 1 has no bar of its own to be visible, so it is always in
-        return page == 1 or viewable[page] ~= nil
+        return viewable[page] ~= nil
     end
 
     local function nextViewablePage(from, delta)
@@ -1450,6 +1480,12 @@ function DragonflightUIActionbarMixin:SetupPageNumberFrame()
         if type(_G['MultiActionBar_Update']) == 'function' then
             hooksecurefunc('MultiActionBar_Update', refreshPageArrows)
         end
+
+        -- That hook only fires for Blizzard's own settings, and the answer now
+        -- comes from whether OUR bars are shown - which changes when the player
+        -- toggles one in DFUI's settings, and nothing there calls into
+        -- Blizzard. Publish it so the driver is rebuilt then too.
+        addonTable.RefreshActionbarPageArrows = refreshPageArrows
     else
         ActionBarUpButton = _G['ActionBarUpButton']
         ActionBarDownButton = _G['ActionBarDownButton']
@@ -1511,6 +1547,28 @@ function DragonflightUIActionbarMixin:SetupPageNumberFrame()
         fixAnchor(text)
     end)
     fixAnchor(GetActionBarPage())
+
+    -- Blizzard re-anchors this string behind our back. MainActionBarMixin:
+    -- UpdateEndCaps ends with
+    --
+    --     self.ActionBarPageNumber.Text:SetPoint("CENTER", 15, 0);   -- classic caps
+    --     self.ActionBarPageNumber.Text:SetPoint("CENTER", -7, 0);   -- modern caps
+    --
+    -- and SetPoint with no relativeTo means "relative to my parent" - which we
+    -- have changed to our own frame. So its offset lands on our anchor and
+    -- shoves the number sideways, -7 of it in the modern style, which is the
+    -- reported "counter shifted left on initial render". UpdateEndCaps runs on
+    -- show and on every loading screen, and the number only came right once
+    -- something called SetText and tripped the hook above - hence "after
+    -- switching between action bars it moves to the correct place".
+    --
+    -- Same function the end-cap art has to be re-applied after; put our anchor
+    -- back the moment it has finished moving it.
+    if MainActionBar and MainActionBar.UpdateEndCaps then
+        hooksecurefunc(MainActionBar, 'UpdateEndCaps', function()
+            fixAnchor(MainMenuBarPageNumber:GetText())
+        end)
+    end
 
     -- era-1159: the page number text was updated by MainActionBar's
     -- ACTIONBAR_PAGE_CHANGED handler, which died with UnregisterAllEvents -

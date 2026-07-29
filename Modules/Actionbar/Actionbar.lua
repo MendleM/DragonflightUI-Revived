@@ -3275,6 +3275,13 @@ function Module:ApplySettingsInternal(sub, key)
     -- print('function Module:ApplySettings(sub)', sub, GetTime(), key)
     local db = Module.db.profile
 
+    -- Which pages the scroll arrows will visit depends on which bars are on
+    -- screen, and this is where that changes. Deferred to the end of the frame
+    -- so the bars have taken their new state before we ask them about it.
+    if addonTable.RefreshActionbarPageArrows then
+        C_Timer.After(0, addonTable.RefreshActionbarPageArrows)
+    end
+
     if not sub or sub == 'ALL' then
         Module.bar1:SetState(db.bar1)
         Module.bar2:SetState(db.bar2)
