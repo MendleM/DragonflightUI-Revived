@@ -37,9 +37,11 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log watch [name] snapshot the frames that get re-anchored behind our
 --                          back - keyring and bag slots, chat, micro menu - plus
 --                          the friend counts. Run it, reproduce the problem, run
---                          it again: the second run prints only what moved, and
---                          names the frame it moved to. An optional name (or
---                          'mouse') adds a frame the list does not cover
+--                          it again: the second run reports only what moved,
+--                          names the frame it moved to, and opens the copy
+--                          window on it - no reload, no hunting for a file. An
+--                          optional name (or 'mouse') adds a frame the list
+--                          does not cover
 --     /df log watch reset  drop the baseline and start again
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
@@ -699,6 +701,8 @@ function DF:LogWatch(extraName)
 
         DF:Log(tag, 'baseline taken: %d frames, %d absent (%s)', present, #absent,
                (#absent > 0 and table.concat(absent, ', ')) or 'none')
+        -- No window on this run: there is nothing to report yet, and popping one
+        -- up before the problem has been reproduced invites sending it early.
         print(PREFIX .. 'baseline taken. Now reproduce the problem, then run /df log watch again.')
         return
     end
@@ -717,7 +721,19 @@ function DF:LogWatch(extraName)
     DF:Log(tag, '=== %d frame(s) changed since the baseline ===', changed)
     watchBaseline = snapshot
 
-    print(PREFIX .. changed .. ' frame(s) changed. /df log copy watch to read it, then /reload to save it.')
+    -- Open the copy window rather than asking for the SavedVariables file. The
+    -- log is only written on /reload or logout, so the old instructions were
+    -- "reproduce it, reload, go and find a file" - three chances to lose the
+    -- capture, and a reload is itself a layout application, which is one of the
+    -- things being investigated. Selecting text out of a window is one step and
+    -- disturbs nothing.
+    --
+    -- Filtered to the watch tag, which includes the baseline: the anchors a
+    -- frame started with are half of what makes the diff mean anything. If that
+    -- overruns the window's limit it keeps the tail, so the diff survives and
+    -- the baseline is what gets dropped - the right way round.
+    print(PREFIX .. changed .. ' frame(s) changed - copy the window and paste it into the report.')
+    DF:LogCopy(tag)
 end
 
 -- Start over without a reload, for a reporter who wants a second attempt at the
