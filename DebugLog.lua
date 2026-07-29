@@ -810,7 +810,9 @@ local function CreateCopyWindow()
     scroll:SetScrollChild(edit)
     f.EditBox = edit
 
-    if UISpecialFrames then table.insert(UISpecialFrames, 'DragonflightUILogCopyFrame') end
+    -- Escape closes it, without the UISpecialFrames name lookup that taints
+    -- whoever owns the global. See Helper:CloseWithEscape.
+    addonTable.Helper:CloseWithEscape(f)
 
     copyFrame = f
     return f

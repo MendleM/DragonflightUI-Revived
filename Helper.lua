@@ -374,6 +374,55 @@ function Helper:ColorGradiant(percent)
     return red, green, blue
 end
 
+-- Escape closes this window, without putting its name in UISpecialFrames.
+--
+-- UISpecialFrames holds frame NAMES, and Blizzard's CloseSpecialWindows walks
+-- it doing `local frame = _G[value]` - reading a global an addon created, which
+-- taints that execution. Blizzard knows: the function carries a comment saying
+-- it "handles possibly tainted values and so should always be called from
+-- secure code using securecall()", and their one call site does exactly that.
+--
+-- The containment holds while it is Blizzard's function being called. It stops
+-- holding when an addon replaces the global, which AceConfigDialog-3.0 does
+-- permanently the first time any Ace options window is opened - ours or any
+-- other addon's, and the library ships with half of them. From that point the
+-- read escapes, and it is attributed to whoever owns the global it read. Four
+-- DFUI windows were in that list, so it was regularly us - which is why our
+-- name kept appearing on other people's taint reports.
+--
+-- Handling the key ourselves costs nothing and takes us out of it entirely.
+-- Propagation stays ON except for the Escape we consume, so typing in the
+-- window still works and every other key reaches the game.
+function Helper:CloseWithEscape(frame)
+    if not frame or frame.DFEscapeHandled then return end
+    frame.DFEscapeHandled = true
+
+    local function propagate(f, on)
+        if f.SetPropagateKeyboardInput then
+            -- Refused on a protected frame in combat; none of ours are, but a
+            -- refusal here must not take the caller down with it.
+            pcall(f.SetPropagateKeyboardInput, f, on)
+        end
+    end
+
+    frame:EnableKeyboard(true)
+    propagate(frame, true)
+
+    frame:HookScript('OnKeyDown', function(f, key)
+        if key == 'ESCAPE' then
+            propagate(f, false)
+            f:Hide()
+        else
+            propagate(f, true)
+        end
+    end)
+
+    -- A frame hidden while it was swallowing Escape would otherwise keep the
+    -- keyboard on its next show.
+    frame:HookScript('OnShow', function(f) propagate(f, true) end)
+    frame:HookScript('OnHide', function(f) propagate(f, true) end)
+end
+
 function Helper:CreateFrameEventCallback(event, fn)
     return EventRegistry:RegisterFrameEventAndCallback(event, function(_, ...)
         fn(...)

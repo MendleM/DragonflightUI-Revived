@@ -195,8 +195,10 @@ local function CreateWindow()
     f.Content = content
     f.ContentWidth = WIDTH - (PAD * 2) - 20
 
-    -- Escape closes it, like any other dialog.
-    if UISpecialFrames then table.insert(UISpecialFrames, 'DragonflightUIWhatsNewFrame') end
+    -- Escape closes it, like any other dialog - but handled here rather than
+    -- through UISpecialFrames, which is read by name out of _G and taints
+    -- whoever owns the global. See Helper:CloseWithEscape.
+    addonTable.Helper:CloseWithEscape(f)
 
     -- Mark it read however it was closed. Escape and the close button take
     -- different routes, and only this one catches both - otherwise dismissing

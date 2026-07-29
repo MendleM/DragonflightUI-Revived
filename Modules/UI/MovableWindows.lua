@@ -12,7 +12,7 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- panel manager keys off (Blizzard_UIParentPanelManager: GetUIPanelAttribute
 -- reads it, ShowUIPanel places the frame by it), and clearing it leaves the
 -- frame to be shown wherever it stands. Escape-to-close comes from the panel
--- system too, so a detached window is added to UISpecialFrames to keep it.
+-- system too, so a detached window gets its own Escape handler to keep it.
 --
 -- The UIPanelWindows[name] entry is deliberately left alone. Blizzard code
 -- indexes it directly - PVPFrameBase does `UIPanelWindows["CharacterFrame"].width
@@ -192,17 +192,12 @@ function Detach(entry)
         -- placed, pushed, and closed to make room for the next panel.
         if SetUIPanelAttribute then SetUIPanelAttribute(frame, 'area', nil) end
 
-        -- Escape used to close it because the panel manager owned it.
-        if UISpecialFrames then
-            local present = false
-            for _, name in ipairs(UISpecialFrames) do
-                if name == entry.frame then
-                    present = true
-                    break
-                end
-            end
-            if not present then table.insert(UISpecialFrames, entry.frame) end
-        end
+        -- Escape used to close it because the panel manager owned it. Handled
+        -- directly rather than by adding the name to UISpecialFrames: that list
+        -- is walked with _G[name], which taints whoever owns the global, and a
+        -- detached window would have put us in it for every window detached.
+        -- See Helper:CloseWithEscape.
+        addonTable.Helper:CloseWithEscape(frame)
     end
 end
 
@@ -243,11 +238,10 @@ local function Restore(entry)
         if record.panel then
             if SetUIPanelAttribute then SetUIPanelAttribute(record.frame, 'area', record.area) end
 
-            if UISpecialFrames then
-                for i = #UISpecialFrames, 1, -1 do
-                    if UISpecialFrames[i] == entry.frame then table.remove(UISpecialFrames, i) end
-                end
-            end
+            -- Nothing to take back out of UISpecialFrames - we no longer put
+            -- anything in it. The Escape handler stays installed and is
+            -- harmless once the panel manager owns the window again: both
+            -- routes end in the same Hide.
         end
         -- The panel manager re-places it on the next show, so nothing to
         -- reposition here.

@@ -422,7 +422,9 @@ function Module:AddConfigFrame()
     end
 
     _G['DragonflightUIConfigFrame'] = config
-    tinsert(UISpecialFrames, 'DragonflightUIConfigFrame')
+    -- Not UISpecialFrames: that list is read by name out of _G and taints
+    -- whoever owns the global. See Helper:CloseWithEscape.
+    Helper:CloseWithEscape(config)
 
     Module:RegisterChatCommand('dragonflight', 'SlashCommand')
     Module:RegisterChatCommand('df', 'SlashCommand')
