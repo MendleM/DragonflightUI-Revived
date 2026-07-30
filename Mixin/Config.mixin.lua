@@ -370,10 +370,13 @@ function DragonFlightUIConfigMixin:AddToolbar()
     -- Revived's own Discord, not upstream's - this pointed at
     -- discord.gg/D7CtUHT87G, which is Karl-Heinz's server, so every player who
     -- clicked it went to the wrong place to report a bug about this fork.
+    --
+    -- Kept in step with README.md, which is the source of truth for this. The
+    -- CurseForge listing carries a different invite and is not.
     table.insert(t, {
         name = L["ConfigToolbarDiscord"],
         tooltip = L["ConfigToolbarDiscordTooltip"],
-        link = "https://discord.gg/c6E2arnkdx",
+        link = "https://discord.gg/yaYHsGhaA",
         icon = 'discord'
     })
     table.insert(t, {
