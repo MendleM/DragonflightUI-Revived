@@ -371,12 +371,12 @@ function DragonFlightUIConfigMixin:AddToolbar()
     -- discord.gg/D7CtUHT87G, which is Karl-Heinz's server, so every player who
     -- clicked it went to the wrong place to report a bug about this fork.
     --
-    -- Kept in step with README.md, which is the source of truth for this. The
-    -- CurseForge listing carries a different invite and is not.
+    -- One invite, in one place: this, README.md and the CurseForge listing all
+    -- carry discord.gg/c6E2arnkdx. If it ever needs changing, change all three.
     table.insert(t, {
         name = L["ConfigToolbarDiscord"],
         tooltip = L["ConfigToolbarDiscordTooltip"],
-        link = "https://discord.gg/yaYHsGhaA",
+        link = "https://discord.gg/c6E2arnkdx",
         icon = 'discord'
     })
     table.insert(t, {

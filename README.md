@@ -1,11 +1,11 @@
 # DragonflightUI Classic — Revived
 
-[![Join the Discord](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/yaYHsGhaA)
+[![Join the Discord](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/c6E2arnkdx)
 [![Download on CurseForge](https://img.shields.io/badge/CurseForge-Download-F16436?style=for-the-badge&logo=curseforge&logoColor=white)](https://www.curseforge.com/wow/addons/dragonflight-ui-classic-revived)
 
-### 💬 Talk to us on Discord: **[discord.gg/yaYHsGhaA](https://discord.gg/yaYHsGhaA)**
+### 💬 Talk to us on Discord: **[discord.gg/c6E2arnkdx](https://discord.gg/c6E2arnkdx)**
 
-Found a bug, got a screenshot of something broken, want a feature, or just want to tell us what you are playing? **[Jump into the Discord](https://discord.gg/yaYHsGhaA)** — it is the fastest way to reach the people working on this addon, and the reports posted there are what drive the fixes. Every bug in the Era 1.15.9 overhaul was found by players who spoke up.
+Found a bug, got a screenshot of something broken, want a feature, or just want to tell us what you are playing? **[Jump into the Discord](https://discord.gg/c6E2arnkdx)** — it is the fastest way to reach the people working on this addon, and the reports posted there are what drive the fixes. Every bug in the Era 1.15.9 overhaul was found by players who spoke up.
 
 ---
 
@@ -43,7 +43,7 @@ This repository is that home. It carries the **full commit history of the origin
 Two ways, both open to everyone:
 
 - **[GitHub Issues](https://github.com/MendleM/DragonflightUI-Revived/issues)** — anyone can open one, no permission needed. Best for anything reproducible.
-- **[Discord: Dragonflight UI Classic - Revived](https://discord.gg/yaYHsGhaA)** — for quick questions, screenshots and general chat.
+- **[Discord: Dragonflight UI Classic - Revived](https://discord.gg/c6E2arnkdx)** — for quick questions, screenshots and general chat.
 
 A good report includes:
 
