@@ -76,11 +76,6 @@ do
     L["ConfigToolbarDiscordTooltip"] = "Предлагайте идеи и получайте поддержку."
     L["ConfigToolbarGithub"] = "Github"
     L["ConfigToolbarGithubTooltip"] = "Просматривайте код, сообщайте о проблемах и вносите вклад."
-    L["ConfigToolbarCoffee"] = "BuyMeACoffee"
-    L["ConfigToolbarCoffeeTooltip1"] =
-        "Каждый комментарий, лайк или репост имеет значение, но если вы чувствуете себя очень добрым, вы можете угостить меня куском пиццы для дальнейшей разработки!"
-    L["ConfigToolbarCoffeeTooltip2"] =
-        "Поддерживающие получают эксклюзивные привилегии, узнайте о них в разделе для спонсоров на нашем Discord."
 end
 
 -- profiles

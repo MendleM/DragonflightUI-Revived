@@ -80,11 +80,6 @@ do
     L["ConfigToolbarDiscordTooltip"] = "Contribute ideas & get support."
     L["ConfigToolbarGithub"] = "Github"
     L["ConfigToolbarGithubTooltip"] = "View code, report issues & contribute."
-    L["ConfigToolbarCoffee"] = "BuyMeACoffee"
-    L["ConfigToolbarCoffeeTooltip1"] =
-        "Every comment, like or share counts, but if you're feeling very kind, you can buy me a slice of pizza to fuel further development!"
-    L["ConfigToolbarCoffeeTooltip2"] =
-        "Supporters enjoy exclusive perks, discover them in our Discord's supporter section."
 end
 
 -- profiles

@@ -367,10 +367,13 @@ function DragonFlightUIConfigMixin:AddToolbar()
     local base = 'Interface\\Addons\\DragonflightUI\\Textures\\Art\\'
 
     local t = {}
+    -- Revived's own Discord, not upstream's - this pointed at
+    -- discord.gg/D7CtUHT87G, which is Karl-Heinz's server, so every player who
+    -- clicked it went to the wrong place to report a bug about this fork.
     table.insert(t, {
         name = L["ConfigToolbarDiscord"],
         tooltip = L["ConfigToolbarDiscordTooltip"],
-        link = "https://discord.gg/D7CtUHT87G",
+        link = "https://discord.gg/c6E2arnkdx",
         icon = 'discord'
     })
     table.insert(t, {
@@ -378,13 +381,6 @@ function DragonFlightUIConfigMixin:AddToolbar()
         tooltip = L["ConfigToolbarGithubTooltip"],
         link = "https://github.com/MendleM/DragonflightUI-Revived",
         icon = 'github',
-        sizeDelta = 4
-    })
-    table.insert(t, {
-        name = L["ConfigToolbarCoffee"],
-        tooltipTable = {L["ConfigToolbarCoffeeTooltip1"], ' ', L["ConfigToolbarCoffeeTooltip2"]},
-        link = "https://buymeacoffee.com/karlheinzschneider",
-        icon = 'coffee',
         sizeDelta = 4
     })
 

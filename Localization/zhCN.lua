@@ -76,10 +76,6 @@ do
     L["ConfigToolbarDiscordTooltip"] = "交流创意与获取支持"
     L["ConfigToolbarGithub"] = "Github"
     L["ConfigToolbarGithubTooltip"] = "查看代码、提交问题与贡献"
-    L["ConfigToolbarCoffee"] = "BuyMeACoffee"
-    L["ConfigToolbarCoffeeTooltip1"] =
-        "每个点赞分享都是支持，若您愿意，也可以请开发者喝杯咖啡继续开发！"
-    L["ConfigToolbarCoffeeTooltip2"] = "支持者可享专属福利，详见Discord支持者频道。"
 end
 
 -- profiles

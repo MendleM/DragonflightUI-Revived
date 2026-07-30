@@ -5,9 +5,9 @@
 ## Interface-TBC: 20506, 20505
 ## Interface-Classic: 11508
 ## Title: DragonflightUI |cff8080ff0.42.0|r
-## Notes: Brings the modern retail UI to classic.|n|cffbbbbbbMaintained by MendleM|r|n|cffbbbbbbOriginally by Karl-Heinz Schneider|r|n|n|TInterface/Addons/DragonflightUI/Textures/Art/coffee:12:12|t |cff82c5ffbuymeacoffee.com/karlheinzschneider|r
-## Notes-esES: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r|n|n|TInterface/Addons/DragonflightUI/Textures/Art/coffee:12:12|t |cff82c5ffbuymeacoffee.com/karlheinzschneider|r
-## Notes-esMX: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r|n|n|TInterface/Addons/DragonflightUI/Textures/Art/coffee:12:12|t |cff82c5ffbuymeacoffee.com/karlheinzschneider|r
+## Notes: Brings the modern retail UI to classic.|n|cffbbbbbbMaintained by MendleM|r|n|cffbbbbbbOriginally by Karl-Heinz Schneider|r
+## Notes-esES: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r
+## Notes-esMX: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r
 ## Author: MendleM, Karl-Heinz Schneider
 ## X-Website: https://github.com/MendleM/DragonflightUI-Revived
 ## X-Curse-Project-ID: 819757
