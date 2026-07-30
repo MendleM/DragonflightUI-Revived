@@ -7,7 +7,65 @@ May 2026). Current builds report version `0.42.0`.
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
 
-## 0.42.0 — Bug reports, answered (27 July 2026)
+## 0.42.0 — Fixes from the field (30 July 2026)
+
+### Loot rolls
+
+- Hovering **Need**, **Greed** or **Pass** names who chose it again
+- The count is back on each button; an empty Pass reads `0`
+- The line under the item name no longer repeats those numbers — it shows how
+  many have yet to answer, then the winner
+- The settings preview shows a live roll, tooltips included
+
+### Request Stop / vehicle exit button
+
+- Sits above the top action bar, flush with the left edge, at button size, with
+  the same frame as every other button
+- Glows while it can actually be clicked — it had no usable-or-not look at all
+- Can be turned off, and previewed from the settings without catching a flight
+
+### Action bars
+
+- Scrolling bar 1 no longer cycles through bars already on screen. This only
+  ever worked on TBC
+- The page number no longer sits offset on the first render
+- **Pet Bar** works as an anchor — it pointed at a frame that does not exist
+
+### Unit frames
+
+- Fixed a burst of Lua errors at login, from the player, target, pet and
+  secondary resource frames
+- Health and mana numbers show on party frames with **Status Text** on
+
+### Edit mode
+
+- **Use Raid-Style Party Frames** works, and stays put. The toggle wrote a
+  setting the game no longer reads, and Blizzard's own checkbox was being undone
+  on the next reload or dungeon
+
+### Compatibility
+
+- Fixed an error at login with **Clique**, which was also costing Clique its
+  party frame mouse handling
+
+### Buffs
+
+- The settings page now says plainly that the game's **Consolidate Buffs**
+  option cannot reach DragonflightUI's buff frame
+
+### Elsewhere
+
+- The Discord button opens this project's server, not the original author's
+- BuyMeACoffee removed — it collected for upstream
+
+### For bug reports
+
+- The version number is real; reports no longer read `@project-version@`
+- New `/df log watch` — run it, reproduce the problem, run it again. It reports
+  what moved and opens a window to copy
+- One less source of taint errors carrying DragonflightUI's name
+
+## 0.41.2 — Bug reports, answered (27 July 2026)
 
 ### Blue shamans (new)
 
@@ -31,63 +89,21 @@ Everything before v0.40.3 is in
 - Scrolling the main bar skips bars already on screen again
 - **Paging**: *Smart* only differs from *Default* on druids, and now says so
 
-### Request Stop / vehicle exit button
-
-- Can be turned off — there was no setting for it at all
-- **Preview** button in the settings, since the real one only exists on a taxi
-  or in a vehicle and could not otherwise be placed without catching a flight
-- The button frame and the active glow can each be turned off
-- Sits above the top action bar by default, flush with the left edge of the
-  bars, at button size rather than oversized, and wears the same frame as every
-  other action and pet button
-- Lights up with the same corner glow a pet ability gets when it is set to
-  autocast, so you can see when it is live — it had no state artwork at all
-  before, and looked identical whether or not it would do anything
-- Fixed **Pet Bar** doing nothing when picked as an anchor for any bar: the
-  setting named a frame that does not exist, and a missing anchor silently fell
-  back to the parent instead of saying so
-
-### Loot rolls
-
-- Fixed hovering **Need**, **Greed** or **Pass** no longer naming who chose it —
-  the retail restyle left the count and the tooltip behind, so all that was left
-  was the tally
-- The number on each roll button is back, sitting in the corner of the button
-  it counts; an empty Pass now reads `0` instead of `*`
-- The line under the item name no longer repeats those same three numbers — it
-  says how many people have yet to answer, then names the winner
-- The settings preview shows a roll in progress — counts, hover tooltips and
-  all — so the whole frame can be judged without waiting for a drop
-
 ### Unit frames
 
-- Fixed a burst of Lua errors at login — `SetUserPlaced(): Frame is not movable
-  or resizable` for the player, target, target-of-target and pet frames, and an
-  `attempt to index local 'f'` from the secondary resource bar. Settings were
-  being applied to the unit frames before they had been built
 - Fixed an invisible frame eating clicks around the target, target-of-target,
   pet and focus frames after opening edit mode
-- Health and mana numbers show on party frames again with **Status Text** on —
-  on Era the frames had no text to fill in at all
 - Fixed party frame settings only applying when someone joined or left the group
 - Fixed party members vanishing when combat started
 - XP bar text is centred again when rested XP is showing
 
 ### Edit mode
 
-- Fixed changes made in Blizzard's Edit Mode being undone by DragonflightUI —
-  most visibly **Use Raid-Style Party Frames**, which turned itself back off on
-  entering a dungeon or reloading. That setting lives in the Edit Mode layout,
-  and DFUI was saving a copy of the layout it had read at login
 - The *Empty* placeholder keeps the frame's shape — no more oversized box over a
   narrow bar
 
 ### Elsewhere
 
-- Fixed an error at login with **Clique** installed — the party half of the
-  compatibility fix expected the old named party frames, which Era 1.15.9 does
-  not have. It threw before finishing, so Clique lost mouse handling on the
-  frames it had not reached yet
 - Fixed guild and community list avatars not loading
 - Fixed the blank gap where an out-of-range player's name goes in tooltips
 - Aimed Shot shows a cast bar

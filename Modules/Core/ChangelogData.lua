@@ -25,6 +25,60 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 DF.ChangelogData = {
     {
         version = '0.42.0',
+        title = 'Fixes from the field',
+        date = '30 July 2026',
+        intro = 'Everything reported since the last CurseForge build, fixed.',
+        sections = {
+            {
+                title = 'Loot rolls',
+                items = {
+                    'Hovering Need, Greed or Pass names who chose it again.',
+                    'The count is back on each button; an empty Pass reads 0.',
+                    'The line under the item name shows how many have yet to answer, then the winner - it no longer repeats those numbers.',
+                    'The settings preview shows a live roll, tooltips included.'
+                }
+            }, {
+                title = 'Request Stop button',
+                items = {
+                    'Sits above the top action bar, flush left, at button size, with the same frame as every other button.',
+                    'Glows while it can actually be clicked - it had no usable-or-not look at all.',
+                    'Can be turned off, and previewed from the settings without catching a flight.'
+                }
+            }, {
+                title = 'Action bars',
+                items = {
+                    'Scrolling bar 1 no longer cycles through bars already on screen. This only ever worked on TBC.',
+                    'The page number no longer sits offset on the first render.',
+                    'Pet Bar works as an anchor - it pointed at a frame that does not exist.'
+                }
+            }, {
+                title = 'Unit frames',
+                items = {
+                    'Fixed a burst of Lua errors at login, from the player, target, pet and secondary resource frames.',
+                    'Health and mana numbers show on party frames with Status Text on.'
+                }
+            }, {
+                title = 'Edit mode',
+                items = {
+                    'Use Raid-Style Party Frames works again, and stays put after a reload or a dungeon.'
+                }
+            }, {
+                title = 'Elsewhere',
+                items = {
+                    'Fixed an error at login with Clique, which was also costing Clique its party frame mouse handling.',
+                    'The buff settings page says plainly that the game\'s Consolidate Buffs option cannot reach our buff frame.',
+                    'The Discord button opens this project\'s server, not the original author\'s.'
+                }
+            }, {
+                title = 'For bug reports',
+                items = {
+                    'The version number is real - reports no longer read @project-version@.',
+                    'New /df log watch: run it, reproduce the problem, run it again. It reports what moved and opens a window to copy.'
+                }
+            }
+        }
+    }, {
+        version = '0.41.2',
         title = 'Bug reports, answered',
         date = '27 July 2026',
         intro = 'A week of bug reports from the Discord, answered.',
@@ -53,29 +107,9 @@ DF.ChangelogData = {
                     'Paging: Smart only differs from Default on druids, and now says so.'
                 }
             }, {
-                title = 'Request Stop button',
-                items = {
-                    'Can be turned off - there was no setting for it at all.',
-                    'Preview button in the settings, since the real one only appears on a taxi or in a vehicle.',
-                    'The button frame and the active glow can each be turned off.',
-                    'Sits above the top action bar, flush with the left edge of the bars, at button size, with the same frame the other buttons wear.',
-                    'Lights up with the same corner glow an autocasting pet ability gets, so you can see when it is live.',
-                    'Fixed Pet Bar doing nothing when picked as an anchor for any bar.'
-                }
-            }, {
-                title = 'Loot rolls',
-                items = {
-                    'Fixed hovering Need, Greed or Pass no longer naming who chose it.',
-                    'The number on each roll button is back, in the corner of the button it counts.',
-                    'The line under the item name no longer repeats those numbers - it says how many have yet to answer.',
-                    'The settings preview shows a roll in progress, tooltips included.'
-                }
-            }, {
                 title = 'Unit frames',
                 items = {
-                    'Fixed a burst of Lua errors at login about frames not being movable, from settings being applied before the frames were built.',
                     'Fixed an invisible frame eating clicks around the target, target-of-target, pet and focus frames after opening edit mode.',
-                    'Health and mana numbers show on party frames again with Status Text on - on Era the frames had no text to fill in at all.',
                     'Fixed party frame settings only applying when someone joined or left the group.',
                     'Fixed party members vanishing when combat started.',
                     'XP bar text is centred again when rested XP is showing.'
@@ -83,13 +117,11 @@ DF.ChangelogData = {
             }, {
                 title = 'Edit mode',
                 items = {
-                    'Fixed Use Raid-Style Party Frames turning itself back off after a dungeon or a reload - DFUI was saving a copy of the Edit Mode layout it read at login, over anything you had changed since.',
                     'The Empty placeholder keeps the frame\'s shape - no more oversized box over a narrow bar.'
                 }
             }, {
                 title = 'Elsewhere',
                 items = {
-                    'Fixed an error at login with Clique installed, which also cost Clique mouse handling on some frames.',
                     'Fixed guild and community list avatars not loading.',
                     'Fixed the blank gap where an out-of-range player\'s name goes in tooltips.',
                     'Aimed Shot shows a cast bar.'
