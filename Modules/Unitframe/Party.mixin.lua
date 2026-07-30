@@ -132,6 +132,51 @@ function SubModuleMixin:SetDefaults()
     self.Defaults = defaults;
 end
 
+-- Use Raid-Style Party Frames.
+--
+-- This used to read and write the useCompactPartyFrames CVar, which is what it
+-- was on the old clients. On 1.15.9 that CVar is dead - the string does not
+-- appear anywhere in the client - and the answer moved into the Edit Mode
+-- layout. Both frames ask the same question:
+--
+--   CompactPartyFrameMixin:ShouldShow()
+--     return ShouldShowPartyFrames() and EditModeManagerFrame:UseRaidStylePartyFrames()
+--   PartyFrameMixin:ShouldShow()
+--     return ShouldShowPartyFrames() and not EditModeManagerFrame:UseRaidStylePartyFrames()
+--
+-- and UseRaidStylePartyFrames reads the layout setting, not a CVar. So the
+-- toggle was writing somewhere nothing reads, which is exactly the "doesn't do
+-- anything when toggled on and off" report.
+--
+-- Older flavours still have the CVar, so keep it for them and pick by what the
+-- client actually offers rather than by flavour.
+local function HasModernRaidStyleSetting()
+    return (EditModeManagerFrame and EditModeManagerFrame.UseRaidStylePartyFrames and Enum and
+               Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames) and true or false
+end
+
+function SubModuleMixin.GetRaidStylePartyFrames()
+    if HasModernRaidStyleSetting() then
+        local ok, value = pcall(EditModeManagerFrame.UseRaidStylePartyFrames, EditModeManagerFrame)
+        if ok then return value and true or false end
+    end
+
+    return C_CVar and C_CVar.GetCVar('useCompactPartyFrames') == '1'
+end
+
+function SubModuleMixin.SetRaidStylePartyFrames(enabled)
+    if HasModernRaidStyleSetting() and PartyFrame and addonTable.SetBlizzEditmodeFrameSetting then
+        -- Goes through the layout, so it survives a reload and reaches both
+        -- frames. SetBlizzEditmodeFrameSetting schedules the application that
+        -- makes them swap.
+        addonTable:SetBlizzEditmodeFrameSetting(PartyFrame, Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames,
+                                                enabled and 1 or 0)
+        return
+    end
+
+    if SetCVar then SetCVar('useCompactPartyFrames', enabled and '1' or '0') end
+end
+
 function SubModuleMixin:SetupOptions()
     local Module = self.ModuleRef;
     local function getDefaultStr(key, sub, extra)
@@ -305,12 +350,7 @@ function SubModuleMixin:SetupOptions()
             local sub = info[2]
 
             if sub == 'useCompactPartyFrames' then
-                local value = C_CVar.GetCVar("useCompactPartyFrames");
-                if value == '1' then
-                    return true
-                else
-                    return false
-                end
+                return SubModuleMixin.GetRaidStylePartyFrames()
             else
                 return getOption(info)
             end
@@ -321,11 +361,7 @@ function SubModuleMixin:SetupOptions()
             local sub = info[2]
 
             if sub == 'useCompactPartyFrames' then
-                if value then
-                    SetCVar("useCompactPartyFrames", "1");
-                else
-                    SetCVar("useCompactPartyFrames", "0");
-                end
+                SubModuleMixin.SetRaidStylePartyFrames(value)
             else
                 setOption(info, value)
             end

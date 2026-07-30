@@ -382,13 +382,11 @@ function SubModuleMixin:SetupOptions()
             local key = info[1]
             local sub = info[2]
 
+            -- Same setting as the party page's copy, and on 1.15.9 it lives in
+            -- the Edit Mode layout rather than in the dead useCompactPartyFrames
+            -- CVar. One implementation, in Party.mixin.lua.
             if sub == 'useCompactPartyFrames' then
-                local value = C_CVar.GetCVar("useCompactPartyFrames");
-                if value == '1' then
-                    return true
-                else
-                    return false
-                end
+                return addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames()
             end
 
             if moreOptions[sub].proxy then
@@ -403,11 +401,7 @@ function SubModuleMixin:SetupOptions()
             local sub = info[2]
 
             if sub == 'useCompactPartyFrames' then
-                if value then
-                    SetCVar("useCompactPartyFrames", "1");
-                else
-                    SetCVar("useCompactPartyFrames", "0");
-                end
+                addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value)
             end
 
             if moreOptions[sub].proxy then
