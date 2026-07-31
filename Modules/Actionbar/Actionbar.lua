@@ -3866,12 +3866,7 @@ function Module.ChangeBackpack()
 
     -- bags
     do
-        CharacterBag0Slot:SetPoint('RIGHT', MainMenuBarBackpackButton, 'LEFT', -12, 0)
-
-        for i = 1, 3 do
-            local gap = 0
-            _G['CharacterBag' .. i .. 'Slot']:SetPoint('RIGHT', _G['CharacterBag' .. (i - 1) .. 'Slot'], 'LEFT', -gap, 0)
-        end
+        Module.AnchorBagSlots()
 
         for i = 0, 3 do
             local slot = _G['CharacterBag' .. i .. 'Slot']
@@ -3957,9 +3952,8 @@ function Module.ChangeBackpack()
     if not DF.Cata then
         -- print('KEYRING')
         KeyRingButton:SetSize(30, 30)
-        KeyRingButton:ClearAllPoints()
-        KeyRingButton:SetPoint('RIGHT', _G['CharacterBag3Slot'], 'LEFT', 0, 0)
         KeyRingButton:SetScale(1)
+        Module.AnchorBagSlots()
 
         local size = 30.5
 
@@ -4033,7 +4027,53 @@ function Module.ChangeBackpack()
     if _G['BagsBar'] then
         --
         addonTable:OverrideBlizzEditmode(_G['BagsBar'], 'RIGHT', f, 'RIGHT', 0, 0)
+        Module.HookBagBarLayout()
     end
+end
+
+-- The bag bar's order: keyring, bags 3..0, backpack, right to left, no gaps.
+--
+-- Has to be re-applied rather than set once. BagsBarMixin:Layout walks
+-- MainMenuBarBagManager's buttons and does ClearAllPoints() then SetPoint() on
+-- every one of them, chaining each off the last in its own order - so any
+-- Layout throws our anchors away. It runs on variables-loaded, on the bar
+-- expand toggle, when the main action bar state is overridden, and from
+-- KeyringMixin:OnShow, which calls self:GetParent():Layout() directly. That
+-- last one is why the keyring wandered into the middle of the bags when the
+-- bag menu was opened and closed: showing it relaid the whole bar.
+function Module.AnchorBagSlots()
+    if not (MainMenuBarBackpackButton and _G['CharacterBag0Slot']) then return end
+
+    _G['CharacterBag0Slot']:ClearAllPoints()
+    _G['CharacterBag0Slot']:SetPoint('RIGHT', MainMenuBarBackpackButton, 'LEFT', -12, 0)
+
+    for i = 1, 3 do
+        local slot = _G['CharacterBag' .. i .. 'Slot']
+        local previous = _G['CharacterBag' .. (i - 1) .. 'Slot']
+        if slot and previous then
+            local gap = 0
+            slot:ClearAllPoints()
+            slot:SetPoint('RIGHT', previous, 'LEFT', -gap, 0)
+        end
+    end
+
+    -- Past the last bag, so it reads as one more slot on the end rather than
+    -- something dropped into the middle of them.
+    if not DF.Cata and KeyRingButton and _G['CharacterBag3Slot'] then
+        KeyRingButton:ClearAllPoints()
+        KeyRingButton:SetPoint('RIGHT', _G['CharacterBag3Slot'], 'LEFT', 0, 0)
+    end
+end
+
+-- Put them back the moment Blizzard has finished moving them. Hooked on the
+-- frame because the mixin's functions are copied onto it.
+function Module.HookBagBarLayout()
+    if Module.BagBarLayoutHooked then return end
+    local bar = _G['BagsBar']
+    if not (bar and bar.Layout) then return end
+
+    Module.BagBarLayoutHooked = true
+    hooksecurefunc(bar, 'Layout', function() Module.AnchorBagSlots() end)
 end
 
 function Module.UpdateBagSlotIcons()

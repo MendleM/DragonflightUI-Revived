@@ -30,6 +30,8 @@ Everything before v0.40.3 is in
   ever worked on TBC
 - The page number no longer sits offset on the first render
 - **Pet Bar** works as an anchor — it pointed at a frame that does not exist
+- The keyring stays on the end of the bag bar instead of wandering in among the
+  bags when the bag menu is opened and closed
 
 ### Unit frames
 

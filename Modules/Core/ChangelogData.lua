@@ -49,7 +49,8 @@ DF.ChangelogData = {
                 items = {
                     'Scrolling bar 1 no longer cycles through bars already on screen. This only ever worked on TBC.',
                     'The page number no longer sits offset on the first render.',
-                    'Pet Bar works as an anchor - it pointed at a frame that does not exist.'
+                    'Pet Bar works as an anchor - it pointed at a frame that does not exist.',
+                    'The keyring stays on the end of the bag bar instead of wandering in among the bags.'
                 }
             }, {
                 title = 'Unit frames',
