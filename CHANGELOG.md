@@ -33,10 +33,18 @@ Everything before v0.40.3 is in
 - The keyring stays on the end of the bag bar instead of wandering in among the
   bags when the bag menu is opened and closed
 
+### Character pane
+
+- Tab labels are vertically centred again, in both the selected and unselected
+  tab
+- The pane was building itself out of the game's script budget and getting cut
+  off partway, which left it half-made
+
 ### Unit frames
 
 - Fixed a burst of Lua errors at login, from the player, target, pet and
   secondary resource frames
+- **TBC:** fixed a flood of `Invalid frame handle` errors during combat
 - Health and mana numbers show on party frames with **Status Text** on
 
 ### Edit mode

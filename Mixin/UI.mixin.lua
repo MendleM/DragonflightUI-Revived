@@ -5256,9 +5256,28 @@ function DragonflightUIMixin:CharacterFrameTabButtonTemplate(frame, hideDisabled
         middle:SetPoint('TOPLEFT', left, 'TOPRIGHT', 0, 0)
         middle:SetPoint('TOPRIGHT', right, 'TOPLEFT', 0, 0)
 
+        -- Centre the label on the ART, which is not what it was anchored to.
+        --
+        -- TabButtonTemplate anchors the label BOTTOM, +5 - an offset measured
+        -- against Blizzard's tab art. This reskin replaces that art with pieces
+        -- of a different height, anchored from the TOP, and changes the
+        -- button's height too, and never re-anchored the label. Any one of
+        -- those three invalidates the +5; all three together is why the labels
+        -- sat low in every tab.
+        --
+        -- The art hangs from the top edge, so its middle is half its own height
+        -- below that, whatever the button height happens to be. Done here
+        -- because this is the one place that knows which art is on.
+        local function centreText(artHeight)
+            local text = frame.Text or _G[name .. 'Text']
+            if not text then return end
+            text:ClearAllPoints()
+            text:SetPoint('CENTER', frame, 'TOP', 0, -artHeight / 2)
+        end
+
         function frame:SetNormal(normal, keepSize)
             if normal then
-                --   
+                --
                 if not keepSize then frame:SetHeight(32) end
 
                 left:SetSize(35, 36)
@@ -5269,6 +5288,8 @@ function DragonflightUIMixin:CharacterFrameTabButtonTemplate(frame, hideDisabled
 
                 middle:SetSize(1, 36)
                 middle:SetTexCoord(0, 0.015625, 0.175781, 0.316406)
+
+                centreText(36)
             else
                 --
                 if not keepSize then frame:SetHeight(42) end
@@ -5281,8 +5302,17 @@ function DragonflightUIMixin:CharacterFrameTabButtonTemplate(frame, hideDisabled
 
                 middle:SetSize(1, 42)
                 middle:SetTexCoord(0, 0.015625, 0.00390625, 0.167969)
+
+                -- The selected tab's art is taller and hangs lower, so its
+                -- middle is lower too - which is why one offset for both states
+                -- would only ever be right for one of them.
+                centreText(42)
             end
         end
+
+        -- A tab that is already in its resting state when this runs never gets
+        -- an OnEnable or OnDisable to hook, so place the label now as well.
+        centreText(frame:IsEnabled() and 36 or 42)
 
         frame:HookScript('OnEnable', function()
             frame:SetNormal(true)

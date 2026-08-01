@@ -53,9 +53,16 @@ DF.ChangelogData = {
                     'The keyring stays on the end of the bag bar instead of wandering in among the bags.'
                 }
             }, {
+                title = 'Character pane',
+                items = {
+                    'Tab labels are vertically centred again, in both the selected and unselected tab.',
+                    'The pane was building itself out of the game\'s script budget and getting cut off partway, leaving it half-made.'
+                }
+            }, {
                 title = 'Unit frames',
                 items = {
                     'Fixed a burst of Lua errors at login, from the player, target, pet and secondary resource frames.',
+                    'TBC: fixed a flood of Invalid frame handle errors during combat.',
                     'Health and mana numbers show on party frames with Status Text on.'
                 }
             }, {
