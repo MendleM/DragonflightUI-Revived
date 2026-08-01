@@ -32,6 +32,9 @@ function DragonflightUICharacterStatsPanelMixin:OnLoad()
     C_Timer.After(1, function()
         self:SetupStats() -- version specific mixin
 
+        -- Once, now that every element is in, rather than after each insert.
+        self:SortCategories()
+
         self:SetScript("OnUpdate", function(_, elapsed)
             self:OnUpdate(elapsed)
         end)
@@ -378,6 +381,12 @@ function DragonflightUICharacterStatsPanelMixin:RegisterCategory(id, info, sortC
 
     local node = dataProvider:Insert(data)
 
+    -- Keep it. RegisterElement used to search the whole tree for this node
+    -- again on every single element, which is where the character pane ran out
+    -- of watchdog budget - see the note there.
+    self.DFCategoryNodes = self.DFCategoryNodes or {}
+    self.DFCategoryNodes[id] = node
+
     local affectChildren = true;
     local skipSort = false;
 
@@ -413,13 +422,58 @@ function DragonflightUICharacterStatsPanelMixin:RegisterElement(id, categoryID, 
     --     return nodeData.id == data.categoryID
     -- end)
 
-    local parentNode = self.DataProvider:FindElementDataByPredicate(function(node)
-        local d = node:GetData();
-        return d.id == categoryID;
-    end, false)
+    -- Look the category up, do not go hunting for it.
+    --
+    -- This used to be FindElementDataByPredicate over the whole provider, once
+    -- per element, with a Sort() after every insert. Era's per-frame script
+    -- watchdog kills a frame that runs too long WITHOUT scriptProfile, and this
+    -- is what it was killing:
+    --
+    --   TreeListDataProvider.lua:372: script ran too long
+    --     FindByPredicate <- FindElementDataByPredicate
+    --     CharacterStatsPanel.mixin.lua:416 RegisterElement
+    --     CharacterStatsEra.mixin.lua:492 AddStatsRanged
+    --
+    -- Being killed mid-build is why the pane comes up half-made: the elements
+    -- after the kill never register, and whatever the setup was going to do
+    -- after this never runs.
+    --
+    -- RegisterCategory already had the node in its hand, so keep it there.
+    local parentNode = self.DFCategoryNodes and self.DFCategoryNodes[categoryID]
+
+    if not parentNode then
+        -- A category registered before this cache existed, or by something that
+        -- did not go through RegisterCategory.
+        parentNode = self.DataProvider:FindElementDataByPredicate(function(node)
+            local d = node:GetData();
+            return d.id == categoryID;
+        end, false)
+        if parentNode then
+            self.DFCategoryNodes = self.DFCategoryNodes or {}
+            self.DFCategoryNodes[categoryID] = parentNode
+        end
+    end
+
     if parentNode then
         parentNode:Insert(data)
-        parentNode:Sort()
+
+        -- Sorting after every insert re-sorts everything already there, so a
+        -- category of n elements sorted n times. The comparator is set on the
+        -- node with affectChildren, so one sort once the category is filled is
+        -- enough; SortCategories does it.
+        self.DFDirtyCategories = self.DFDirtyCategories or {}
+        self.DFDirtyCategories[categoryID] = parentNode
+    end
+end
+
+-- Sort the categories that gained elements. Cheap to call more than once: a
+-- category is only in the list if something was inserted into it since.
+function DragonflightUICharacterStatsPanelMixin:SortCategories()
+    if not self.DFDirtyCategories then return end
+
+    for id, node in pairs(self.DFDirtyCategories) do
+        if node.Sort then node:Sort() end
+        self.DFDirtyCategories[id] = nil
     end
 end
 
