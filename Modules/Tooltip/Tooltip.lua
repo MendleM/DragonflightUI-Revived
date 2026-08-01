@@ -1155,15 +1155,30 @@ function Module:HookStatusBar()
         self.DFDefaultAnchor = false;
     end)
 
-    -- if (SharedTooltip_SetBackdropStyle) then
-    --     hooksecurefunc("SharedTooltip_SetBackdropStyle", function(self, style, embedded)
-    --         -- print('SharedTooltip_SetBackdropStyle', self:GetName())
-    --         if self.NineSlice then
-    --             --
-    --             -- self.NineSlice:Hide()              
-    --         end
-    --     end)
-    -- end
+    -- Keep Blizzard's backdrop hidden, every time it puts it back.
+    --
+    -- We draw our own tooltip border and hide the NineSlice to get it out of
+    -- the way, but hiding it once does not hold: SharedTooltip_SetBackdropStyle
+    -- ends with self.NineSlice:Show(), and it is called on every repopulate -
+    -- TooltipDataHandler, GameTooltip_UpdateStyle, GameTooltip_OnHide. A unit
+    -- tooltip repopulates while you hover it, so Blizzard's backdrop came back
+    -- and ours only removed it again on the next UpdateFrameSize. The two took
+    -- turns, which is the tooltip "alternating visible, not visible, over and
+    -- over" while the cursor sits still.
+    --
+    -- hooksecurefunc runs immediately after, in the same call, so the NineSlice
+    -- never gets a frame on screen in the shown state.
+    --
+    -- This hook existed here already with its body commented out, so it looked
+    -- installed and did nothing.
+    if SharedTooltip_SetBackdropStyle then
+        hooksecurefunc('SharedTooltip_SetBackdropStyle', function(tooltip)
+            -- Only the tooltips we have taken over. Everything else keeps
+            -- Blizzard's backdrop, which is the only thing drawing it.
+            if not (tooltip and Module.TooltipsRefTable and Module.TooltipsRefTable[tooltip]) then return end
+            if tooltip.NineSlice then tooltip.NineSlice:Hide() end
+        end)
+    end
 end
 
 function Module:SetExtraStringTable(self, strTable)

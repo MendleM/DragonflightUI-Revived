@@ -72,6 +72,11 @@ DF.ChangelogData = {
                     'Rotate Minimap survives a reload - it was written somewhere the game overwrites on every layout.'
                 }
             }, {
+                title = 'Tooltips',
+                items = {
+                    'Fixed the tooltip body flickering on and off while you hover it.'
+                }
+            }, {
                 title = 'Elsewhere',
                 items = {
                     'Fixed an error at login with Clique, which was also costing Clique its party frame mouse handling.',

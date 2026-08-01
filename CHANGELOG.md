@@ -65,6 +65,11 @@ Everything before v0.40.3 is in
 - The settings page now says plainly that the game's **Consolidate Buffs**
   option cannot reach DragonflightUI's buff frame
 
+### Tooltips
+
+- Fixed the tooltip body flickering on and off while you hover it. Blizzard put
+  its own backdrop back on every refresh and ours took it away again
+
 ### Elsewhere
 
 - The Discord button opens this project's server, not the original author's
