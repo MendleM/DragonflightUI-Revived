@@ -52,6 +52,8 @@ Everything before v0.40.3 is in
 - **Use Raid-Style Party Frames** works, and stays put. The toggle wrote a
   setting the game no longer reads, and Blizzard's own checkbox was being undone
   on the next reload or dungeon
+- **Rotate Minimap** survives a reload. It was written somewhere the game
+  overwrites every time it applies its layout
 
 ### Compatibility
 

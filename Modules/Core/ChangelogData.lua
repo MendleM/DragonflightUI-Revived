@@ -68,7 +68,8 @@ DF.ChangelogData = {
             }, {
                 title = 'Edit mode',
                 items = {
-                    'Use Raid-Style Party Frames works again, and stays put after a reload or a dungeon.'
+                    'Use Raid-Style Party Frames works again, and stays put after a reload or a dungeon.',
+                    'Rotate Minimap survives a reload - it was written somewhere the game overwrites on every layout.'
                 }
             }, {
                 title = 'Elsewhere',

@@ -58,6 +58,50 @@ function SubModuleMixin:SetDefaults()
     self.Defaults = defaults;
 end
 
+-- Rotate Minimap.
+--
+-- The rotateMinimap CVar is real and the minimap does read it, but it is not
+-- where the setting LIVES - the Edit Mode layout owns it and pushes its own
+-- value back into the CVar on every layout application:
+--
+--   EditModeMinimapSystemMixin:UpdateSystemSettingRotateMinimap()
+--     self:SetRotateMinimap(self:GetSettingValueBool(
+--         Enum.EditModeMinimapSetting.RotateMinimap))
+--
+--   MinimapClusterMixin:SetRotateMinimap(v)  ->  SetCVar("rotateMinimap", v)
+--
+-- So writing the CVar worked, right up until the next layout application -
+-- which a reload always performs - put the layout's value back over the top.
+-- That is the whole of "doesn't persist after reload": it was never saved
+-- anywhere that survives.
+--
+-- The TBC branch already wrote the layout setting and was right; the gate was
+-- the mistake. Pick on what the client actually offers rather than on flavour.
+local function HasEditModeRotateSetting()
+    return (MinimapCluster and Enum and Enum.EditModeMinimapSetting and
+               Enum.EditModeMinimapSetting.RotateMinimap ~= nil) and true or false
+end
+
+function SubModuleMixin.GetRotateMinimap()
+    if HasEditModeRotateSetting() and addonTable.GetBlizzEditmodeFrameSettingBool then
+        local ok, value = pcall(addonTable.GetBlizzEditmodeFrameSettingBool, addonTable, MinimapCluster,
+                                Enum.EditModeMinimapSetting.RotateMinimap)
+        if ok and value ~= nil then return value and true or false end
+    end
+
+    return C_CVar and C_CVar.GetCVarBool('rotateMinimap') or false
+end
+
+function SubModuleMixin.SetRotateMinimap(enabled)
+    if HasEditModeRotateSetting() and addonTable.SetBlizzEditmodeFrameSetting then
+        addonTable:SetBlizzEditmodeFrameSetting(MinimapCluster, Enum.EditModeMinimapSetting.RotateMinimap,
+                                                enabled and 1 or 0)
+        return
+    end
+
+    if C_CVar then C_CVar.SetCVar('rotateMinimap', enabled and 1 or 0) end
+end
+
 function SubModuleMixin:SetupOptions()
     local Module = self.ModuleRef;
     local function getDefaultStr(key, sub, extra)
@@ -239,12 +283,7 @@ function SubModuleMixin:SetupOptions()
             local sub = info[2]
 
             if sub == 'rotate' then
-                if DF.API.Version.IsTBC then
-                    return addonTable:GetBlizzEditmodeFrameSettingBool(MinimapCluster,
-                                                                       Enum.EditModeMinimapSetting.RotateMinimap);
-                else
-                    return C_CVar.GetCVarBool("rotateMinimap")
-                end
+                return SubModuleMixin.GetRotateMinimap()
             else
                 return getOption(info)
             end
@@ -255,22 +294,7 @@ function SubModuleMixin:SetupOptions()
             local sub = info[2]
 
             if sub == 'rotate' then
-                if DF.API.Version.IsTBC then
-                    if value then
-                        addonTable:SetBlizzEditmodeFrameSetting(MinimapCluster,
-                                                                Enum.EditModeMinimapSetting.RotateMinimap, 1)
-
-                    else
-                        addonTable:SetBlizzEditmodeFrameSetting(MinimapCluster,
-                                                                Enum.EditModeMinimapSetting.RotateMinimap, 0)
-                    end
-                else
-                    if value then
-                        C_CVar.SetCVar("rotateMinimap", 1)
-                    else
-                        C_CVar.SetCVar("rotateMinimap", 0)
-                    end
-                end
+                SubModuleMixin.SetRotateMinimap(value)
 
                 self:UpdateMinimapShape()
             else

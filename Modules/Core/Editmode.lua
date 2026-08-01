@@ -761,6 +761,12 @@ function Module:InitEditmodeOverride()
     end
 
     function addonTable:GetBlizzEditmodeFrameSettingBool(f, setting)
+        -- Read the layout as it is now, not as it was at login. Without this a
+        -- settings page shows our stale copy, so a checkbox can disagree with
+        -- the thing it controls after the player has been in Blizzard's Edit
+        -- Mode. Same reason the writers refresh.
+        addonTable:RefreshBlizzEditmodeLayouts()
+
         local value = LibEditModeOverride:GetFrameSetting(f, setting)
         if value == 1 then
             return true;
