@@ -1,6 +1,32 @@
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 DragonflightUIStateHandlerMixin = {}
 
+-- Whether a restricted snippet is allowed to show or hide this frame.
+--
+-- "Invalid frame handle" names the wrong thing. RestrictedFrames.lua:84 is
+--
+--   if (frame and (isProtected or (IsProtected(frame) or not InCombatLockdown())))
+--       then return frame end
+--   error("Invalid frame handle")
+--
+-- so the handle resolved perfectly well: the frame simply is not protected, and
+-- we are in combat, and the restricted environment will not hand an unprotected
+-- frame to a snippet mid-fight. A plain CreateFrame('FRAME', ...) - the XP bar,
+-- the pet bar, the buff frame - registered as a HideFrame therefore throws once
+-- per state change for as long as the fight lasts, which is where 418 of them
+-- came from.
+--
+-- Guarding with `if f then` cannot help, and neither can pcall: the handle is
+-- truthy and the throw happens inside the restricted call.
+--
+-- Show and Hide only NEED to be secure for protected frames. For anything else
+-- they are ordinary calls that work in combat, from anywhere - so those go out
+-- of the snippet, exactly as the alpha path already does.
+local function CanSnippetTouch(frame)
+    if not (frame and frame.IsProtected) then return false end
+    return frame:IsProtected() and true or false
+end
+
 function DragonflightUIStateHandlerMixin:InitStateHandler(extraX, extraY)
     local handler = CreateFrame('FRAME', self:GetName() .. 'Handler', nil, 'SecureHandlerStateTemplate')
     self.DFStateHandler = handler
@@ -56,7 +82,15 @@ function DragonflightUIStateHandlerMixin:InitStateHandler(extraX, extraY)
     self.DFShower = shower
 
     handler:SetFrameRef('Shower', shower)
-    handler:SetFrameRef('HideFrame1', self)
+
+    -- Index 1 is this frame, and it splits the same way as any other: the
+    -- action bars are SecureFrameTemplate and stay in the snippet, the XP bar,
+    -- the pet bar and the buff frame are plain frames and must not.
+    self:SetHideFrame(self, 1)
+
+    -- The insecure half follows the shower, which is what the snippet drives.
+    shower:HookScript('OnShow', function() self:ApplyStateShown(true) end)
+    shower:HookScript('OnHide', function() self:ApplyStateShown(false) end)
 
     shower:SetAttribute('_onshow', [[   
         local frameRef = self:GetFrameRef("MainHandler")
@@ -152,13 +186,35 @@ function DragonflightUIStateHandlerMixin:ApplyStateAlpha(newstate)
 end
 
 function DragonflightUIStateHandlerMixin:SetHideFrame(frame, index)
-    -- The ref stays: the visibility snippet is genuinely secure work and still
-    -- shows and hides these. The plain table is for the alpha path, which is
-    -- not.
-    self.DFStateHandler:SetFrameRef('HideFrame' .. index, frame)
+    if not frame then return end
 
+    -- Every managed frame, for the alpha path, which is not secure work.
     self.DFHideFrames = self.DFHideFrames or {}
     self.DFHideFrames[index] = frame
+
+    -- Showing and hiding splits by whether the snippet is allowed to: a
+    -- protected frame keeps the secure ref, because in combat only the snippet
+    -- can move it. An unprotected one is handled from ordinary code, because
+    -- the snippet would throw on it and does not need to be involved.
+    if CanSnippetTouch(frame) then
+        self.DFStateHandler:SetFrameRef('HideFrame' .. index, frame)
+    else
+        self.DFInsecureHideFrames = self.DFInsecureHideFrames or {}
+        self.DFInsecureHideFrames[index] = frame
+    end
+end
+
+-- The insecure half of show/hide, driven by the shower's own visibility so the
+-- two halves always agree.
+function DragonflightUIStateHandlerMixin:ApplyStateShown(shown)
+    if not self.DFInsecureHideFrames then return end
+
+    for _, f in pairs(self.DFInsecureHideFrames) do
+        -- Re-checked rather than trusted from registration time: a frame that
+        -- has become protected since is the snippet's to move, and ours to
+        -- leave alone in combat.
+        if f and not (InCombatLockdown() and CanSnippetTouch(f)) then f:SetShown(shown) end
+    end
 end
 
 function DragonflightUIStateHandlerMixin:SetUnit(unit)
