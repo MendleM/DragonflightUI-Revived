@@ -3584,12 +3584,15 @@ function Module:ForceMoveBlizzEditModeGhosts()
         end
         -- Save now, apply once: every ApplyChanges is a full Blizzard layout
         -- application, and the scheduler collapses the burst into one.
+        -- Save, and ask for an application through the scheduler or not at all.
+        -- The old direct ApplyChanges fallback here ran exactly when the
+        -- scheduler was not up yet, which is during login - the one time an
+        -- application must not happen, because it taints every Edit Mode
+        -- system's frames for the session (see ScheduleBlizzEditmodeApply).
+        -- The anchors are saved either way, and Blizzard's own
+        -- PLAYER_ENTERING_WORLD application puts them into effect.
         lib:SaveOnly()
-        if addonTable.ScheduleBlizzEditmodeApply then
-            addonTable:ScheduleBlizzEditmodeApply()
-        elseif not InCombatLockdown() then
-            lib:ApplyChanges()
-        end
+        if addonTable.ScheduleBlizzEditmodeApply then addonTable:ScheduleBlizzEditmodeApply() end
     else
         for k, v in ipairs(t) do
             v:SetClampedToScreen(false)

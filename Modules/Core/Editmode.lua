@@ -618,7 +618,13 @@ function Module:InitEditmodeOverride()
     --     --
     --     LibEditModeOverride:SetActiveLayout(DFLayoutName)
     -- end
-    LibEditModeOverride:ApplyChanges()
+    --
+    -- Deliberately NOT ApplyChanges() here. See BlizzEditmodeApplyAllowed
+    -- below: applying the layout from our own code during login is what
+    -- tainted the party frames for the whole session. Saving is enough -
+    -- Blizzard applies the layout itself at PLAYER_ENTERING_WORLD, securely,
+    -- and picks this up.
+    LibEditModeOverride:SaveOnly()
 
     -- ApplyChanges() show/hides EditModeManagerFrame, which is a FULL
     -- Blizzard layout application: it re-anchors every managed system,
@@ -711,7 +717,57 @@ function Module:InitEditmodeOverride()
         ReapplyOwnedPositions()
     end
 
+    -- Applications are refused until login is over. This is the party-frame
+    -- taint fix, and it is worth spelling out.
+    --
+    -- ApplyChanges works by showing and hiding EditModeManagerFrame, and that is
+    -- a FULL layout application: Blizzard re-sets-up every Edit Mode system
+    -- inside our call. The field assignments it makes on the way through belong
+    -- to whoever is on the stack, so CompactPartyFrameMemberN.optionTable and
+    -- .isLootObject came out tainted by DragonflightUI and stayed that way for
+    -- the session. Every later CompactUnitFrame_UpdateAll then tainted itself on
+    -- the optionTable read and had its SetSize/SetAttribute/Show refused - party
+    -- members that never appear, a party that collapses to one, "Interface
+    -- action failed because of an AddOn". Proven with /df log party: those two
+    -- fields insecure on all five members, with PartyFrame, CompactPartyFrame
+    -- and every EditModeManagerFrame field clean.
+    --
+    -- OverrideBlizzEditmode is called at enable from about ten places, so this
+    -- fired on every single login. It does not need to. SaveOnly writes the
+    -- anchors, and Blizzard applies the layout itself at PLAYER_ENTERING_WORLD -
+    -- from its own execution, so the same setup happens without our taint on it.
+    --
+    -- After that first application the gate opens, because an application from
+    -- then on is the player having just changed something: rare, deliberate, and
+    -- gone at the next reload.
+    -- Nothing is replayed when the gate opens. Everything that asked for an
+    -- application during login had already saved its anchors, and Blizzard's own
+    -- PEW application is what puts them into effect - running ours afterwards
+    -- would re-taint the frames for exactly no gain, which is the whole bug.
+    local function OpenApplyGate()
+        addonTable.BlizzEditmodeApplyAllowed = true
+    end
+
+    if not addonTable.BlizzEditmodeApplyGateInstalled then
+        addonTable.BlizzEditmodeApplyGateInstalled = true
+
+        local gate = CreateFrame('Frame')
+        gate:RegisterEvent('PLAYER_ENTERING_WORLD')
+        gate:SetScript('OnEvent', function(g)
+            g:UnregisterAllEvents()
+            -- After Blizzard's own application for this PEW, not before it.
+            C_Timer.After(2, OpenApplyGate)
+        end)
+    end
+
     function addonTable:ScheduleBlizzEditmodeApply()
+        if not addonTable.BlizzEditmodeApplyAllowed then
+            if DF and DF.Log then
+                DF:Log('editmode', 'layout apply skipped during login - saved only, Blizzard applies it at PEW')
+            end
+            return
+        end
+
         if applyScheduled then return end
         applyScheduled = true
         C_Timer.After(0.5, applyNow)
