@@ -1760,8 +1760,13 @@ function DFProfessionMixin:UpdateHeader()
 
     local prof = self.ProfessionTable[self.SelectedProfession]
 
+    -- The circular mask is ours (SetupFrameStyle), so all that is wanted here is
+    -- the crop that trims an icon's own border. SetPortraitToTexture used to do
+    -- both; on 1.15.9 it is a C function that leaves the icon uncropped, which
+    -- left the profession icon sitting inside its border rather than filling
+    -- the portrait ring.
     self.Icon:SetTexture(prof.profData.icon)
-    SetPortraitToTexture(self.Icon, self.Icon:GetTexture())
+    self.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
     local isLink, playerName = IsTradeSkillLinked()
     if isLink then
