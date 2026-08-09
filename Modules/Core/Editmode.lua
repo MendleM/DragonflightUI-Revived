@@ -11,7 +11,13 @@ Mixin(Module, CallbackRegistryMixin)
 local defaults = {
     profile = {
         scale = 1,
-        general = {showGrid = true, gridSize = 20, snapGrid = true, snapElements = true},
+        general = {
+            showGrid = true,
+            gridSize = 20,
+            snapGrid = true,
+            snapElements = true,
+            blockBlizzardEditMode = true
+        },
         advanced = {
             -- actionbar
             ActionBars = true,
@@ -124,6 +130,14 @@ local generalOptions = {
             desc = '' .. getDefaultStr('snapGrid', 'general'),
             order = 102,
             small = true
+        },
+        blockBlizzardEditMode = {
+            type = 'toggle',
+            name = "Disable Blizzard's Edit Mode",
+            desc = "Blizzard's Edit Mode moves the same frames this one does, and saving in it writes its whole layout over ours. With this on, the game hides its own way in - the Escape menu entry, the right-click menu on a unit frame, the raid manager button. " ..
+                getDefaultStr('blockBlizzardEditMode', 'general'),
+            order = 103,
+            width = 'double'
         }
         -- snapElements = {
         --     type = 'toggle',
@@ -369,6 +383,43 @@ function Module:ApplySettings(sub, key)
     end, 0, self)
 end
 
+-- Blizzard's Edit Mode manages the same frames this one does, and its Save
+-- writes its whole layout over ours - so people who wander into it come back
+-- with a broken UI and no idea what they did. Blizzard has a supported way to
+-- say "not now": CanEnterEditMode() is false while FramesBlockingEditMode is
+-- non-empty (EditModeManager.lua:1638), and BlockEnteringEditMode is how their
+-- own pet battle and override action bar code says it.
+--
+-- Going through that gate rather than hiding buttons ourselves means every
+-- entry point disables itself - the Escape menu never adds its button, the
+-- unit-frame right-click entry hides, the raid manager button greys, the micro
+-- menu stops offering its helptip - and we touch none of them.
+--
+-- Our own layout applications are unaffected: LibEditModeOverride:ApplyChanges
+-- reaches the frame through ShowUIPanel, which never consults the gate.
+local blockerFrame
+
+function Module:SetBlizzEditmodeBlocked(blocked)
+    if not (EditModeManagerFrame and EditModeManagerFrame.BlockEnteringEditMode and
+        EditModeManagerFrame.UnblockEnteringEditMode) then
+        return false
+    end
+
+    blockerFrame = blockerFrame or CreateFrame('Frame', 'DragonflightUIEditModeBlocker')
+
+    if blocked then
+        EditModeManagerFrame:BlockEnteringEditMode(blockerFrame)
+    else
+        EditModeManagerFrame:UnblockEnteringEditMode(blockerFrame)
+    end
+
+    return true
+end
+
+function Module:IsBlizzEditmodeBlocked()
+    return Module.db and Module.db.profile.general.blockBlizzardEditMode and true or false
+end
+
 function Module:ApplySettingsInternal(sub, key)
     local db = Module.db.profile
     local state = db.general
@@ -381,6 +432,11 @@ function Module:ApplySettingsInternal(sub, key)
     else
         f.Grid:SetShown(false)
     end
+
+    -- Driven from here rather than from its own lifecycle so that it follows
+    -- the setting, survives a profile switch, and re-asserts itself if
+    -- EditModeManagerFrame was not there the first time we asked.
+    Module:SetBlizzEditmodeBlocked(state.blockBlizzardEditMode)
 end
 
 local frame = CreateFrame('FRAME')
@@ -668,6 +724,19 @@ function Module:InitEditmodeOverride()
 
         EventRegistry:RegisterCallback('EditMode.Enter', function()
             if addonTable.ApplyingBlizzLayout then return end
+
+            -- CanEnterEditMode gates the ways a player gets in, but not
+            -- ShowUIPanel itself - Blizzard_DamageMeter calls that directly,
+            -- and so can any addon. Close it again rather than let it apply
+            -- its layout over ours. Hiding a panel is protected work, so in
+            -- combat we can only let it stand and repair afterwards.
+            if Module:IsBlizzEditmodeBlocked() and not Helper:IsCombatLocked() then
+                Module:Print("Blizzard's Edit Mode is turned off by DragonflightUI - use /editmode instead. " ..
+                                 'The setting is under EditMode options.')
+                HideUIPanel(EditModeManagerFrame)
+                C_Timer.After(0, ReapplyOwnedPositions)
+                return
+            end
 
             if Module.IsEditMode then
                 Module:Print("Blizzard's Edit Mode opened - closing Dragonflight edit mode so the two do not fight"
