@@ -518,7 +518,11 @@ function SubModuleMixin:SetupOptions()
                     if value then b = 1; end
                     addonTable:SetBlizzEditmodeFrameSetting(TargetFrame, Enum.EditModeUnitFrameSetting.BuffsOnTop, b);
                 end
-                if TargetFrame_UpdateAuras then TargetFrame_UpdateAuras(TargetFrame) end
+                -- Not TargetFrame_UpdateAuras directly: driving it from here
+                -- can make Blizzard create a TargetFrameDebuffN global inside
+                -- our tainted execution, which taints that global for the
+                -- session. See Helper:RefreshUnitAuras.
+                Helper:RefreshUnitAuras(TargetFrame)
             else
                 setOption(info, value)
             end

@@ -72,9 +72,18 @@ function frame:Update()
     SetCVarFunc('noBuffDebuffFilterOnTarget', AuraDurationsDB.noDebuffFilter)
     SetCVarFunc('showDynamicBuffSize', AuraDurationsDB.dynamicBuffSize)
 
-    if TargetFrame_UpdateAuras then TargetFrame_UpdateAuras(TargetFrame) end
-    if TargetFrame.UpdateAuras then TargetFrame:UpdateAuras() end
-    if FocusFrame and FocusFrame.UpdateAuras then FocusFrame:UpdateAuras() end
+    -- Driving Blizzard's aura update from here can make it create a
+    -- TargetFrameDebuffN / FocusFrameDebuffN global inside our tainted
+    -- execution, and that global stays tainted for the session - every later
+    -- UpdateAuras() then taints itself on the read. DFUI's Helper knows how to
+    -- tell when a refresh cannot create anything; embedded, we defer to it.
+    -- Standalone there is no such guard, so we do not force the refresh at all
+    -- and let the next UNIT_AURA do it, which the client does securely.
+    local Helper = addonTable and addonTable.Helper
+    if not (Helper and Helper.RefreshUnitAuras) then return end
+
+    Helper:RefreshUnitAuras(TargetFrame)
+    if FocusFrame then Helper:RefreshUnitAuras(FocusFrame) end
 end
 
 frame:SetScript("OnEvent", function(self, event, ...)

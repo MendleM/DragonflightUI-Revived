@@ -481,3 +481,83 @@ end
 --     end)
 -- end
 
+
+-- Blizzard builds the target/focus aura buttons lazily and BY NAME:
+-- TargetFrame.lua:542 does CreateFrame('Button', selfName..'Debuff'..i, ...)
+-- the first time a unit actually carries that many auras. Whichever execution
+-- happens to be on the stack at that moment owns the resulting global for the
+-- rest of the session, and if that execution is ours the global is tainted -
+-- so every later TargetFrame:UpdateAuras() taints itself the moment it reads
+-- the name back (TargetFrame.lua:539, :585, :742).
+--
+-- That is not theoretical: a taintLog run over a full addon set put DFUI second
+-- only to NovaWorldBuffs, with 23,708 events, all but a few hundred of them
+-- TargetFrameDebuffN. The counts fall away by index exactly as lazy creation
+-- predicts - Debuff1 constantly, Debuff6 rarely.
+--
+-- So a refresh driven from our code is only allowed when it cannot create
+-- anything: every button it might reach for has to exist already. When it
+-- cannot, we do nothing at all. The client refreshes on the next UNIT_AURA
+-- regardless, and it does so securely.
+
+-- Highest N for which <name><kind>1 .. <name><kind>N all exist.
+local function CountCreatedAuraFrames(name, kind, cap)
+    local created = 0
+    for i = 1, cap do
+        if not _G[name .. kind .. i] then break end
+        created = i
+    end
+    return created
+end
+
+local function CountAuras(unit, filterString, cap)
+    -- No way to count means no way to prove it is safe.
+    if not (AuraUtil and AuraUtil.ForEachAura) then return cap end
+
+    local count = 0
+    AuraUtil.ForEachAura(unit, filterString, cap, function()
+        count = count + 1
+        return count >= cap
+    end)
+    return count
+end
+
+function Helper:CanRefreshUnitAuras(frame)
+    if not (frame and frame.GetName and AuraUtil and AuraUtil.CreateFilterString and AuraUtil.AuraFilters) then
+        return false
+    end
+
+    local name = frame:GetName()
+    local unit = frame.unit
+    if not (name and unit) then return false end
+
+    -- Nothing on the unit means nothing to create, and nothing to redraw.
+    if not UnitExists(unit) then return false end
+
+    local maxDebuffs = frame.maxDebuffs or MAX_TARGET_DEBUFFS or 16
+    local maxBuffs = MAX_TARGET_BUFFS or 32
+
+    local harmful = AuraUtil.CreateFilterString(AuraUtil.AuraFilters.Harmful, AuraUtil.AuraFilters.IncludeNameplateOnly)
+    local helpful = AuraUtil.CreateFilterString(AuraUtil.AuraFilters.Helpful)
+
+    if CountAuras(unit, harmful, maxDebuffs) > CountCreatedAuraFrames(name, 'Debuff', maxDebuffs) then return false end
+    if CountAuras(unit, helpful, maxBuffs) > CountCreatedAuraFrames(name, 'Buff', maxBuffs) then return false end
+
+    return true
+end
+
+-- Drives frame:UpdateAuras() only when doing so cannot create a named aura
+-- button. Returns whether the refresh actually ran.
+function Helper:RefreshUnitAuras(frame)
+    if not Helper:CanRefreshUnitAuras(frame) then return false end
+
+    if frame.UpdateAuras then
+        frame:UpdateAuras()
+    elseif TargetFrame_UpdateAuras then
+        TargetFrame_UpdateAuras(frame)
+    else
+        return false
+    end
+
+    return true
+end
