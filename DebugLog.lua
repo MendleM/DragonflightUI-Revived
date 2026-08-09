@@ -34,9 +34,31 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log tot          every term of the client's target-of-target show
 --                          condition, plus the frame's own state, and a verdict
 --     /df log tot watch    toggle a watcher that logs each time that changes
+--     /df log party        every party/raid frame field that is tainted, and
+--                          the addon that dirtied it. issecurevariable sees
+--                          what taintLog cannot: taintLog records tainted
+--                          globals, and these are tainted fields on frames the
+--                          client owns. Run it after the party frames have
+--                          misbehaved - the taint is sticky, so it is still
+--                          there afterwards
+--     /df log fonts        every shared font object's height, flags and path,
+--                          plus the live text of a bag count, the chat box and a
+--                          character tab. For "text sits low in its box in
+--                          several addons at once", which is a font report and
+--                          not a layout one - font objects are global, so one
+--                          addon changing one changes it for everybody. Run it
+--                          with the suspect addon on and again with it off, and
+--                          diff
+--     /df log screen       the display and the UI panel budget computed from it:
+--                          UIParent's size in UI units, the panel offset
+--                          constants, GetMaxUIPanelsWidth and the two
+--                          CanShow...UIPanel tests. For "it only misbehaves on
+--                          this monitor" - run it on both and diff
 --     /df log watch [name] snapshot the frames that get re-anchored behind our
---                          back - keyring and bag slots, chat, micro menu - plus
---                          the friend counts. Run it, reproduce the problem, run
+--                          back - keyring and bag slots, chat, micro menu, the
+--                          managed action bars and unit frames, the character
+--                          pane itself - plus the friend counts and the screen
+--                          metrics above. Run it, reproduce the problem, run
 --                          it again: the second run reports only what moved,
 --                          names the frame it moved to, and opens the copy
 --                          window on it - no reload, no hunting for a file. An
@@ -567,7 +589,31 @@ local WATCH_GROUPS = {
         label = 'chat',
         frames = {'ChatFrame1', 'ChatFrame1Tab', 'ChatFrame1EditBox', 'GeneralDockManager',
                   'DragonflightUIChatFrame'}
-    }, {label = 'micromenu', frames = {'MicroMenuContainer', 'MicroMenu', 'SocialsMicroButton', 'QuickJoinToastButton'}}
+    }, {label = 'micromenu', frames = {'MicroMenuContainer', 'MicroMenu', 'SocialsMicroButton', 'QuickJoinToastButton'}},
+    -- Opening a UI panel runs the whole panel manager, and Classic's
+    -- UIParentPanelManagerOverrides re-anchors these five by name on every run
+    -- (its gate is IsShown() and IsInDefaultPosition()). Anything an addon has
+    -- hung off them travels with them, which is what "everything shifted and
+    -- came back when I closed it" looks like from the outside.
+    {
+        label = 'bars',
+        frames = {'MainMenuBar', 'MultiBarBottomLeft', 'MultiBarBottomRight', 'MultiBarLeft', 'MultiBarRight',
+                  'StanceBar', 'PetActionBar', 'PossessActionBar', 'MainMenuBarVehicleLeaveButton',
+                  'MainStatusTrackingBarContainer', 'SecondaryStatusTrackingBarContainer',
+                  'UIParentBottomManagedFrameContainer', 'UIParentRightManagedFrameContainer'}
+    }, {
+        label = 'units',
+        frames = {'PlayerFrame', 'TargetFrame', 'TargetFrameToT', 'PetFrame', 'FocusFrame', 'BuffFrame',
+                  'DebuffFrame', 'MinimapCluster', 'Minimap'}
+    }, {
+        -- The panel itself and the pieces DFUI adds to it: a shift that lives
+        -- inside the window is a different bug from a shift of the window.
+        label = 'panel',
+        frames = {'UIParent', 'CharacterFrame', 'PaperDollFrame', 'CharacterFrameInset',
+                  'DragonflightUICharacterFrameInset', 'DragonflightUICharacterFrameInsetRight',
+                  'CharacterModelFrame', 'PaperDollItemsFrame', 'CharacterFrameTab1', 'CharacterFrameTab2',
+                  'DressUpFrame', 'DressUpModel', 'AuctionFrame'}
+    }
 }
 
 -- Everything about a frame that a re-anchor would change. Points are the point
@@ -588,8 +634,15 @@ local function SnapshotFrame(f)
         points = {}
     }
 
+    -- Positions in UIParent's coordinates, not the frame's own. GetLeft returns
+    -- a number in the frame's own space, so two frames at different effective
+    -- scales report positions that cannot be compared with each other - a bag
+    -- slot at "1216" and the button it is anchored to at "839" look like a bug
+    -- and are not one. Scaling both to UIParent makes the numbers mean the same
+    -- thing, and makes a scale change show up as the shift it actually is.
     local left, bottom = f:GetLeft(), f:GetBottom()
-    snap.pos = (left and bottom) and string.format('%.0f,%.0f', left, bottom) or 'unplaced'
+    local k = ((f.GetEffectiveScale and f:GetEffectiveScale()) or 1) / UIParent:GetEffectiveScale()
+    snap.pos = (left and bottom) and string.format('%.0f,%.0f', left * k, bottom * k) or 'unplaced'
 
     for i = 1, ((f.GetNumPoints and f:GetNumPoints()) or 0) do
         local point, relativeTo, relativePoint, x, y = f:GetPoint(i)
@@ -657,14 +710,232 @@ local function LogFriendFacts(tag)
     DF:Log(tag, 'friend counts: %s', (#parts > 0 and table.concat(parts, ' ')) or 'no API available')
 end
 
+-- /df log fonts - the shared font objects, and the live text that uses them.
+--
+-- "Text sits low inside its box, in frames belonging to addons that have
+-- nothing to do with each other" is not a layout report, it is a font report.
+-- Every one of those fontstrings is anchored to a point and grows from it, so
+-- if the height behind the font object changes, text overflows its container
+-- and appears to have moved - in every addon at once, without anything being
+-- re-anchored. That is the one mechanism that explains a symptom crossing addon
+-- boundaries while a full frame-position sweep reports nothing moved.
+--
+-- Font objects are global and shared, so whoever changes one changes it for
+-- everybody. Run this with the suspect addon on and again with it off: any line
+-- that differs names the culprit's effect directly.
+--
+-- The live fontstrings at the end are the three the reports actually name - a
+-- bag stack count, the chat edit box, a character tab. A fontstring can carry
+-- its own font instead of a font object's, so the object being clean does not
+-- prove the text is.
+function DF:LogFonts(tag)
+    tag = tag or 'fonts'
+
+    local function describeFont(label, obj)
+        if type(obj) ~= 'table' or not obj.GetFont then
+            DF:Log(tag, '%s: absent', label)
+            return
+        end
+
+        local ok, path, height, flags = pcall(obj.GetFont, obj)
+        if not ok then
+            DF:Log(tag, '%s: GetFont failed', label)
+            return
+        end
+
+        local extra = {}
+        if obj.GetSpacing then
+            local okS, spacing = pcall(obj.GetSpacing, obj)
+            if okS and spacing and spacing ~= 0 then extra[#extra + 1] = 'spacing=' .. tostring(spacing) end
+        end
+        if obj.GetShadowOffset then
+            local okO, sx, sy = pcall(obj.GetShadowOffset, obj)
+            if okO and sx and (sx ~= 0 or sy ~= 0) then
+                extra[#extra + 1] = string.format('shadow=%.1f,%.1f', sx, sy or 0)
+            end
+        end
+        if obj.GetJustifyV then
+            local okJ, jv = pcall(obj.GetJustifyV, obj)
+            if okJ and jv then extra[#extra + 1] = 'justifyV=' .. tostring(jv) end
+        end
+
+        -- The path is the long half and the least interesting when it has not
+        -- changed, so it goes last.
+        DF:Log(tag, '%s: height=%s flags=%s %s | %s', label, tostring(height), tostring(flags),
+               table.concat(extra, ' '), tostring(path))
+    end
+
+    -- The globals that carry a font path around as a plain string. An addon
+    -- reassigning one of these changes every later SetFont that reads it.
+    for _, name in ipairs({'STANDARD_TEXT_FONT', 'UNIT_NAME_FONT', 'DAMAGE_TEXT_FONT', 'NAMEPLATE_FONT'}) do
+        DF:Log(tag, 'global %s = %s', name, tostring(_G[name]))
+    end
+
+    -- Chosen for what the reports name: tab labels and most panel text are the
+    -- GameFont family, item stack counts are NumberFont, the chat box is
+    -- ChatFontNormal.
+    for _, name in ipairs({'GameFontNormal', 'GameFontNormalSmall', 'GameFontNormalLarge', 'GameFontHighlight',
+                           'GameFontHighlightSmall', 'NumberFontNormal', 'NumberFontNormalSmall',
+                           'NumberFontNormalLarge', 'NumberFontNormalYellow', 'ChatFontNormal', 'QuestFont',
+                           'SystemFont_Shadow_Med1', 'GameTooltipText', 'ItemTextFontNormal'}) do
+        describeFont('object ' .. name, _G[name])
+    end
+
+    -- And the live text, which is what is actually on screen.
+    local live = {
+        {'bag slot count', ContainerFrame1 and _G['ContainerFrame1Item1'] and _G['ContainerFrame1Item1'].Count},
+        {'chat edit box', _G['ChatFrame1EditBox']},
+        {'character tab 1', _G['CharacterFrameTab1'] and (_G['CharacterFrameTab1'].Text or _G['CharacterFrameTab1Text'])},
+        {'action button 1 count', _G['ActionButton1'] and _G['ActionButton1'].Count}
+    }
+    for _, entry in ipairs(live) do
+        local label, obj = entry[1], entry[2]
+        if obj then
+            describeFont('live ' .. label, obj)
+            if obj.GetNumPoints then
+                for i = 1, (obj:GetNumPoints() or 0) do
+                    local point, relativeTo, relativePoint, x, y = obj:GetPoint(i)
+                    DF:Log(tag, '   %s point%d: %s -> %s %s (%.1f,%.1f)', label, i, tostring(point),
+                           (relativeTo and relativeTo.GetName and (relativeTo:GetName() or '<anon>')) or
+                               tostring(relativeTo), tostring(relativePoint), x or 0, y or 0)
+                end
+            end
+            if obj.GetHeight then
+                DF:Log(tag, '   %s box: %.1fx%.1f', label, obj:GetWidth() or -1, obj:GetHeight() or -1)
+            end
+        else
+            DF:Log(tag, 'live %s: not present (open it first)', label)
+        end
+    end
+end
+
+-- /df log screen - the numbers the UI panel layout is computed from.
+--
+-- "It only does this on my laptop" is a claim about one thing: the size of
+-- UIParent in UI units. The client's panel budget is a set of fixed constants
+-- (LEFT_OFFSET, DEFAULT_FRAME_WIDTH, RIGHT_OFFSET_BUFFER) measured against
+-- UIParent:GetRight(), and that is the only term in the whole calculation that
+-- changes with the display. A 16:10 laptop panel is ~180 UI units narrower than
+-- a 16:9 monitor at the same height, so a panel arrangement that fits on one
+-- can fail CanShowRightUIPanel/CanShowCenterUIPanel on the other - and a panel
+-- that cannot be shown where it belongs makes the manager close or re-place
+-- other panels instead, on every open and again on every close.
+--
+-- So this dumps both halves: what the display is, and what the panel manager
+-- currently thinks it can afford. Run it on both machines and diff.
+function DF:LogScreen(tag)
+    tag = tag or 'screen'
+
+    local function num(v) return type(v) == 'number' and string.format('%.1f', v) or tostring(v) end
+
+    -- Blizzard's own GetUIPanelAttribute is a local in
+    -- Blizzard_UIParentPanelManager and cannot be called from here. This is the
+    -- reading half of it: the live attribute if the frame has been defined,
+    -- otherwise the UIPanelWindows entry it would have been defined from. The
+    -- writing half is deliberately not reproduced - stamping UIPanelLayout
+    -- attributes onto a Blizzard panel from addon code is how that panel's
+    -- placement ends up tainted.
+    local function panelAttr(frame, name)
+        local live = frame:GetAttribute('UIPanelLayout-' .. name)
+        if live ~= nil then return live end
+        local entry = UIPanelWindows and frame.GetName and frame:GetName() and UIPanelWindows[frame:GetName()]
+        return entry and entry[name]
+    end
+
+    local w, h = GetScreenWidth(), GetScreenHeight()
+    DF:Log(tag, 'screen: %s x %s UI units (aspect %.3f)', num(w), num(h), (h and h ~= 0) and (w / h) or 0)
+
+    if GetPhysicalScreenSize then
+        local pw, ph = GetPhysicalScreenSize()
+        DF:Log(tag, 'physical: %s x %s px', num(pw), num(ph))
+    end
+
+    DF:Log(tag, 'UIParent: size %sx%s scale %.4f effective %.4f right %s top %s', num(UIParent:GetWidth()),
+           num(UIParent:GetHeight()), UIParent:GetScale(), UIParent:GetEffectiveScale(), num(UIParent:GetRight()),
+           num(UIParent:GetTop()))
+
+    if GetCVar then
+        DF:Log(tag, 'cvars: uiScale=%s useUiScale=%s gxMaximize=%s gxWindow=%s', tostring(GetCVar('uiScale')),
+               tostring(GetCVar('useUiScale')), tostring(GetCVar('gxMaximize')), tostring(GetCVar('gxWindow')))
+    end
+
+    -- The constants, read from UIParent rather than hardcoded here: they are
+    -- per-flavour XML attributes and this addon runs on several.
+    local attrs = {}
+    for _, key in ipairs({'TOP_OFFSET', 'LEFT_OFFSET', 'CENTER_OFFSET', 'RIGHT_OFFSET', 'RIGHT_OFFSET_BUFFER',
+                          'DEFAULT_FRAME_WIDTH', 'PANEl_SPACING_X'}) do
+        attrs[#attrs + 1] = key .. '=' .. tostring(UIParent:GetAttribute(key))
+    end
+    DF:Log(tag, 'panel budget: %s', table.concat(attrs, ' '))
+
+    local maxWidth = GetMaxUIPanelsWidth and GetMaxUIPanelsWidth()
+    DF:Log(tag, 'GetMaxUIPanelsWidth: %s (UIParent right %s minus buffer)', num(maxWidth), num(UIParent:GetRight()))
+
+    -- What is open, and how wide the manager thinks each one is. GetUIPanelWidth
+    -- reads the UIPanelLayout-width attribute in preference to the real width,
+    -- so a window that resizes itself - the character pane does, per tab - is
+    -- budgeted at whatever it last declared, not at what it looks like.
+    for _, key in ipairs({'left', 'center', 'right', 'doublewide', 'fullscreen'}) do
+        local frame = GetUIPanel and GetUIPanel(key)
+        if frame then
+            local name = (frame.GetName and frame:GetName()) or '<anon>'
+            DF:Log(tag, 'panel %s: %s real %s wide, declared %s, scale %.2f, xoffset %s, area %s', key, name,
+                   num(frame:GetWidth()), tostring(panelAttr(frame, 'width')), frame:GetScale(),
+                   tostring(panelAttr(frame, 'xoffset')), tostring(panelAttr(frame, 'area')))
+        else
+            DF:Log(tag, 'panel %s: -', key)
+        end
+    end
+
+    -- The two tests that decide whether the manager places a panel or starts
+    -- evicting other ones. Asked about a default-width panel, because that is
+    -- the question the manager asks when it has no frame yet.
+    if CanShowCenterUIPanel then
+        DF:Log(tag, 'CanShowCenterUIPanel(default): %s', tostring(CanShowCenterUIPanel(nil)))
+    end
+    if CanShowRightUIPanel then
+        DF:Log(tag, 'CanShowRightUIPanel(default): %s', tostring(CanShowRightUIPanel(nil)))
+    end
+end
+
 local watchBaseline
 
 function DF:LogWatch(extraName)
     local tag = 'watch'
     local taking = {}
+    local seenName = {}
 
     for _, group in ipairs(WATCH_GROUPS) do
-        for _, name in ipairs(group.frames) do taking[#taking + 1] = {label = group.label, name = name} end
+        for _, name in ipairs(group.frames) do
+            if not seenName[name] then
+                seenName[name] = true
+                taking[#taking + 1] = {label = group.label, name = name}
+            end
+        end
+    end
+
+    -- Then every named frame parented to UIParent, whoever created it.
+    --
+    -- A named list only finds what it was told to look for, and "my whole UI
+    -- shifts, in several addons at once, and shifts back" is a report about
+    -- frames this addon has never heard of. Sweeping UIParent's children costs
+    -- nothing to snapshot and catches all of them; they are marked quiet so the
+    -- baseline stays readable, and they only ever appear in the diff - which is
+    -- the half that answers the question.
+    --
+    -- Forbidden frames are skipped rather than guarded: touching one from addon
+    -- code raises, and the panel manager's own delegate is exactly such a frame.
+    local swept = 0
+    for _, child in ipairs({UIParent:GetChildren()}) do
+        local ok, forbidden = pcall(function() return child.IsForbidden and child:IsForbidden() end)
+        if ok and not forbidden then
+            local name = child.GetName and child:GetName()
+            if name and not seenName[name] then
+                seenName[name] = true
+                taking[#taking + 1] = {label = 'sweep', name = name, frame = child, quiet = true}
+                swept = swept + 1
+            end
+        end
     end
 
     -- An extra frame for whatever the report is about that this list does not
@@ -683,6 +954,11 @@ function DF:LogWatch(extraName)
 
     LogFriendFacts(tag)
 
+    -- Under the same tag, so the copy window carries it: half of what moves a
+    -- frame behind our back is the panel manager, and what the panel manager
+    -- does depends entirely on how wide this display is.
+    DF:LogScreen(tag)
+
     if not watchBaseline then
         watchBaseline = snapshot
 
@@ -691,15 +967,17 @@ function DF:LogWatch(extraName)
             local key = entry.label .. '/' .. entry.name
             if snapshot[key] then
                 present = present + 1
-                DF:Log(tag, 'baseline %s: %s | %s | shown=%s parent=%s', key, snapshot[key].pos, snapshot[key].size,
-                       snapshot[key].shown, snapshot[key].parent)
-                for i, p in ipairs(snapshot[key].points) do DF:Log(tag, '   point%d %s', i, p) end
-            else
+                if not entry.quiet then
+                    DF:Log(tag, 'baseline %s: %s | %s | shown=%s parent=%s', key, snapshot[key].pos,
+                           snapshot[key].size, snapshot[key].shown, snapshot[key].parent)
+                    for i, p in ipairs(snapshot[key].points) do DF:Log(tag, '   point%d %s', i, p) end
+                end
+            elseif not entry.quiet then
                 absent[#absent + 1] = entry.name
             end
         end
 
-        DF:Log(tag, 'baseline taken: %d frames, %d absent (%s)', present, #absent,
+        DF:Log(tag, 'baseline taken: %d frames (%d swept from UIParent), %d absent (%s)', present, swept, #absent,
                (#absent > 0 and table.concat(absent, ', ')) or 'none')
         -- No window on this run: there is nothing to report yet, and popping one
         -- up before the problem has been reproduced invites sending it early.
@@ -912,6 +1190,71 @@ function DF:LogClear()
     print(PREFIX .. 'cleared')
 end
 
+-- Party frames refusing Show/Hide/SetAttribute/SetSize when a group member logs
+-- in or out, in combat, with DragonflightUI named as the taint source. taintLog
+-- cannot answer this one: it records tainted GLOBALS, and these are tainted
+-- FIELDS on frames the client owns, so the blocked stack comes back pure
+-- Blizzard with nothing naming the origin.
+--
+-- issecurevariable can see what taintLog cannot. Its second return is the addon
+-- that dirtied the field, so walking the party frames and their interesting
+-- fields turns "something tainted this" into a name and a key.
+local PARTY_TAINT_FIELDS = {
+    'unit', 'isLootObject', 'displayedUnit', 'inVehicle', 'optionTable', 'layoutIndex', 'maxBuffs', 'maxDebuffs',
+    'showBuffs', 'showDebuffs', 'shouldShow'
+}
+
+local function LogFrameTaint(tag, name)
+    local frame = _G[name]
+    if not frame then
+        DF:Log(tag, '%s absent', name)
+        return
+    end
+
+    -- The frame's own entry in _G: dirty here means something replaced or
+    -- created the global itself, which is the worst case.
+    local ok, who = issecurevariable(name)
+    if not ok then DF:Log(tag, '%s GLOBAL insecure, tainted by %s', name, tostring(who or '?')) end
+
+    local dirty = 0
+    for _, key in ipairs(PARTY_TAINT_FIELDS) do
+        if rawget(frame, key) ~= nil then
+            local fieldOk, fieldWho = issecurevariable(frame, key)
+            if not fieldOk then
+                dirty = dirty + 1
+                DF:Log(tag, '%s.%s insecure, tainted by %s', name, key, tostring(fieldWho or '?'))
+            end
+        end
+    end
+
+    if dirty == 0 and ok then DF:Log(tag, '%s clean', name) end
+end
+
+-- /df log party - names whoever tainted the party frames. Run it once the
+-- frames have misbehaved; the taint is sticky, so it is still there afterwards.
+function DF:LogPartyTaint(tag)
+    tag = tag or 'party'
+
+    DF:Log(tag, 'combat=%s group=%d raidstyle=%s', tostring(InCombatLockdown()), GetNumGroupMembers and
+               GetNumGroupMembers() or -1, tostring(EditModeManagerFrame and EditModeManagerFrame.UseRaidStylePartyFrames
+                                                        and EditModeManagerFrame:UseRaidStylePartyFrames()))
+
+    LogFrameTaint(tag, 'PartyFrame')
+    LogFrameTaint(tag, 'CompactPartyFrame')
+
+    for i = 1, 5 do
+        LogFrameTaint(tag, 'CompactPartyFrameMember' .. i)
+        LogFrameTaint(tag, 'PartyMemberFrame' .. i)
+    end
+
+    -- The two calls both ShouldShow paths run through. If reading these taints
+    -- us, that is the shared seed the blocked stacks never showed.
+    if EditModeManagerFrame then
+        local ok, who = issecurevariable(EditModeManagerFrame, 'accountSettings')
+        if not ok then DF:Log(tag, 'EditModeManagerFrame.accountSettings insecure, tainted by %s', tostring(who or '?')) end
+    end
+end
+
 -- Returns true when the input was a log command and has been handled.
 function DF:HandleLogCommand(rest)
     rest = rest or ''
@@ -957,6 +1300,12 @@ function DF:HandleLogCommand(rest)
         else
             DF:LogWatch(arg)
         end
+    elseif sub == 'screen' then
+        DF:LogScreen('screen')
+        DF:LogDump('screen', 40)
+    elseif sub == 'fonts' then
+        DF:LogFonts('fonts')
+        DF:LogCopy('fonts')
     elseif sub == 'blockers' then
         DF:LogBlockers(arg ~= '' and arg or nil, 'blockers')
         DF:LogDump('blockers', 60)
@@ -967,6 +1316,9 @@ function DF:HandleLogCommand(rest)
             DF:LogToT('totdump')
             DF:LogDump('totdump', 40)
         end
+    elseif sub == 'party' then
+        DF:LogPartyTaint('party')
+        DF:LogDump('party', 80)
     else
         DF:LogDump(rest, 60)
     end
