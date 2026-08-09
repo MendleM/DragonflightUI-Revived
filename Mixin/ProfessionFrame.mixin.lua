@@ -109,6 +109,45 @@ function DFProfessionMixin:OnLoad()
 
     -- blizzmove
     self:AddBlizzMoveSupport();
+
+    self:SuppressBlizzardFrames()
+
+    -- The Show() above is load-time setup, not a request to be on screen: some
+    -- of what Refresh and the tab layout measure only settles once the frame has
+    -- been shown. This frame is created at login, so leaving it shown put an
+    -- empty profession window on screen at every login - tabs filled in, but the
+    -- title still reading "tmp" and the reagents still "*Reagent1*", because
+    -- Refresh returns before UpdateHeader when no profession is open.
+    --
+    -- ShouldShow is the only thing that should decide this, and nothing has
+    -- rendered between the Show and here.
+    self:Hide()
+end
+
+-- Blizzard's own window stays open underneath ours the whole time: it is a UI
+-- panel, closing it closes the profession (TradeSkillFrame's OnHide calls
+-- CloseTradeSkill), and this addon needs it for its panel-layout width. So it
+-- is made invisible rather than hidden.
+--
+-- This used to happen only inside the BlizzMove compatibility callback, which
+-- runs only when BlizzMove is installed. Without it, both windows were on
+-- screen: ours sits at TradeSkillFrame's TOPLEFT + (12,-12) and covered most of
+-- Blizzard's, so it read as a border round the wrong edges - and once ours can
+-- be dragged, it stops covering it at all.
+--
+-- Mouse off with it, so the invisible window does not eat clicks where ours no
+-- longer is. Its buttons are children and keep their own mouse, which only
+-- matters once ours has been dragged clear of them.
+function DFProfessionMixin:SuppressBlizzardFrames()
+    -- By name, not by value: CraftFrame does not exist on every flavour, and a
+    -- nil in the middle of a list would end the loop at it.
+    for _, name in ipairs({'TradeSkillFrame', 'CraftFrame'}) do
+        local frame = _G[name]
+        if frame and frame.SetAlpha then
+            frame:SetAlpha(0)
+            if frame.EnableMouse then frame:EnableMouse(false) end
+        end
+    end
 end
 
 -- The template is movable but nothing ever started a drag, so the window could
@@ -178,6 +217,10 @@ function DFProfessionMixin:ShouldShow(should)
     -- print('~~~~~ should show', should)
     if should then
         self:Show()
+
+        -- Again here, not only at load: on flavours where the profession addons
+        -- load late, the frame we want to quiet may not have existed yet.
+        self:SuppressBlizzardFrames()
 
         if self.TradeSkillOpen then
             if not self:RestorePosition() then
@@ -556,9 +599,6 @@ function DFProfessionMixin:AddBlizzMoveSupport()
         if not BlizzMoveAPI or not BlizzMoveAPI.RegisterAddOnFrames then return end
 
         local data = {['DragonflightUI'] = {['DragonflightUIProfessionFrame'] = {}}}
-
-        if TradeSkillFrame then TradeSkillFrame:SetAlpha(0); end
-        if CraftFrame then CraftFrame:SetAlpha(0); end
 
         BlizzMoveAPI:RegisterAddOnFrames(data)
 
