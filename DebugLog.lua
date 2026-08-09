@@ -1239,8 +1239,39 @@ function DF:LogPartyTaint(tag)
                GetNumGroupMembers() or -1, tostring(EditModeManagerFrame and EditModeManagerFrame.UseRaidStylePartyFrames
                                                         and EditModeManagerFrame:UseRaidStylePartyFrames()))
 
+    -- The parent chain, which is the half a taint dump does not show.
+    --
+    -- PartyFrame is protected and we reparent it onto a holder of our own. That
+    -- holder has to be protected too: hanging a protected frame off an
+    -- unprotected one is what makes the client refuse its own Show/Hide and
+    -- SetAttribute on the pooled members. So report what the parent actually is,
+    -- not just whether anything is tainted - "parent protected=false" is the
+    -- whole bug in one line, and it is invisible to issecurevariable.
+    if PartyFrame then
+        local parent = PartyFrame:GetParent()
+        local parentName = (parent and parent.GetName and (parent:GetName() or '<anon>')) or 'none'
+        local parentProtected = parent and parent.IsProtected and parent:IsProtected()
+
+        DF:Log(tag, 'PartyFrame: parent=%s parent protected=%s, self protected=%s, shown=%s', parentName,
+               tostring(parentProtected), tostring(PartyFrame.IsProtected and PartyFrame:IsProtected()),
+               tostring(PartyFrame:IsShown()))
+    end
+
+    -- The pooled members, which have no global names to walk.
+    if PartyFrame and PartyFrame.PartyMemberFramePool then
+        local n = 0
+        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            n = n + 1
+            DF:Log(tag, 'pooled member %d: unit=%s shown=%s protected=%s parent=%s', n, tostring(pf.unit),
+                   tostring(pf:IsShown()), tostring(pf.IsProtected and pf:IsProtected()),
+                   (pf:GetParent() and pf:GetParent():GetName()) or '<anon>')
+        end
+        DF:Log(tag, 'pooled members active: %d (group has %d)', n, GetNumGroupMembers and GetNumGroupMembers() or -1)
+    end
+
     LogFrameTaint(tag, 'PartyFrame')
     LogFrameTaint(tag, 'CompactPartyFrame')
+    LogFrameTaint(tag, 'DragonflightUIPartyMoveFrame')
 
     for i = 1, 5 do
         LogFrameTaint(tag, 'CompactPartyFrameMember' .. i)

@@ -408,6 +408,43 @@ function SubModuleMixin:SetupOptions()
     self.OptionsEditmode = optionsPartyEditmode;
 end
 
+-- The holder the party frames get reparented onto.
+--
+-- SecureFrameTemplate,SecureHandlerEnterLeaveTemplate - the same pair the
+-- player, pet, target, focus and ToT holders inherit in Load.xml, and the thing
+-- this one was missing: it was a bare Frame.
+--
+-- PartyFrame is protected and its member frames are pooled children of it.
+-- Reparenting a protected frame onto an unprotected one leaves the client
+-- holding a protected frame whose parent chain an addon owns, and its own
+-- Show/Hide/SetAttribute on those members start coming back refused - the
+-- "Interface action failed because of an AddOn" message, members that do not
+-- appear, a party that collapses to one member on a pull. Every other unit
+-- frame in this addon is reparented exactly the same way onto a secure holder,
+-- and none of them have this problem; party was the one exception.
+--
+-- It is also why the reports were worse in the open world than in dungeons:
+-- this is the party-style PartyFrame, and raid-style CompactPartyFrame - what a
+-- five-man is more often on - is never reparented by this code at all.
+--
+-- Mouse explicitly off. On these clients a frame inheriting those templates
+-- comes up mouse-enabled, and a UIParent-parented holder sitting over the party
+-- frames' spot would swallow clicks meant for the world. Same lesson as the
+-- unit frame holders.
+function SubModuleMixin:EnsurePartyMoveFrame()
+    if self.PartyMoveFrame then return self.PartyMoveFrame end
+
+    local moveFrame = CreateFrame('Frame', 'DragonflightUIPartyMoveFrame', UIParent,
+                                  'SecureFrameTemplate,SecureHandlerEnterLeaveTemplate')
+    moveFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
+    moveFrame:SetFrameStrata('LOW')
+    moveFrame:SetFrameLevel(2)
+    moveFrame:EnableMouse(false)
+    self.PartyMoveFrame = moveFrame
+
+    return moveFrame
+end
+
 -- era-1159: DF-restyle for the pooled modern party member frames. Mirrors
 -- the geometry of the classic reskin above (frame 120x53, DF border art,
 -- health 71x10 @ 44,-19, mana 74x7 @ 41,-30) using the parentKeys the
@@ -422,14 +459,7 @@ function SubModuleMixin:SetupModern()
     -- anchor settings did nothing at all on 1.15.9 - only the classic path
     -- had a move frame. Give the modern path the same one, and keep Blizzard
     -- from wandering off it.
-    if not self.PartyMoveFrame then
-        local moveFrame = CreateFrame('Frame', 'DragonflightUIPartyMoveFrame', UIParent)
-        moveFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
-        moveFrame:SetFrameStrata('LOW')
-        moveFrame:SetFrameLevel(2)
-        moveFrame:SetSize(120, 53 * 4 + 3 * 10)
-        self.PartyMoveFrame = moveFrame
-    end
+    self:EnsurePartyMoveFrame():SetSize(120, 53 * 4 + 3 * 10)
 
     -- Put PartyFrame back on our move frame, out of combat only.
     --
@@ -978,14 +1008,7 @@ function SubModuleMixin:Update()
 end
 
 function SubModuleMixin:ChangePartyFrame()
-    local PartyMoveFrame = self.PartyMoveFrame
-    if not PartyMoveFrame then
-        PartyMoveFrame = CreateFrame('Frame', 'DragonflightUIPartyMoveFrame', UIParent)
-        PartyMoveFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
-        PartyMoveFrame:SetFrameStrata('LOW')
-        PartyMoveFrame:SetFrameLevel(2)
-        self.PartyMoveFrame = PartyMoveFrame
-    end
+    local PartyMoveFrame = self:EnsurePartyMoveFrame()
 
     local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
     local gap = 10;
