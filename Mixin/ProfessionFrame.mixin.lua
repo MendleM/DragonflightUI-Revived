@@ -105,8 +105,67 @@ function DFProfessionMixin:OnLoad()
         self:ResetFilter()
     end)
 
+    self:SetupDrag()
+
     -- blizzmove
     self:AddBlizzMoveSupport();
+end
+
+-- The template is movable but nothing ever started a drag, so the window could
+-- only be moved by installing BlizzMove. Drag by the header only: the close and
+-- minimize buttons consume their own clicks, and dragging from the body would
+-- fight the recipe list.
+local HEADER_HEIGHT = 32
+
+function DFProfessionMixin:SetupDrag()
+    self.frameDB = DF.db:RegisterNamespace('ProfessionFrame', {profile = {position = {}}})
+
+    self:SetMovable(true)
+    self:EnableMouse(true)
+    self:SetClampedToScreen(true)
+    self:RegisterForDrag('LeftButton')
+    self:SetScript('OnDragStart', function(frame)
+        if frame.BlizzMoveOwnsDrag then return end
+
+        local _, cursorY = GetCursorPosition()
+        local scale = frame:GetEffectiveScale()
+        local top = frame:GetTop()
+        if top and scale and scale > 0 and (top - (cursorY / scale)) <= HEADER_HEIGHT then
+            frame:StartMoving()
+            frame.DFIsMoving = true
+        end
+    end)
+    self:SetScript('OnDragStop', function(frame)
+        if not frame.DFIsMoving then return end
+
+        frame.DFIsMoving = nil
+        frame:StopMovingOrSizing()
+        frame:SavePosition()
+    end)
+end
+
+function DFProfessionMixin:SavePosition()
+    if not self.frameDB then return end
+
+    local point, _, relativePoint, x, y = self:GetPoint(1)
+    if not point then return end
+
+    -- A drag leaves the frame anchored to UIParent, so only the offsets matter.
+    self.frameDB.profile.position = {point = point, relativePoint = relativePoint, x = x, y = y}
+end
+
+-- Anchors the window where the player left it, or over the Blizzard frame it
+-- replaces if it has never been moved. Returns false when the default anchor
+-- still applies.
+function DFProfessionMixin:RestorePosition()
+    if self.BlizzMoveOwnsDrag then return false end
+
+    local pos = self.frameDB and self.frameDB.profile.position
+    if not pos or not pos.point then return false end
+
+    self:ClearAllPoints()
+    self:SetPoint(pos.point, UIParent, pos.relativePoint or pos.point, pos.x or 0, pos.y or 0)
+    return true
 end
 
 function DFProfessionMixin:OnShow()
@@ -121,16 +180,20 @@ function DFProfessionMixin:ShouldShow(should)
         self:Show()
 
         if self.TradeSkillOpen then
-            self:ClearAllPoints()
-            self:SetPoint('TOPLEFT', TradeSkillFrame, 'TOPLEFT', 12, -12)
+            if not self:RestorePosition() then
+                self:ClearAllPoints()
+                self:SetPoint('TOPLEFT', TradeSkillFrame, 'TOPLEFT', 12, -12)
+            end
 
             TradeSkillFrame:SetFrameStrata('BACKGROUND')
             self:SetFrameStrata('MEDIUM')
 
             self:UpdateUIPanelWindows(not self.minimized)
         elseif self.CraftOpen then
-            self:ClearAllPoints()
-            self:SetPoint('TOPLEFT', CraftFrame, 'TOPLEFT', 12, -12)
+            if not self:RestorePosition() then
+                self:ClearAllPoints()
+                self:SetPoint('TOPLEFT', CraftFrame, 'TOPLEFT', 12, -12)
+            end
 
             CraftFrame:SetFrameStrata('BACKGROUND')
             self:SetFrameStrata('MEDIUM')
@@ -498,6 +561,12 @@ function DFProfessionMixin:AddBlizzMoveSupport()
         if CraftFrame then CraftFrame:SetAlpha(0); end
 
         BlizzMoveAPI:RegisterAddOnFrames(data)
+
+        -- BlizzMove keeps its own position for the frames it owns; stand our
+        -- drag handling down rather than have the two fight over the anchor.
+        self.BlizzMoveOwnsDrag = true
+        self:SetScript('OnDragStart', nil)
+        self:SetScript('OnDragStop', nil)
     end)
 end
 
