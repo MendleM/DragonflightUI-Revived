@@ -1278,11 +1278,32 @@ function DF:LogPartyTaint(tag)
         LogFrameTaint(tag, 'PartyMemberFrame' .. i)
     end
 
-    -- The two calls both ShouldShow paths run through. If reading these taints
-    -- us, that is the shared seed the blocked stacks never showed.
+    -- The shared seed, and the reason to look here at all.
+    --
+    -- Blocked actions turn up on BOTH party systems - PartyFrame and
+    -- CompactPartyFrame - with stacks that are pure Blizzard and name no addon
+    -- file. Whatever taints them is therefore upstream of both, and the one term
+    -- both ShouldShow paths run through is
+    -- EditModeManagerFrame:UseRaidStylePartyFrames(), which reads the Edit Mode
+    -- layout. This addon writes that layout through LibEditModeOverride on every
+    -- OverrideBlizzEditmode and SetBlizzEditmodeFrameSetting.
+    --
+    -- taintLog cannot see any of this: it records tainted globals, and these are
+    -- fields. That is why this was once "ruled out" and should not have been.
     if EditModeManagerFrame then
-        local ok, who = issecurevariable(EditModeManagerFrame, 'accountSettings')
-        if not ok then DF:Log(tag, 'EditModeManagerFrame.accountSettings insecure, tainted by %s', tostring(who or '?')) end
+        for _, key in ipairs({'accountSettings', 'layoutInfo', 'activeLayout', 'savedLayouts', 'registeredSystemFrames'}) do
+            if rawget(EditModeManagerFrame, key) ~= nil then
+                local ok, who = issecurevariable(EditModeManagerFrame, key)
+                DF:Log(tag, 'EditModeManagerFrame.%s: %s%s', key, ok and 'clean' or 'INSECURE',
+                       ok and '' or (', tainted by ' .. tostring(who or '?')))
+            end
+        end
+
+        -- The call itself, which is what ShouldShow actually asks.
+        if EditModeManagerFrame.UseRaidStylePartyFrames then
+            local ok, value = pcall(EditModeManagerFrame.UseRaidStylePartyFrames, EditModeManagerFrame)
+            DF:Log(tag, 'UseRaidStylePartyFrames() -> %s (call ok=%s)', tostring(value), tostring(ok))
+        end
     end
 end
 
@@ -1349,7 +1370,10 @@ function DF:HandleLogCommand(rest)
         end
     elseif sub == 'party' then
         DF:LogPartyTaint('party')
-        DF:LogDump('party', 80)
+        -- Copy window rather than a chat dump: this one is read by somebody
+        -- other than the player running it, and 80 lines of chat cannot be
+        -- pasted anywhere useful.
+        DF:LogCopy('party')
     else
         DF:LogDump(rest, 60)
     end
