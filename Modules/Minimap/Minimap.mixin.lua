@@ -500,14 +500,20 @@ function SubModuleMixin:Update()
             end
 
             -- 140
+            -- The CVar is written for the client's own benefit, but it is not
+            -- what makes the clock go away: showMinimapClock is read by
+            -- TimeManager when it initialises, and writing it afterwards moves
+            -- nothing. So show and hide the button too - the two lines that were
+            -- commented out here, which is why this setting never held.
             local clockSpace;
+            local clock = _G['TimeManagerClockButton']
             if state.hideClock then
-                -- _G['TimeManagerClockButton']:Hide();
                 C_CVar.SetCVar('showMinimapClock', 0)
+                if clock then clock:Hide() end
                 clockSpace = 0;
             else
-                -- _G['TimeManagerClockButton']:Show();
                 C_CVar.SetCVar('showMinimapClock', 1)
+                if clock then clock:Show() end
                 clockSpace = 40;
             end
             -- _G['MinimapZoneTextButton']:SetWidth(140 - 4 - clockSpace - 4)
@@ -683,6 +689,20 @@ function SubModuleMixin:ChangeClock()
 
     btn:HookScript('OnEnter', function()
         TimeManagerClockButton_UpdateTooltip()
+    end)
+
+    -- Hiding it once does not hold. Blizzard shows this button from its own
+    -- code, after we have run: TimeManager reads showMinimapClock when it
+    -- initialises and shows the button accordingly, and a reload puts our hide
+    -- before that rather than after it. The setting was saved correctly the
+    -- whole time - the checkbox stayed ticked and the clock came back anyway -
+    -- and toggling the option off and on only appeared to fix it because that
+    -- ran the hide again, late enough to stick. Reported by Kaitesan.
+    --
+    -- So hide it whenever it is shown, not once: same answer as Blizzard's
+    -- tooltip backdrop, and for the same reason.
+    btn:HookScript('OnShow', function(f)
+        if self.state and self.state.hideClock then f:Hide() end
     end)
 
     local ticker = _G['TimeManagerClockTicker']
