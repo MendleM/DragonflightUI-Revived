@@ -2461,9 +2461,40 @@ function Module:GetSetupActionbarSteps()
     end
 
     local extraBases = {[6] = 'MultiBar5Button', [7] = 'MultiBar6Button', [8] = 'MultiBar7Button'}
+
+    -- Bars 6-8 adopt Blizzard's own MultiBar5/6/7 buttons wherever the client
+    -- ships them, instead of building standalone DFUI ones. Adopted buttons
+    -- carry Blizzard's native MULTIACTIONBAR5/6/7BUTTONn bindings, so a keybind
+    -- is shared with the stock bars and keeps working on a login straight into
+    -- combat, before DFUI has finished loading (issue #7). TBC has always taken
+    -- this path; the Midnight backport brought the same buttons to MoP 5.5.4+
+    -- and Era 1.15.9+.
+    --
+    -- Probe for the buttons themselves rather than for a flavour: IsTBC/IsModern
+    -- only say the client *should* have them, and IsModern in particular probes
+    -- Edit Mode and status bars - different features that need not ship
+    -- together with the extra bars. Guessing wrong is expensive and silent:
+    -- createStuff would collect nils, HookExtraButtonsTBC would error on the
+    -- first one, and because the createExtra fallback no longer runs the player
+    -- would be left with no bars 6-8 at all. Asking for the exact frames we are
+    -- about to adopt cannot be wrong on any client, present or future.
+    local useNativeExtraBars
+    local function UseNativeExtraBars()
+        if useNativeExtraBars == nil then
+            useNativeExtraBars = true
+            for n = 6, 8 do
+                for i = 1, 12 do
+                    if not _G[extraBases[n] .. i] then useNativeExtraBars = false end
+                end
+            end
+            Module.UsesNativeExtraBars = useNativeExtraBars
+        end
+        return useNativeExtraBars
+    end
+
     for n = 6, 8 do
         steps[#steps + 1] = {'ExtraBar' .. n, function()
-            if DF.API.Version.IsTBC then
+            if UseNativeExtraBars() then
                 createStuff(n, extraBases[n])
             else
                 createExtra(n)
@@ -2472,7 +2503,7 @@ function Module:GetSetupActionbarSteps()
     end
 
     steps[#steps + 1] = {'ExtraBarsFinish', function()
-    if DF.API.Version.IsTBC then
+    if UseNativeExtraBars() then
         for i = 6, 8 do
             local bar = Module['bar' .. i]
             if bar then
@@ -2510,7 +2541,10 @@ function Module:GetSetupActionbarSteps()
     -- DragonflightUIActionbarMixin:HookGlow()
     DragonflightUIActionbarMixin:MigrateOldKeybinds()
 
-    if DF.API.Version.IsTBC then DragonflightUIActionbarMixin:MigrateOldKeybindsTBC(); end
+    -- Only meaningful once the bars actually use the native buttons: it rewrites
+    -- old "CLICK DragonflightUIMultiactionBarNButtonM:Keybind" bindings to the
+    -- MULTIACTIONBAR bindings those buttons answer to.
+    if UseNativeExtraBars() then DragonflightUIActionbarMixin:MigrateOldKeybindsTBC(); end
 
     -- TODOTBC
     if ActionButton_UpdateHotkeys then
