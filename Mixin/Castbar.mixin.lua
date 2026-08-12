@@ -1081,7 +1081,10 @@ function DragonFlightUICastbarMixin:AutoPosition()
     local dy = state.autoAdjustY or -20;
 
     -- (buffsOnTop) or (no spellbarAnchor=no buffs/debuffs)
-    if parent.buffsOntop or not parent.spellbarAnchor or tonumber(parent.auraRows) < 1 then
+    -- auraRows is nil until the target frame has laid its auras out once, and
+    -- tonumber(nil) < 1 throws the same way the line below did. Nil rows means
+    -- no rows, which is the branch this is testing for anyway.
+    if parent.buffsOntop or not parent.spellbarAnchor or (tonumber(parent.auraRows) or 0) < 1 then
         -- print('default')
         self:SetPoint('TOPLEFT', parent, 'BOTTOMLEFT', dx, dy) -- default
         return;
@@ -1089,9 +1092,23 @@ function DragonFlightUICastbarMixin:AutoPosition()
 
     local spellbarAnchor = parent.spellbarAnchor;
 
-    local autoDy = spellbarAnchor:GetBottom() - parent:GetBottom();
-    -- print(spellbarAnchor:GetBottom(), parent:GetBottom(), dy)
-    if autoDy >= 0 then autoDy = 0; end
+    -- GetBottom returns nil for a frame the layout has not resolved a position
+    -- for yet. On TBC Anniversary that is the state at startup, and the
+    -- subtraction threw - reported by Kaitesan against this line.
+    --
+    -- Without both edges there is no offset to compute, and the honest answer is
+    -- the one the no-auras branch above already gives: no adjustment. Guarding
+    -- each side with `or 0` instead would invent one - a nil anchor against a
+    -- placed parent yields -parent:GetBottom(), several hundred pixels of drop -
+    -- which is only harmless here because there is no target to show a castbar
+    -- for at the moment it happens.
+    local anchorBottom, parentBottom = spellbarAnchor:GetBottom(), parent:GetBottom()
+
+    local autoDy = 0
+    if anchorBottom and parentBottom then
+        autoDy = anchorBottom - parentBottom
+        if autoDy >= 0 then autoDy = 0; end
+    end
     -- print('~>', dy)
 
     self:SetPoint('TOPLEFT', parent, 'BOTTOMLEFT', dx, autoDy + dy)
