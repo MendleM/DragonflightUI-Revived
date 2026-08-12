@@ -102,7 +102,6 @@ function DFSettingsListMixin:OnLoad()
         elseif elementType == 'color' then
             factory("DFSettingsListColorPicker", Initializer);
         else
-            print('~no factory: ', elementType, ' ~')
             factory("Frame");
         end
     end);
@@ -156,7 +155,6 @@ function DFSettingsListMixin:Display(data, small)
     end
 
     if not data then
-        print('DFSettingsListMixin:Display', 'no data')
         return
     end
 

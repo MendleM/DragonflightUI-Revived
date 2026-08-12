@@ -63,10 +63,8 @@ local function setOption(info, value)
 end
 
 local function setPreset(T, preset, sub)
-    print('setPreset')
     for k, v in pairs(preset) do
         --
-        print(k, v)
         T[k] = v;
     end
     Module:ApplySettings(sub)

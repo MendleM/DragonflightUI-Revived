@@ -656,7 +656,6 @@ end
 function SelectionPopoutMixinDF:SetEntrys(data)
     local count = #data
     if count > self.MAX_POOL then
-        print('DATA TO BIG')
         return
     end
 
@@ -797,7 +796,6 @@ function SettingsListMixinDF:Display(data, small)
     self.Header.DefaultsButton:Hide()
 
     if not data then
-        print('SettingsListMixinDF:Display', 'no data')
         return
     end
 

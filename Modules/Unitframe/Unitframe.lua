@@ -697,7 +697,6 @@ function Module:TakePicture()
     if Module.PictureTakerFrame:IsVisible() then
         Module.PictureTakerFrame:Hide()
     else
-        print('cheeese ', GetUnitName('target'))
         Module.PictureTakerFrame:Show()
         Module.PictureTakerFrame:Update()
     end

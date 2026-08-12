@@ -862,7 +862,6 @@ function Module:InitEditmodeOverride()
 
             if newUpdate > lastUpdate then
                 lastUpdate = newUpdate;
-                print('~> update')
                 fun()
             end
         end)
@@ -873,7 +872,6 @@ function Module:InitEditmodeOverride()
 
                 if newUpdate > lastUpdate then
                     lastUpdate = newUpdate;
-                    print('~> update')
                     fun()
                 end
             end)

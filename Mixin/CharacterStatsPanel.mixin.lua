@@ -142,7 +142,6 @@ function DragonflightUICharacterStatsPanelMixin:SetupScrollBox()
         elseif elementData.spacer then
             factory("DFCharacterStatsSpacer", Initializer);
         else
-            print('~no factory: ', elementType, ' ~')
             factory("Frame");
         end
     end);

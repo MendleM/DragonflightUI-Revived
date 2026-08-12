@@ -6,7 +6,6 @@ DFUpdateFrame:RegisterEvent('BAG_UPDATE_DELAYED')
 -- DFUpdateFrame:SetScript('OnEvent', DragonflightUIItemColorMixin.OnEvent)
 
 function DragonflightUIItemColorMixin:OnEvent(event, arg1, ...)
-    print(' DragonflightUIItemColorMixin:OnEvent', event, arg1)
 end
 
 local base = 'Interface\\Addons\\DragonflightUI\\Textures\\UI\\'

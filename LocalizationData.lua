@@ -5,5 +5,4 @@ DragonflightUILocalizationData = {}
 local locale = GetLocale()
 
 function DragonflightUILocalizationData:Get()
-    print('GETSS')
 end

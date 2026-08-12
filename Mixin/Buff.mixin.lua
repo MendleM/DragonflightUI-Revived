@@ -358,7 +358,6 @@ function DragonflightUIBuffFrameContainerTemplateMixin:OnLoad()
         name = 'DFPlayerDebuffHeader'
         self.DFBuffLimit = DEBUFF_MAX_DISPLAY or 16;
     else
-        print('shouldnt happen :§')
     end
 
     local header = CreateFrame("Frame", name, nil, "SecureAuraHeaderTemplate");
@@ -374,7 +373,6 @@ function DragonflightUIBuffFrameContainerTemplateMixin:OnLoad()
     elseif filter == 'HARMFUL' then
         header:SetAttribute("template", "DragonflightUIAuraButtonDebuffTemplate");
     else
-        print('shouldnt happen :§')
     end
 
     header:SetAttribute("unit", "player");

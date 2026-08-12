@@ -3,7 +3,6 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local locale = GetLocale()
 
 function DragonflightUILocalizationData:Getss()
-    print('GETSSssss')
 end
 
 -- Professions

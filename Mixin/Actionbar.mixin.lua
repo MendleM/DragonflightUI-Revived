@@ -815,7 +815,6 @@ function DragonflightUIActionbarMixin:UpdatePagingStateDriver(state)
 end
 
 function DragonflightUIActionbarMixin:AddAlphaStateDriver()
-    print('DragonflightUIActionbarMixin:AddAlphaStateDriver()')
     local handler = CreateFrame("Frame", "DragonflightUIActionBarAlphaHandler", self, "SecureHandlerStateTemplate")
     self.AlphaStateDriver = handler;
 
@@ -897,8 +896,6 @@ function DragonflightUIActionbarMixin:AddTargetStateDriver()
     ]])
 
     handler:SetAttribute('OnStateChanged', [[
-        print('OnStateChanged')
-        print('---------')
     ]])
 
     for i, btn in ipairs(self.buttonTable) do
@@ -2369,12 +2366,10 @@ end
 
 function DragonflightUIActionbarMixin:FixGlow(btn)
     if not btn.overlay then return end
-    print('~~~FixGlow', btn:GetName())
 
     local isGlowing = btn.overlay.animIn:IsPlaying()
     local isOut = btn.overlay.animOut:IsPlaying()
 
-    print('~~>> isGlowing, isOut?', isGlowing, isOut)
     -- if not isGlowing then return end
     -- print('GLOWING')
 

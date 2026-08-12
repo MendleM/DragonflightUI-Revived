@@ -3464,8 +3464,6 @@ end
 
 function Module.HookAlwaysShowActionbar()
     local updateGrids = function()
-        print('updateGrids')
-        print(Module.db.profile.bar2.alwaysShow, Module.db.profile.bar3.alwaysShow)
         Module.bar2:UpdateGrid(Module.db.profile.bar2.alwaysShow)
         Module.bar3:UpdateGrid(Module.db.profile.bar3.alwaysShow)
     end
@@ -3474,19 +3472,13 @@ function Module.HookAlwaysShowActionbar()
         -- updateGrids()
     end)
     hooksecurefunc('MultiActionBar_ShowAllGrids', function()
-        print('MultiActionBar_ShowAllGrids')
         updateGrids()
         C_Timer.After(2, updateGrids)
     end)
     hooksecurefunc('MultiActionBar_HideAllGrids', function()
-        print('MultiActionBar_HideAllGrids')
         updateGrids()
         C_Timer.After(2, updateGrids)
 
-    end)
-
-    hooksecurefunc('ActionButton_ShowGrid', function(btn)
-        print('ShowGrid', btn:GetName())
     end)
 
 end

@@ -737,7 +737,6 @@ function Module:GeneratorEditmodeLayout(withDefaults, IsSelected, SetSelected)
 
                 local copyButton = radio:CreateButton(L["EditModeCopyLayout"], function()
                     -- self:ShowNewLayoutDialog(layoutInfo);
-                    print('copyss')
                 end);
 
                 radio:DeactivateSubmenu();

@@ -31,7 +31,6 @@ function DragonflightUIBossframeMixin:OnLoad()
 end
 
 local function UnitFrameTargetIcon_OpenMenu(self)
-    print('UnitFrameTargetIcon_OpenMenu', self:GetName())
     local contextData = {fromTargetFrame = false, unit = self.unit};
     UnitPopup_OpenMenu("RAID_TARGET_ICON", contextData);
 end

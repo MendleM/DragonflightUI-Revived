@@ -424,7 +424,6 @@ function DragonflightUIMixin:ChangeTradeskillFrameCata(frame)
         -- print('child:', child:GetName())
         if child:GetObjectType() == 'Texture' then
             -- child:SetTexture('')
-            print('child:', 'Texture', child:GetTexture(), child:GetSize())
             local tex = child:GetTexture()
 
             if tex == 136797 then
@@ -3686,7 +3685,6 @@ function DragonflightUIMixin:ChangeTalentsEra()
 end
 
 function DragonflightUIMixin:ChangeLFGListingFrameEra()
-    print('DragonflightUIMixin:ChangeLFGListingFrameEra()')
     local frame = LFGListingFrame
     local parentFrame = LFGParentFrame
     if not frame then return end
