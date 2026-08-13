@@ -24,6 +24,68 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.43.0',
+        title = 'Party frames and professions',
+        date = '13 August 2026',
+        intro = 'Party frames stay put in combat, the profession window behaves, and TBC starts up again.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'Party frames survive combat.',
+                    'One profession window, and you can move it.',
+                    'TBC: fixed a crash on startup.',
+                    'Hide Clock finally sticks.'
+                }
+            }, {
+                title = 'Party frames',
+                items = {
+                    'Members no longer vanish, or collapse to a single member, when combat starts. This addon was applying Blizzard\'s edit mode layout at login, which tainted the party frames for the rest of the session.'
+                }
+            }, {
+                title = 'Profession window',
+                items = {
+                    'Only one window opens now. Blizzard\'s was left sitting behind ours unless you happened to have BlizzMove installed.',
+                    'Drag it by its header, and it stays where you put it.',
+                    'No more empty profession window at every login.',
+                    'The profession icon fills its ring instead of sitting inside a border.'
+                }
+            }, {
+                title = 'Edit mode',
+                items = {
+                    'New setting: Disable Blizzard\'s Edit Mode, on by default. Saving in Blizzard\'s writes its whole layout over this one, so the game\'s own ways in are switched off.',
+                    'Rotate Minimap survives a reload - it was written somewhere the game overwrites on every layout.'
+                }
+            }, {
+                title = 'Unit frames',
+                items = {
+                    'Stopped tainting the target frame\'s debuff buttons, a long-standing source of blocked actions.',
+                    'TBC: fixed a flood of Invalid frame handle errors during combat.'
+                }
+            }, {
+                title = 'Minimap',
+                items = {'Hide Clock stays hidden after a reload or relog.'}
+            }, {
+                title = 'Castbar',
+                items = {'TBC: fixed an error on startup when the target frame had not been placed yet.'}
+            }, {
+                title = 'Character pane',
+                items = {
+                    'Tab labels are vertically centred again, in both the selected and unselected tab.',
+                    'The pane was building itself out of the game\'s script budget and getting cut off partway, leaving it half-made.'
+                }
+            }, {
+                title = 'Action bars',
+                items = {'The keyring stays on the end of the bag bar instead of wandering in among the bags.'}
+            }, {
+                title = 'Tooltips',
+                items = {'Fixed the tooltip body flickering on and off while you hover it.'}
+            }, {
+                title = 'Under the hood',
+                items = {'Removed leftover debug messages that printed to chat.'}
+            }
+        }
+    }, {
         version = '0.42.0',
         title = 'Fixes from the field',
         date = '30 July 2026',
@@ -49,32 +111,18 @@ DF.ChangelogData = {
                 items = {
                     'Scrolling bar 1 no longer cycles through bars already on screen. This only ever worked on TBC.',
                     'The page number no longer sits offset on the first render.',
-                    'Pet Bar works as an anchor - it pointed at a frame that does not exist.',
-                    'The keyring stays on the end of the bag bar instead of wandering in among the bags.'
-                }
-            }, {
-                title = 'Character pane',
-                items = {
-                    'Tab labels are vertically centred again, in both the selected and unselected tab.',
-                    'The pane was building itself out of the game\'s script budget and getting cut off partway, leaving it half-made.'
+                    'Pet Bar works as an anchor - it pointed at a frame that does not exist.'
                 }
             }, {
                 title = 'Unit frames',
                 items = {
                     'Fixed a burst of Lua errors at login, from the player, target, pet and secondary resource frames.',
-                    'TBC: fixed a flood of Invalid frame handle errors during combat.',
                     'Health and mana numbers show on party frames with Status Text on.'
                 }
             }, {
                 title = 'Edit mode',
                 items = {
-                    'Use Raid-Style Party Frames works again, and stays put after a reload or a dungeon.',
-                    'Rotate Minimap survives a reload - it was written somewhere the game overwrites on every layout.'
-                }
-            }, {
-                title = 'Tooltips',
-                items = {
-                    'Fixed the tooltip body flickering on and off while you hover it.'
+                    'Use Raid-Style Party Frames works again, and stays put after a reload or a dungeon.'
                 }
             }, {
                 title = 'Elsewhere',

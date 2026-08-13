@@ -2,10 +2,76 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.42.0`.
+May 2026). Current builds report version `0.43.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.43.0 — Party frames and professions (13 August 2026)
+
+Party frames stay put in combat, the profession window behaves, and TBC starts
+up again.
+
+**Highlights** — party frames survive combat · one profession window, and you
+can move it · TBC: fixed a crash on startup · Hide Clock finally sticks
+
+### Party frames
+
+- Members no longer vanish, or collapse to a single member, when combat starts.
+  This addon was applying Blizzard's edit mode layout at login, which tainted
+  the party frames for the rest of the session
+
+### Profession window
+
+- Only one window opens now. Blizzard's was left sitting behind ours unless you
+  happened to have BlizzMove installed
+- Drag it by its header, and it stays where you put it
+- No more empty profession window at every login
+- The profession icon fills its ring instead of sitting inside a border
+
+### Edit mode
+
+- New setting: **Disable Blizzard's Edit Mode**, on by default. Saving in
+  Blizzard's writes its whole layout over this one, so the game's own ways in
+  are switched off
+- **Rotate Minimap** survives a reload. It was written somewhere the game
+  overwrites every time it applies its layout
+
+### Unit frames
+
+- Stopped tainting the target frame's debuff buttons, a long-standing source of
+  blocked actions
+- **TBC:** fixed a flood of `Invalid frame handle` errors during combat
+
+### Minimap
+
+- **Hide Clock** stays hidden after a reload or relog
+
+### Castbar
+
+- **TBC:** fixed an error on startup when the target frame had not been placed
+  yet
+
+### Character pane
+
+- Tab labels are vertically centred again, in both the selected and unselected
+  tab
+- The pane was building itself out of the game's script budget and getting cut
+  off partway, which left it half-made
+
+### Action bars
+
+- The keyring stays on the end of the bag bar instead of wandering in among the
+  bags when the bag menu is opened and closed
+
+### Tooltips
+
+- Fixed the tooltip body flickering on and off while you hover it. Blizzard put
+  its own backdrop back on every refresh and ours took it away again
+
+### Under the hood
+
+- Removed leftover debug messages that printed to chat
 
 ## 0.42.0 — Fixes from the field (30 July 2026)
 
@@ -30,21 +96,11 @@ Everything before v0.40.3 is in
   ever worked on TBC
 - The page number no longer sits offset on the first render
 - **Pet Bar** works as an anchor — it pointed at a frame that does not exist
-- The keyring stays on the end of the bag bar instead of wandering in among the
-  bags when the bag menu is opened and closed
-
-### Character pane
-
-- Tab labels are vertically centred again, in both the selected and unselected
-  tab
-- The pane was building itself out of the game's script budget and getting cut
-  off partway, which left it half-made
 
 ### Unit frames
 
 - Fixed a burst of Lua errors at login, from the player, target, pet and
   secondary resource frames
-- **TBC:** fixed a flood of `Invalid frame handle` errors during combat
 - Health and mana numbers show on party frames with **Status Text** on
 
 ### Edit mode
@@ -52,8 +108,6 @@ Everything before v0.40.3 is in
 - **Use Raid-Style Party Frames** works, and stays put. The toggle wrote a
   setting the game no longer reads, and Blizzard's own checkbox was being undone
   on the next reload or dungeon
-- **Rotate Minimap** survives a reload. It was written somewhere the game
-  overwrites every time it applies its layout
 
 ### Compatibility
 
@@ -64,11 +118,6 @@ Everything before v0.40.3 is in
 
 - The settings page now says plainly that the game's **Consolidate Buffs**
   option cannot reach DragonflightUI's buff frame
-
-### Tooltips
-
-- Fixed the tooltip body flickering on and off while you hover it. Blizzard put
-  its own backdrop back on every refresh and ours took it away again
 
 ### Elsewhere
 
