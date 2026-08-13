@@ -1204,6 +1204,48 @@ local PARTY_TAINT_FIELDS = {
     'showBuffs', 'showDebuffs', 'shouldShow'
 }
 
+-- Fields on a frame object, whether or not it has a name in _G.
+--
+-- The pooled party member frames are anonymous, so the by-name walk below
+-- reported them "absent" and checked nothing - which is how a report of every
+-- named frame coming back clean sat next to a log full of blocked actions on
+-- those very frames. A frame with no global name is the normal case here, not
+-- the exception.
+--
+-- The methods matter as much as the data. hooksecurefunc(frame, 'Method', fn)
+-- writes an insecure function into the frame's own table, and Blizzard reads
+-- that field every time it calls the method - so a hooked method is a taint
+-- seed that looks like nothing at all in a data-only dump.
+local PARTY_TAINT_METHODS = {'UpdateOnlineStatus', 'UpdateMember', 'UpdateArt', 'UpdatePet', 'Show', 'Hide',
+                             'SetShown', 'SetPoint', 'SetAttribute'}
+
+local function LogFrameFieldTaint(tag, label, frame)
+    local dirty = 0
+
+    for _, key in ipairs(PARTY_TAINT_FIELDS) do
+        if rawget(frame, key) ~= nil then
+            local fieldOk, fieldWho = issecurevariable(frame, key)
+            if not fieldOk then
+                dirty = dirty + 1
+                DF:Log(tag, '%s.%s insecure, tainted by %s', label, key, tostring(fieldWho or '?'))
+            end
+        end
+    end
+
+    -- rawget on purpose: an inherited method lives on the mixin and is not this
+    -- frame's problem. One written onto the frame itself is exactly the hook.
+    for _, key in ipairs(PARTY_TAINT_METHODS) do
+        if rawget(frame, key) ~= nil then
+            local fieldOk, fieldWho = issecurevariable(frame, key)
+            dirty = dirty + 1
+            DF:Log(tag, '%s:%s() overwritten on the frame%s', label, key,
+                   fieldOk and ' (secure)' or (' - INSECURE, tainted by ' .. tostring(fieldWho or '?')))
+        end
+    end
+
+    return dirty
+end
+
 local function LogFrameTaint(tag, name)
     local frame = _G[name]
     if not frame then
@@ -1216,16 +1258,7 @@ local function LogFrameTaint(tag, name)
     local ok, who = issecurevariable(name)
     if not ok then DF:Log(tag, '%s GLOBAL insecure, tainted by %s', name, tostring(who or '?')) end
 
-    local dirty = 0
-    for _, key in ipairs(PARTY_TAINT_FIELDS) do
-        if rawget(frame, key) ~= nil then
-            local fieldOk, fieldWho = issecurevariable(frame, key)
-            if not fieldOk then
-                dirty = dirty + 1
-                DF:Log(tag, '%s.%s insecure, tainted by %s', name, key, tostring(fieldWho or '?'))
-            end
-        end
-    end
+    local dirty = LogFrameFieldTaint(tag, name, frame)
 
     if dirty == 0 and ok then DF:Log(tag, '%s clean', name) end
 end
@@ -1265,6 +1298,12 @@ function DF:LogPartyTaint(tag)
             DF:Log(tag, 'pooled member %d: unit=%s shown=%s protected=%s parent=%s', n, tostring(pf.unit),
                    tostring(pf:IsShown()), tostring(pf.IsProtected and pf:IsProtected()),
                    (pf:GetParent() and pf:GetParent():GetName()) or '<anon>')
+
+            -- These have no name in _G, so the by-name walk below never sees
+            -- them. This is where the taint on the party-style frames lives.
+            if LogFrameFieldTaint(tag, 'pooled member ' .. n, pf) == 0 then
+                DF:Log(tag, 'pooled member %d clean', n)
+            end
         end
         DF:Log(tag, 'pooled members active: %d (group has %d)', n, GetNumGroupMembers and GetNumGroupMembers() or -1)
     end

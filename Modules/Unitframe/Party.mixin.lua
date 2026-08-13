@@ -670,16 +670,26 @@ function SubModuleMixin:SetupModern()
         -- member rendered as a bar floating over nothing), so the bars stay
         -- in Blizzard's layering.
 
-        -- Blizzard flips health-bar desaturation in UpdateOnlineStatus and
-        -- the flag could stay stuck on a pooled frame reused for a
-        -- connected player; re-assert our own state right after it runs.
-        if pf.UpdateOnlineStatus and not pf.DFOnlineHooked then
-            pf.DFOnlineHooked = true
-            -- pcall: this runs INSIDE Blizzard's party frame update. An
-            -- error here aborts their loop, leaving the frame being
-            -- processed half-built and the remaining members never created.
-            hooksecurefunc(pf, 'UpdateOnlineStatus', function(f) pcall(UpdateBars, f) end)
-        end
+        -- Blizzard flips health-bar desaturation in UpdateOnlineStatus and the
+        -- flag could stay stuck on a pooled frame reused for a connected
+        -- player, so our own state has to be re-asserted after it runs. That
+        -- used to be done with
+        --
+        --     hooksecurefunc(pf, 'UpdateOnlineStatus', ...)
+        --
+        -- and a per-object hook is a write into the frame's own table:
+        -- hooksecurefunc(table, key, fn) replaces pf.UpdateOnlineStatus with an
+        -- insecure function. These frames are protected, Blizzard reads that
+        -- field every time it calls the method, and the read tainted the whole
+        -- execution - which is why blocked stacks came back with
+        -- "[C]: in function 'UpdateOnlineStatus'" in the middle of them and
+        -- Hide() refused at PartyMemberFrame.lua:428. Members stopped appearing
+        -- from there on.
+        --
+        -- The roster watcher below already registers UNIT_CONNECTION and
+        -- already re-runs UpdateBars for every styled member, which is the same
+        -- coverage from our own execution instead of inside Blizzard's. So the
+        -- hook is not replaced with a safer hook - it is not needed at all.
 
         -- Debuff row. We adopted retail's bar geometry (mana 74x7 at
         -- 41,-30) but the template still carried Classic's aura anchor of
@@ -1480,42 +1490,12 @@ function SubModuleMixin:UpdatePartyHPBar(i)
     end
 end
 
--- TEMP DIAGNOSTIC: who hides a party frame.
---
--- Party members keep vanishing mid-fight and the first fix for it - the anchor
--- hook re-anchoring from inside Blizzard's update - was not the whole story.
--- Rather than guess again, record every hide with a stack, so the next time it
--- happens the log names whatever did it.
---
--- Tracked outside the frames: writing a marker field onto a protected frame
--- taints it, and these are exactly the frames whose taint is under suspicion.
-local hideLogged = setmetatable({}, {__mode = 'k'})
-
-local function LogHides(pf)
-    if hideLogged[pf] then return end
-    hideLogged[pf] = true
-
-    local function record(what)
-        return function(frame)
-            if not DF.Log then return end
-            DF:Log('party', '%s %s | combat=%s | %s', frame:GetName() or '?', what,
-                   tostring(InCombatLockdown()), tostring(debugstack(2, 8, 0)):gsub('\n', ' | '):sub(1, 700))
-        end
-    end
-
-    hooksecurefunc(pf, 'Hide', record('hidden'))
-    hooksecurefunc(pf, 'SetShown', function(frame, shown)
-        if not shown then record('SetShown(false)')(frame) end
-    end)
-end
-
 function SubModuleMixin:AddStateUpdater()
     for i = 1, 4 do
         local pf = _G['PartyMemberFrame' .. i]
         Mixin(pf, DragonflightUIStateHandlerMixin)
         pf:InitStateHandler()
         pf:SetUnit('party' .. i)
-        LogHides(pf)
     end
 end
 
