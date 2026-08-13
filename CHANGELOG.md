@@ -72,6 +72,8 @@ can move it · TBC: fixed a crash on startup · Hide Clock finally sticks
 ### Under the hood
 
 - Removed leftover debug messages that printed to chat
+- The addon no longer writes a performance log to your SavedVariables every
+  session
 
 ## 0.42.0 — Fixes from the field (30 July 2026)
 

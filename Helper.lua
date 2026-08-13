@@ -5,24 +5,16 @@ local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 local Helper = {};
 addonTable.Helper = Helper;
 
--- era-1159 diagnostics: persist phase timings so slow spots can be read from
--- disk after logout ("script ran too long" hides the real sink - the error
--- surfaces wherever the shared load-time budget happens to expire, not where
--- the time went). Wiped at the start of every session: the file always holds
--- the LAST session.
+-- era-1159 diagnostics: phase timings, so a slow spot can be found when "script
+-- ran too long" hides the real sink - that error surfaces wherever the shared
+-- load-time budget happens to expire, not where the time went.
+--
+-- In memory only. This used to be a SavedVariable so it could be read off disk
+-- after logout, which meant every player wrote a diagnostic file every session
+-- for the benefit of nobody but whoever was chasing era-1159 load times. Read it
+-- in the session that produced it: /dump DragonflightUIPerfLog.
 local perfLog = { boot = true }
 DragonflightUIPerfLog = perfLog
--- SavedVariables load AFTER this file runs and would re-point the global at
--- last session's table; re-assert ours so the file on disk is always the
--- most recent session.
-local perfFrame = CreateFrame('Frame')
-perfFrame:RegisterEvent('ADDON_LOADED')
-perfFrame:SetScript('OnEvent', function(self, _, name)
-    if name == addonName then
-        DragonflightUIPerfLog = perfLog
-        self:UnregisterAllEvents()
-    end
-end)
 
 -- make globally available
 _G['DragonflightUI_Helper'] = Helper;

@@ -82,7 +82,10 @@ DF.ChangelogData = {
                 items = {'Fixed the tooltip body flickering on and off while you hover it.'}
             }, {
                 title = 'Under the hood',
-                items = {'Removed leftover debug messages that printed to chat.'}
+                items = {
+                    'Removed leftover debug messages that printed to chat.',
+                    'The addon no longer writes a performance log to your SavedVariables every session.'
+                }
             }
         }
     }, {
