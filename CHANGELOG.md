@@ -23,8 +23,9 @@ can move it · TBC: fixed a crash on startup · Hide Clock finally sticks
 
 ### Profession window
 
-- Only one window opens now. Blizzard's was left sitting behind ours unless you
-  happened to have BlizzMove installed
+- Tradeskills open one window instead of two. Blizzard's was left sitting behind
+  ours unless you happened to have BlizzMove installed. Enchanting still shows
+  Blizzard's craft window, because the **Enchant** button lives on it
 - Drag it by its header, and it stays where you put it
 - No more empty profession window at every login
 - The profession icon fills its ring instead of sitting inside a border

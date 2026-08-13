@@ -138,15 +138,30 @@ end
 -- Mouse off with it, so the invisible window does not eat clicks where ours no
 -- longer is. Its buttons are children and keep their own mouse, which only
 -- matters once ours has been dragged clear of them.
+--
+-- TradeSkillFrame only, and CraftFrame deliberately NOT.
+--
+-- This window replaces the tradeskill one outright: its own Create button, its
+-- own DoTradeSkill handler. It does not replace the craft one. Look at the
+-- Craft branch of UpdateRecipe - it hides our button and borrows Blizzard's:
+--
+--     self.CreateButton:Hide();
+--     CraftCreateButton:SetParent(self)
+--
+-- so the button an enchanter clicks is still Blizzard's, living on Blizzard's
+-- frame until that reparent happens. Quieting CraftFrame takes away something
+-- this window is still leaning on, and an enchanter who cannot enchant is a far
+-- worse bug than a second window being visible. Reported before it shipped.
+--
+-- Suppressing CraftFrame is fine the day this window grows a working Craft
+-- button of its own - the OnClick for it is already written and already calls
+-- DoCraft; it is only ever Hide()den. Until that is tested in front of an
+-- enchanting table, Blizzard's craft window stays where it is.
 function DFProfessionMixin:SuppressBlizzardFrames()
-    -- By name, not by value: CraftFrame does not exist on every flavour, and a
-    -- nil in the middle of a list would end the loop at it.
-    for _, name in ipairs({'TradeSkillFrame', 'CraftFrame'}) do
-        local frame = _G[name]
-        if frame and frame.SetAlpha then
-            frame:SetAlpha(0)
-            if frame.EnableMouse then frame:EnableMouse(false) end
-        end
+    local frame = _G['TradeSkillFrame']
+    if frame and frame.SetAlpha then
+        frame:SetAlpha(0)
+        if frame.EnableMouse then frame:EnableMouse(false) end
     end
 end
 
