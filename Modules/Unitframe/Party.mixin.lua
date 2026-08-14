@@ -434,8 +434,14 @@ end
 function SubModuleMixin:EnsurePartyMoveFrame()
     if self.PartyMoveFrame then return self.PartyMoveFrame end
 
-    local moveFrame = CreateFrame('Frame', 'DragonflightUIPartyMoveFrame', UIParent,
-                                  'SecureFrameTemplate,SecureHandlerEnterLeaveTemplate')
+    -- From XML (Load.xml), not CreateFrame. A Lua-created frame gets an
+    -- insecure global, and PartyFrame is reparented onto this one - which is
+    -- what left the party members tainted. The five other unit frame holders
+    -- have always come from XML; this was the odd one out.
+    local moveFrame = _G['DragonflightUIPartyMoveFrame']
+    if not moveFrame then return nil end
+
+    moveFrame:SetParent(UIParent)
     moveFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
     moveFrame:SetFrameStrata('LOW')
     moveFrame:SetFrameLevel(2)
@@ -459,7 +465,9 @@ function SubModuleMixin:SetupModern()
     -- anchor settings did nothing at all on 1.15.9 - only the classic path
     -- had a move frame. Give the modern path the same one, and keep Blizzard
     -- from wandering off it.
-    self:EnsurePartyMoveFrame():SetSize(120, 53 * 4 + 3 * 10)
+    local holder = self:EnsurePartyMoveFrame()
+    if not holder then return end
+    holder:SetSize(120, 53 * 4 + 3 * 10)
 
     -- Put PartyFrame back on our move frame, out of combat only.
     --
@@ -1019,6 +1027,7 @@ end
 
 function SubModuleMixin:ChangePartyFrame()
     local PartyMoveFrame = self:EnsurePartyMoveFrame()
+    if not PartyMoveFrame then return end
 
     local sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
     local gap = 10;

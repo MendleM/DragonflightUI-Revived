@@ -23,4 +23,22 @@
 	</Frame>
 	<Frame name="DragonflightUIFocusToTFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
 	</Frame>
+	<!--
+		Declared here rather than CreateFrame'd in Party.mixin.lua, which is the
+		one thing that made this holder different from the five above it.
+
+		PartyFrame is reparented onto this frame. A frame created by Lua gets an
+		insecure global - /df log party said so in as many words,
+		"DragonflightUIPartyMoveFrame GLOBAL insecure, tainted by
+		DragonflightUI" - and hanging the party container off it left Blizzard
+		tainting itself while updating the members, so pooled member .unit came
+		out insecure and Show/SetAttribute were refused. The XML loader creates
+		these, so the global is secure, which is why the player, pet, target and
+		focus holders have never had this problem.
+
+		Not hidden, unlike the others: this one is only ever an anchor, and the
+		frame anchored to it has to stay visible.
+	-->
+	<Frame name="DragonflightUIPartyMoveFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
+	</Frame>
 </Ui>
