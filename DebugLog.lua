@@ -1263,6 +1263,46 @@ local function LogFrameTaint(tag, name)
     if dirty == 0 and ok then DF:Log(tag, '%s clean', name) end
 end
 
+-- /df log seed - catches the exact moment a party member's .unit goes insecure.
+--
+-- Everything else has been deduction, and four deductions in a row have been
+-- wrong. The control settled what it is NOT: PlayerFrame is reparented onto an
+-- insecure holder of ours too and is fine, so neither the holder nor the
+-- reparent breaks anything. The one thing party has that player does not is a
+-- tainted .unit.
+--
+-- .unit is written by UnitFrame_SetUnit. So hook that, check the field straight
+-- afterwards, and the first time it comes back insecure, record the stack. The
+-- stack at that instant contains whatever put this addon on it - which is the
+-- one fact nobody has been able to read off a blocked-action dump, because by
+-- then the damage is long done and the stack is pure Blizzard.
+--
+-- Armed at load, not from a command: the taint happens while the party frames
+-- are being built, which is long before anyone can type. It costs an early
+-- return per call on a party unit and stops working entirely once it has fired.
+--
+-- Read it back with /df log seed.
+local seedArmed, seedFound = false, false
+
+local function ArmSeedWatcher()
+    if seedArmed or not UnitFrame_SetUnit then return end
+    seedArmed = true
+
+    hooksecurefunc('UnitFrame_SetUnit', function(frame, unit)
+        if seedFound or not frame or not unit then return end
+        if type(unit) ~= 'string' or not unit:find('party', 1, true) then return end
+
+        local ok, who = issecurevariable(frame, 'unit')
+        if ok then return end
+
+        seedFound = true
+        DF:Log('seed', 'FIRST INSECURE .unit on %s (unit=%s), tainted by %s', (frame.GetName and frame:GetName()) or
+                   '<pooled>', tostring(unit), tostring(who or '?'))
+        DF:Log('seed', 'stack: %s', tostring(debugstack(2, 30, 0)):gsub('\n', ' | '):sub(1, 3000))
+        print(PREFIX .. 'party taint seed captured - run |cffffff78/df log seed|r')
+    end)
+end
+
 -- /df log party - names whoever tainted the party frames. Run it once the
 -- frames have misbehaved; the taint is sticky, so it is still there afterwards.
 function DF:LogPartyTaint(tag)
@@ -1437,6 +1477,14 @@ function DF:HandleLogCommand(rest)
             DF:LogToT('totdump')
             DF:LogDump('totdump', 40)
         end
+    elseif sub == 'seed' then
+        if seedFound then
+            DF:LogCopy('seed')
+        else
+            print(PREFIX .. 'no party taint seed captured yet' ..
+                      (seedArmed and ' - the watcher is armed; group up and it will fire.' or
+                          ' - the watcher never armed (UnitFrame_SetUnit missing).'))
+        end
     elseif sub == 'party' then
         DF:LogPartyTaint('party')
         -- Copy window rather than a chat dump: this one is read by somebody
@@ -1450,3 +1498,16 @@ function DF:HandleLogCommand(rest)
 end
 
 InstallCapture()
+
+-- Blizzard_UnitFrame may not have loaded when this file runs, so arm now if the
+-- function is already there, and again when it arrives.
+ArmSeedWatcher()
+do
+    local armFrame = CreateFrame('Frame')
+    armFrame:RegisterEvent('ADDON_LOADED')
+    armFrame:RegisterEvent('PLAYER_LOGIN')
+    armFrame:SetScript('OnEvent', function(self)
+        ArmSeedWatcher()
+        if seedArmed then self:UnregisterAllEvents() end
+    end)
+end
