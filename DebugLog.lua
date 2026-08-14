@@ -1312,6 +1312,36 @@ function DF:LogPartyTaint(tag)
     LogFrameTaint(tag, 'CompactPartyFrame')
     LogFrameTaint(tag, 'DragonflightUIPartyMoveFrame')
 
+    -- The control.
+    --
+    -- Every theory so far has blamed something about the party holder - the
+    -- template it inherits, whether XML or Lua created it - and each one was
+    -- answered by a report saying the taint was still there. The way to stop
+    -- guessing is to compare against a unit frame that WORKS.
+    --
+    -- PlayerFrame and TargetFrame are reparented onto holders of ours in
+    -- exactly the same way, and nobody reports them breaking. So: is their
+    -- holder's global insecure too? Is their own .unit tainted too? If yes to
+    -- both, then neither an insecure holder nor a tainted .unit is what breaks
+    -- the party frames, and the difference is somewhere else entirely - which
+    -- kills three theories at once and is worth far more than another guess.
+    for _, name in ipairs({'DragonflightUIPlayerFrame', 'DragonflightUITargetFrame'}) do
+        local ok, who = issecurevariable(name)
+        DF:Log(tag, 'control %s GLOBAL: %s%s', name, ok and 'secure' or 'INSECURE',
+               ok and '' or (', tainted by ' .. tostring(who or '?')))
+    end
+
+    for _, name in ipairs({'PlayerFrame', 'TargetFrame'}) do
+        local frame = _G[name]
+        if frame then
+            DF:Log(tag, 'control %s: parent=%s', name,
+                   (frame:GetParent() and frame:GetParent():GetName()) or '<anon>')
+            if LogFrameFieldTaint(tag, 'control ' .. name, frame) == 0 then
+                DF:Log(tag, 'control %s clean', name)
+            end
+        end
+    end
+
     for i = 1, 5 do
         LogFrameTaint(tag, 'CompactPartyFrameMember' .. i)
         LogFrameTaint(tag, 'PartyMemberFrame' .. i)
