@@ -2943,7 +2943,7 @@ function DragonflightUIFPSMixin:SetupFrame()
     local Path, Size, Flags = FramerateText:GetFont()
 
     do
-        local t = self:CreateFontString('FPSLabel', 'OVERLAY', 'SystemFont_Shadow_Med1')
+        local t = self:CreateFontString(nil, 'OVERLAY', 'SystemFont_Shadow_Med1')
         t:SetPoint('TOPLEFT', 0, 0)
         t:SetText('FPS:')
         t:SetFont(Path, Size, Flags)
@@ -2952,7 +2952,7 @@ function DragonflightUIFPSMixin:SetupFrame()
     end
 
     do
-        local t = self:CreateFontString('PingLabel', 'OVERLAY', 'SystemFont_Shadow_Med1')
+        local t = self:CreateFontString(nil, 'OVERLAY', 'SystemFont_Shadow_Med1')
         t:SetPoint('TOPLEFT', self.FPSLabel, 'BOTTOMLEFT', 0, 0)
         t:SetText('MS:')
         t:SetFont(Path, Size, Flags)
@@ -2961,7 +2961,7 @@ function DragonflightUIFPSMixin:SetupFrame()
     end
 
     do
-        local t = self:CreateFontString('FPSText', 'OVERLAY', 'SystemFont_Shadow_Med1')
+        local t = self:CreateFontString(nil, 'OVERLAY', 'SystemFont_Shadow_Med1')
         t:SetPoint('TOPRIGHT', self, 'TOPRIGHT', 0, 0)
         t:SetText('')
         t:SetFont(Path, Size, Flags)
@@ -2970,7 +2970,7 @@ function DragonflightUIFPSMixin:SetupFrame()
     end
 
     do
-        local t = self:CreateFontString('PingText', 'OVERLAY', 'SystemFont_Shadow_Med1')
+        local t = self:CreateFontString(nil, 'OVERLAY', 'SystemFont_Shadow_Med1')
         t:SetPoint('TOPRIGHT', self.FPSText, 'BOTTOMRIGHT', 0, 0)
         t:SetText('')
         t:SetFont(Path, Size, Flags)

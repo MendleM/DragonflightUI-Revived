@@ -158,7 +158,7 @@ function DragonflightUIMixin:ChangeBag(frame)
     pp:SetPoint('TOPLEFT', frame, 'TOPLEFT', -13, 16)
     pp:SetDrawLayer('OVERLAY', 7)
 
-    frame.TitleContainer = CreateFrame('FRAME', 'TitleContainer', frame)
+    frame.TitleContainer = CreateFrame('FRAME', nil, frame)
     frame.TitleContainer:SetSize(0, 20)
     frame.TitleContainer:SetPoint('TOPLEFT', 35, -1)
     frame.TitleContainer:SetPoint('TOPRIGHT', -24, -1)
@@ -178,7 +178,7 @@ function DragonflightUIMixin:ChangeBag(frame)
         MoneyFrame_SetMaxDisplayWidth(moneyFrame, 178 - 2 * 8)
         moneyFrame:SetHeight(17)
 
-        local border = CreateFrame('FRAME', 'Border', moneyFrame, 'ContainerMoneyFrameBorderTemplate')
+        local border = CreateFrame('FRAME', nil, moneyFrame, 'ContainerMoneyFrameBorderTemplate')
         border:SetParent(moneyFrame)
         border:SetAllPoints()
         moneyFrame.border = border
@@ -265,7 +265,7 @@ function DragonflightUIMixin:ChangeBackpackTokenFrame()
 
     frame:SetHeight(17)
 
-    local border = CreateFrame('FRAME', 'Border', frame, 'ContainerTokenFrameBorderTemplate')
+    local border = CreateFrame('FRAME', nil, frame, 'ContainerTokenFrameBorderTemplate')
     border:SetParent(frame)
     border:SetAllPoints()
     frame.border = border
@@ -3851,13 +3851,13 @@ function DragonflightUIMixin:ChangeSpellbookEra()
                 btn:SetPoint('TOPLEFT', _G['SpellButton' .. (i - 2)], 'BOTTOMLEFT', 0, -29)
             end
 
-            local first = btn:CreateTexture('TextBackground', 'BACKGROUND')
+            local first = btn:CreateTexture(nil, 'BACKGROUND')
             first:SetTexture(base .. 'Spellbook-Parts')
             first:SetPoint('TOPLEFT', _G['SpellButton' .. i .. 'Highlight'], 'TOPRIGHT', -4, 0 - 1)
             first:SetSize(167, 39)
             first:SetTexCoord(0.31250000, 0.96484375, 0.37109375, 0.52343750)
 
-            local second = btn:CreateTexture('TextBackground2', 'BACKGROUND')
+            local second = btn:CreateTexture(nil, 'BACKGROUND')
             second:SetTexture(base .. 'Spellbook-Parts')
             second:SetPoint('TOPLEFT', _G['SpellButton' .. i .. 'Highlight'], 'TOPRIGHT', -4, 0 - 1)
             second:SetSize(167, 39)
@@ -4373,7 +4373,7 @@ function DragonflightUIMixin:AddNineSliceTextures(frame, portrait)
     slice.LeftEdge = frame:CreateTexture('LeftEdge')
     slice.RightEdge = frame:CreateTexture('RightEdge')
 
-    frame.Bg = CreateFrame('FRAME', 'Bg', frame, 'FlatPanelBackgroundTemplate')
+    frame.Bg = CreateFrame('FRAME', nil, frame, 'FlatPanelBackgroundTemplate')
     frame.Bg:SetPoint('TOPLEFT', frame, 'TOPLEFT', 7, -18)
     frame.Bg:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -3, 3)
     frame.Bg:SetFrameLevel(0)

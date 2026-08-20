@@ -628,7 +628,7 @@ function DFEditModeSystemSelectionBaseMixin:AddNineslice()
     slice.RightEdge:SetPoint('TOPLEFT', slice.TopRightCorner, 'BOTTOMLEFT')
     slice.RightEdge:SetPoint('BOTTOMRIGHT', slice.BottomRightCorner, 'TOPRIGHT')
 
-    slice.Center = self:CreateTexture('Center')
+    slice.Center = self:CreateTexture(nil)
     slice.Center:SetSize(16, 16)
     -- slice.Center:SetPoint('TOPLEFT', -8, 8)
     -- slice.Center:SetPoint('BOTTOMRIGHT', 8, -8)

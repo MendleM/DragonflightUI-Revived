@@ -440,7 +440,7 @@ function DragonflightUIMicroMenuMixin:ChangeCharacterMicroButton()
     MicroButtonPortrait:Hide()
 
     -- new portrait
-    local dfPortrait = frame:CreateTexture('NewPortrait', 'ARTWORK')
+    local dfPortrait = frame:CreateTexture(nil, 'ARTWORK')
     dfPortrait:SetAllPoints()
     -- newPortrait:SetSize(sizeX - 2 * inside, sizeY - 2 * inside)
     -- newPortrait:SetPoint('CENTER', 0.5, 0)
@@ -460,7 +460,7 @@ function DragonflightUIMicroMenuMixin:ChangeCharacterMicroButton()
     frame.dfPortraitMask = dfPortraitMask
 
     -- portraitShadow (pushed)
-    local dfPortraitShadow = frame:CreateTexture('NewPortraitShadow', 'OVERLAY')
+    local dfPortraitShadow = frame:CreateTexture(nil, 'OVERLAY')
     dfPortraitShadow:SetTexture(microTexture)
     dfPortraitShadow:SetTexCoord(0.323242, 0.385742, 0.166016, 0.326172)
     dfPortraitShadow:SetSize(32, 41)

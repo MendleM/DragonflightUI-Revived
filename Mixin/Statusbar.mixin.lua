@@ -75,7 +75,7 @@ function DragonflightUIXPBarMixin:CreateBar()
     f.RestedBarMark.Texture:SetAllPoints()
 
     -- border
-    local border = f.Bar:CreateTexture('Border', 'OVERLAY')
+    local border = f.Bar:CreateTexture(nil, 'OVERLAY')
     border:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\XP\\Overlay')
     border:SetTexCoord(0, 0.55517578, 0, 1)
     -- border:SetSize(sizeX, sizeY)

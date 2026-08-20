@@ -467,7 +467,7 @@ function DragonFlightUIConfigMixin:AddToolbar()
             GameTooltip:Hide();
         end)
 
-        local tex = b:CreateTexture('Tex')
+        local tex = b:CreateTexture(nil)
         tex:SetTexture(base .. v.icon)
         tex:SetSize(22 - (v.sizeDelta or 0), 22 - (v.sizeDelta or 0))
         tex:SetPoint('LEFT', b, 'LEFT', 4, 0)

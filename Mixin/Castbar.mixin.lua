@@ -932,7 +932,7 @@ function DragonFlightUICastbarMixin:AddTicks(count)
     if not self.ticks then
         local ticks = {}
         for i = 1, count do
-            local tick = self:CreateTexture('Tick' .. i, 'OVERLAY', 'DragonflightUICastbarTickTemplate')
+            local tick = self:CreateTexture(nil, 'OVERLAY', 'DragonflightUICastbarTickTemplate')
             tick:SetDrawLayer('OVERLAY')
             -- tick:SetVertexColor(0, 0, 0, 0.69)
             tick:ClearAllPoints()
