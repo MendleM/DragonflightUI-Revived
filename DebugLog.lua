@@ -1303,6 +1303,70 @@ local function ArmSeedWatcher()
     end)
 end
 
+-- /df log globals - every global this addon has dirtied.
+--
+-- The seed watcher proved the party taint arrives from OUTSIDE our code: the
+-- stack at the moment .unit goes insecure is pure Blizzard, from UIParent's
+-- event handler down through UpdateRaidAndPartyFrames. So the execution was
+-- already tainted on entry, and in WoW that only happens one way - Blizzard
+-- read a variable we had dirtied.
+--
+-- taintLog reports exactly that and needs a CVar, a reload and an 85MB file.
+-- issecurevariable(name) answers the same question for one global, so asking it
+-- about all of them gives the write-side list directly, in game, on demand.
+--
+-- Everything blamed on DragonflightUI is a candidate seed. The one to look for
+-- is a name Blizzard's party path would read - anything CompactRaidFrame*,
+-- since UpdateRaidAndPartyFrames lives in RaidFrame.lua and this addon calls
+-- CompactRaidFrameManager_SetSetting from its edit mode.
+function DF:LogTaintedGlobals(tag)
+    tag = tag or 'globals'
+
+    if InCombatLockdown() then
+        DF:Log(tag, 'skipped: in combat (this walks every global, so it waits)')
+        return
+    end
+
+    local scanned, dirty, ours = 0, 0, 0
+    local mine = {}
+
+    for name in pairs(_G) do
+        if type(name) == 'string' then
+            scanned = scanned + 1
+            local ok, who = issecurevariable(name)
+            if not ok then
+                dirty = dirty + 1
+                if who == addonName then
+                    ours = ours + 1
+                    mine[#mine + 1] = name
+                end
+            end
+        end
+    end
+
+    table.sort(mine)
+
+    -- Ours first and in full: this is the list that matters. Blizzard-owned
+    -- names in it are the seeds; DragonflightUI* names are just our own frames
+    -- and are expected.
+    local blizz = {}
+    for _, name in ipairs(mine) do
+        if not name:find('DragonflightUI', 1, true) and not name:find('^DF') then blizz[#blizz + 1] = name end
+    end
+
+    DF:Log(tag, 'scanned %d globals: %d tainted overall, %d by %s, %d of those NOT ours', scanned, dirty, ours,
+           addonName, #blizz)
+
+    if #blizz == 0 then
+        DF:Log(tag, 'no Blizzard-owned global is dirtied by this addon')
+    else
+        for _, name in ipairs(blizz) do DF:Log(tag, 'SEED: %s tainted by %s', name, addonName) end
+    end
+
+    -- Our own, collapsed to a count - they are expected and would bury the rest.
+    DF:Log(tag, '(%d of ours, e.g. %s)', ours - #blizz, mine[1] or '-')
+end
+
 -- /df log party - names whoever tainted the party frames. Run it once the
 -- frames have misbehaved; the taint is sticky, so it is still there afterwards.
 function DF:LogPartyTaint(tag)
@@ -1477,6 +1541,9 @@ function DF:HandleLogCommand(rest)
             DF:LogToT('totdump')
             DF:LogDump('totdump', 40)
         end
+    elseif sub == 'globals' then
+        DF:LogTaintedGlobals('globals')
+        DF:LogCopy('globals')
     elseif sub == 'seed' then
         if seedFound then
             DF:LogCopy('seed')
