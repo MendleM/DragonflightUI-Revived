@@ -15,8 +15,6 @@ Module.Tmp = {}
 
 Mixin(Module, DragonflightUIModulesMixin)
 
-Module.SubGroupLootContainer = DF:CreateFrameFromMixinAndInit(addonTable.SubModuleMixins['GroupLootContainer'])
-
 local defaults = {
     profile = {
         scale = 1,
@@ -37,7 +35,6 @@ local defaults = {
         -- the 'movable' sub so the page's Defaults button resets the option
         -- without silently throwing away every position the player set.
         movableWindowPositions = {},
-        roll = Module.SubGroupLootContainer.Defaults,
         widgetBelow = {
             scale = 1,
             anchorFrame = 'Minimap',
@@ -220,8 +217,6 @@ local widgetBelowOptions = {
     type = 'group',
     args = {}
 }
-DF.Settings:AddPositionTable(Module, widgetBelowOptions, 'widgetBelow', 'GroupLootContainer', getDefaultStr, frameTable)
--- DragonflightUIStateHandlerMixin:AddStateTable(Module, rollOptions, 'possess', 'PossessBar', getDefaultStr)
 widgetBelowOptions.args.scale = nil;
 local widgetBelowEditmode = {
     name = 'possess',
@@ -322,7 +317,6 @@ function Module:RegisterSettings()
     -- its own entry, and near the top: it is a feature of its own, not another
     -- restyling toggle to be hunted for among twenty of them
     register('movable', {order = 0.5, name = movableOptions.name, descr = 'desc', isNew = true})
-    register('roll', {order = 18, name = self.SubGroupLootContainer.Options.name, descr = 'desc', isNew = true})
     register('widgetBelow', {order = 19, name = widgetBelowOptions.name, descr = 'desc', isNew = false})
 end
 
@@ -390,10 +384,8 @@ function Module:RefreshOptionScreens()
 
     refreshCat('UI')
     refreshCat('movable')
-    refreshCat('roll')
     refreshCat('widgetBelow')
 
-    self.SubGroupLootContainer.PreviewRoll.DFEditModeSelection:RefreshOptionScreen();
     Module.PreviewWidgetBelow.DFEditModeSelection:RefreshOptionScreen();
 end
 
@@ -497,8 +489,6 @@ function Module:ApplySettingsInternal(sub, key)
     end)
 
     Module:UpdateWidgetBelowState(db.widgetBelow)
-
-    self.SubGroupLootContainer:UpdateState(db.roll)
 
     -- Deliberately not a ConditionalOption: that helper only ever runs its
     -- body once, and this option has to take effect in both directions
@@ -988,11 +978,6 @@ function Module:ChangeWidgetBelow()
     fakeWidget:SetSize(173, 26)
     Module.PreviewWidgetBelow = fakeWidget
 
-    -- local fakePreview = CreateFrame('Frame', 'DragonflightUIEditModeGroupLootContainerFakeLootPreview', fakeRoll,
-    --                                 'DFEditModePreviewGroupLootTemplate')
-    -- fakePreview:SetPoint('CENTER')
-
-    -- fakeRoll.FakePreview = fakePreview
     local f = _G['UIWidgetBelowMinimapContainerFrame']
     hooksecurefunc(f, 'SetPoint', function(frameRef, point, relativeFrame, relativePoint, ofsx, ofsy)
         -- print('SetPoint', point, relativeFrame, relativePoint, ofsx, ofsy) 
@@ -1011,7 +996,6 @@ function Module:ChangeWidgetBelow()
 end
 
 function Module:UpdateWidgetBelowState(state)
-    -- print('UpdateGroupLootContainerState')
 
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
@@ -1029,7 +1013,6 @@ end
 
 function Module:Era()
     Module:ChangeFrames()
-    self.SubGroupLootContainer:Setup()
 
     frame:RegisterEvent('ADDON_LOADED')
     frame:RegisterEvent('PLAYER_ENTERING_WORLD')
@@ -1041,7 +1024,6 @@ end
 
 function Module:TBC()
     Module:ChangeFrames()
-    self.SubGroupLootContainer:Setup()
 
     -- frame:RegisterEvent('ADDON_LOADED')
     -- frame:RegisterEvent('PLAYER_ENTERING_WORLD')
@@ -1053,13 +1035,11 @@ end
 
 function Module:Wrath()
     Module:ChangeFrames()
-    self.SubGroupLootContainer:Setup()
 end
 
 function Module:Cata()
     Module:ChangeFrames()
     Module:HookCharacterFrame()
-    self.SubGroupLootContainer:Setup()
 
     frame:RegisterEvent('ADDON_LOADED')
     frame:RegisterEvent('PLAYER_ENTERING_WORLD')
@@ -1069,8 +1049,6 @@ end
 function Module:Mists()
     Module:ChangeFrames()
     Module:HookCharacterFrame()
-
-    self.SubGroupLootContainer:Setup()
 
     frame:RegisterEvent('ADDON_LOADED')
     frame:RegisterEvent('PLAYER_ENTERING_WORLD')

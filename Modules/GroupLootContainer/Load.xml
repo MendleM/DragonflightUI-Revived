@@ -1,5 +1,3 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ http://wowprogramming.com/FrameXML/UI.xsd">
-	<Include file="UI.lua" />
-	<!-- after UI.lua: resolves the UI module at load -->
-	<Include file="MovableWindows.lua" />
+	<Include file="GroupLootContainer.lua" />
 </Ui>
