@@ -377,6 +377,7 @@ function DragonflightUIActionbarMixin:Update()
     -- mainbar only
     if self.gryphonLeft and self.gryphonRight then self:UpdateGryphons(state.gryphons) end
     if self.BorderArt then self:UpdateBorderArt(state) end
+    self:UpdateDividerArt(state)
 
     if self.numberFrame then self:UpdateNumberFrame() end
 
@@ -613,6 +614,122 @@ function DragonflightUIActionbarMixin:UpdateBorderArt(state)
     end
     -- rects resolve a frame after layout; retry once if not ready yet
     if not anchor() then C_Timer.After(0, anchor) end
+end
+
+-- The dividers are the thin lines between adjacent buttons on the bar.
+--
+-- Retail draws them in MainActionBarMixin:UpdateDividers as a nineslice per gap,
+-- from the ui-hud-actionbar-frame-divider texture kit, and only when three
+-- things hold: the bar art is on, the bar is a single row, and the buttons are
+-- still at their default spacing. Classic has neither that mixin nor that
+-- atlas, so both the art and the rules are rebuilt here.
+--
+-- The hideDivider option has existed since upstream's b0ea9b9 (31 July 2025),
+-- which added it alongside hideBorder and implemented only hideBorder. It has
+-- been a checkbox wired to nothing ever since. Reported by frostbitten_z.
+--
+-- Two textures per gap, not one: the line fades out at both ends, and a single
+-- texture can only gradient one way.
+local DIVIDER_WIDTH, DIVIDER_ALPHA, DIVIDER_MAX_PADDING = 2, 0.35, 4
+
+function DragonflightUIActionbarMixin:UpdateDividerArt(state)
+    if not (state and self.buttonTable) then return end
+
+    self.DividerArt = self.DividerArt or {}
+    local pool = self.DividerArt
+
+    local function hideAll()
+        for _, piece in ipairs(pool) do
+            piece.top:Hide()
+            piece.bottom:Hide()
+        end
+    end
+
+    -- Retail's three conditions. Past a few pixels of padding the line stops
+    -- bridging the gap and just floats between the buttons, which is why
+    -- Blizzard drops them once the player widens the spacing.
+    local hidden = state.hideDivider or (self.BorderArt and state.hideBorder) or (state.rows or 1) > 1 or
+                       (state.padding or 0) > DIVIDER_MAX_PADDING
+    if hidden then
+        hideAll()
+        return
+    end
+
+    local function makePiece()
+        local function part(alphaAtTop)
+            local tex = self:CreateTexture(nil, 'BACKGROUND', nil, -5)
+            tex:SetColorTexture(1, 1, 1, 1)
+            tex:SetWidth(DIVIDER_WIDTH)
+            if tex.SetGradient and CreateColor then
+                local solid, clear = CreateColor(1, 1, 1, DIVIDER_ALPHA), CreateColor(1, 1, 1, 0)
+                -- VERTICAL runs bottom colour -> top colour.
+                tex:SetGradient('VERTICAL', alphaAtTop and clear or solid, alphaAtTop and solid or clear)
+            else
+                tex:SetAlpha(DIVIDER_ALPHA)
+            end
+            return tex
+        end
+        -- top half is solid at the bottom (the button's middle) and fades going up
+        return {top = part(false), bottom = part(true)}
+    end
+
+    local function place()
+        local buttons = {}
+        for _, b in ipairs(self.buttonTable) do
+            if b:IsShown() then
+                -- Not laid out yet. Say so rather than treating it as an empty
+                -- bar, or the retry below never happens and the dividers stay
+                -- hidden until the next settings change.
+                if not b:GetLeft() then return false end
+                buttons[#buttons + 1] = b
+            end
+        end
+
+        if #buttons < 2 then
+            hideAll()
+            return true
+        end
+
+        table.sort(buttons, function(a, b) return a:GetLeft() < b:GetLeft() end)
+
+        local used = 0
+        for i = 2, #buttons do
+            local prev, btn = buttons[i - 1], buttons[i]
+            local gap = btn:GetLeft() - prev:GetRight()
+            local height = btn:GetHeight()
+
+            -- Same row, and actually adjacent. A wrapped bar puts the first
+            -- button of row two to the left of the last of row one, which is a
+            -- gap we must not draw in.
+            if gap >= 0 and height and math.abs(btn:GetTop() - prev:GetTop()) < 0.5 then
+                used = used + 1
+                pool[used] = pool[used] or makePiece()
+                local piece = pool[used]
+                local half = (height - 4) / 2
+                local x = -gap / 2
+
+                piece.top:ClearAllPoints()
+                piece.top:SetPoint('TOP', btn, 'TOPLEFT', x, -2)
+                piece.top:SetHeight(half)
+                piece.top:Show()
+
+                piece.bottom:ClearAllPoints()
+                piece.bottom:SetPoint('BOTTOM', btn, 'BOTTOMLEFT', x, 2)
+                piece.bottom:SetHeight(half)
+                piece.bottom:Show()
+            end
+        end
+
+        for i = used + 1, #pool do
+            pool[i].top:Hide()
+            pool[i].bottom:Hide()
+        end
+
+        return true
+    end
+
+    -- Rects only resolve after layout, same as UpdateBorderArt.
+    if not place() then C_Timer.After(0, place) end
 end
 
 function DragonflightUIActionbarMixin:AddPagingStateDriver()

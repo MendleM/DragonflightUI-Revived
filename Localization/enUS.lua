@@ -340,7 +340,8 @@ do
     L["MoreOptionsBorderFill"] = "Border Fill Opacity"
     L["MoreOptionsBorderFillDesc"] = "Darkness of the fill behind the buttons inside the border frame. Retail uses a very subtle tint (~0.2); 0 disables the fill."
     L["MoreOptionsHideDivider"] = "Hide Bar Divider"
-    L["MoreOptionsHideDividerDesc"] = ""
+    L["MoreOptionsHideDividerDesc"] =
+        "The thin lines between adjacent buttons. Shown only while the bar art is on, the bar is a single row, and the buttons are at their default spacing - the same conditions the modern client uses. "
 
     L["MoreOptionsGryphons"] = "Gryphons"
     L["MoreOptionsGryphonsDesc"] = "Gryphons"
