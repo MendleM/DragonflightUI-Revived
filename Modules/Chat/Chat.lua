@@ -424,6 +424,12 @@ function frame:OnEvent(event, arg1)
         -- Blizzard rebuilds every window from its saved settings here, size
         -- and dock included; our position has to be the last word.
         Module:ApplySettings()
+    elseif event == 'DISPLAY_SIZE_CHANGED' or event == 'UI_SCALE_CHANGED' then
+        -- Going windowed, resizing the window, or any UI scale change re-lays
+        -- the chat frame out from Blizzard's saved position, and ours was not
+        -- being re-applied afterwards. tando_san: "when in windowed mode or
+        -- when zoning the chat window does not honor the anchor settings".
+        Module:ApplySettings()
     end
 end
 frame:SetScript('OnEvent', frame.OnEvent)
@@ -433,12 +439,19 @@ function Module:Era()
 end
 
 function Module:TBC()
+    -- This was empty, so on TBC nothing ever re-applied the anchor: the
+    -- settings were written once at load and the first thing to move the frame
+    -- afterwards kept it. Every other flavour has registered these all along,
+    -- which is why the report is TBC-specific.
+    Module:Wrath()
 end
 
 function Module:Wrath()
     frame:RegisterEvent('PLAYER_ENTERING_WORLD')
     frame:RegisterEvent('UPDATE_FLOATING_CHAT_WINDOWS')
     frame:RegisterEvent('UPDATE_CHAT_WINDOWS')
+    frame:RegisterEvent('DISPLAY_SIZE_CHANGED')
+    frame:RegisterEvent('UI_SCALE_CHANGED')
 end
 
 function Module:Cata()
