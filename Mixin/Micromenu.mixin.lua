@@ -310,6 +310,17 @@ function DragonflightUIMicroMenuMixin:ChangeButtons()
         -- it under a hidden holder instead.
         if MainMenuBarPerformanceBar then MainMenuBarPerformanceBar:Hide() end
 
+        -- The other latency indicator is MainMenuMicroButton's own
+        -- PerformanceIndicator child, anchored for the height of Blizzard's
+        -- button art. Ours is a different size, so it ends up sitting in the
+        -- middle of the button instead of on its bottom edge. Put it back where
+        -- it belongs, the same way the TBC branch below already does.
+        local perf = MainMenuMicroButton and MainMenuMicroButton.PerformanceIndicator
+        if perf then
+            perf:ClearAllPoints()
+            perf:SetPoint('BOTTOM')
+        end
+
         -- self:HookMicromenuOverride()
     elseif DF.Cata then
         self:ChangeCharacterMicroButton()
