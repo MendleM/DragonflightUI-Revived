@@ -3600,6 +3600,22 @@ function Module:ForceMoveBlizzEditModeGhosts()
             end
         end
 
+        -- And take Blizzard's scale off them while we are here.
+        --
+        -- ActionButton1-12 stay parented to MainActionBar - SetButtons skips
+        -- reparenting bar 1 on purpose - so bar 1, alone of the eight, inherits
+        -- whatever scale Blizzard's Edit Mode has on that frame and multiplies
+        -- our own scale into it. Bars 2-8 sit on our own frames and never see
+        -- it. Until 0.43.0 the login ApplyChanges wrote our layout over
+        -- Blizzard's and normalised this to 100%; ca63ea9 stopped applying at
+        -- login, so their 110% survives and bar 1 comes out oversized.
+        --
+        -- Reported by insane_80, who worked out the mechanism from two
+        -- screenshots before we did: "0.43.0 is using the Blizzard 110% as
+        -- default and then using this with the scale setting from the addon,
+        -- but only for Action Bar 1."
+        for k, v in ipairs(t) do if v.SetScale then v:SetScale(1) end end
+
         if addonTable.ScheduleBlizzEditmodeApply then addonTable:ScheduleBlizzEditmodeApply() end
     else
         for k, v in ipairs(t) do
