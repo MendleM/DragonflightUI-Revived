@@ -350,6 +350,21 @@ function SubModuleMixin:Update()
     -- it actually sits.
     if f_orig:GetParent() ~= f and not InCombatLockdown() then f_orig:SetParent(f) end
 
+    -- The holder is declared hidden in Load.xml, like the other five, and
+    -- nothing in this addon ever shows it. That is fine for a holder a frame is
+    -- only anchored to, which is what the other unit frames do - target-of-target
+    -- never reparents, and Focus.mixin.lua has its reparent commented out. This
+    -- one does reparent, and a child of a hidden frame does not render, which is
+    -- "Target of Focus not working, completely hidden" on MoP and "Focus target
+    -- does not show up" on TBC.
+    --
+    -- Show the holder rather than dropping the reparent: the reparent is what
+    -- keeps Blizzard's parent-relative SetPoint in SetSmallSize inside one
+    -- anchor family, which is the warning the comment above describes. The
+    -- holder carries no art and takes no mouse, so showing it costs nothing -
+    -- the party move frame is unhidden for exactly this reason, and says so.
+    f:Show()
+
     f_orig:ClearAllPoints()
     f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
 
