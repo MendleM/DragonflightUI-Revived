@@ -2,10 +2,73 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.43.0`.
+May 2026). Current builds report version `0.44.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.44.0 — What 0.43.0 broke, and what it never fixed (23 August 2026)
+
+Three regressions from the last release, five long-standing bugs, and a checkbox
+that finally does something.
+
+**Highlights** — TBC: the pet frame is back · action bar 1 is the right size
+again · focus target shows up on TBC and MoP · bar dividers work, a year after
+the option appeared
+
+### Fixed from 0.43.0
+
+All three come from the same change: 0.43.0 stopped applying Blizzard's layout
+during login, which is what fixed the party frames, and left the things that
+relied on that application to fend for themselves.
+
+- **TBC:** the pet frame is back. Its position was saved to the layout and then
+  never actually applied, so the frame was placed wherever it happened to be.
+  TBC is the only flavour that routes the pet frame that way
+- Action bar 1 is no longer oversized. It inherits Blizzard's Edit Mode scale on
+  top of ours — the only bar that does, because its buttons stay parented to
+  Blizzard's frame rather than ours. Diagnosed by insane_80
+- Blizzard's own action bar no longer sits on screen alongside ours
+
+### Unit frames
+
+- Focus target is visible again on **TBC** and **MoP**. It is the one unit frame
+  reparented onto a holder, and that holder was never shown, so it could not
+  render at all
+- **Era:** the faction icon sits on the target frame instead of off the edge of
+  it. The fix already existed and only ran on TBC
+- No more error when reloading during combat, from target-of-target not having
+  been built yet
+
+### Action bars
+
+- **Bar dividers** — the lines between buttons, drawn with Blizzard's own art.
+  The option has been in the settings since July 2025 wired to nothing
+- **Flyout Direction:** choosing *Up* works. It never has. Up was left to
+  Blizzard to decide, and Blizzard decides from where the bar sits on screen —
+  ours is parked off it, so the answer was always *Down*
+- **MoP:** the latency indicator sits on the bottom edge of the game menu button
+  instead of in the middle of it
+
+### Chat
+
+- **TBC:** the chat window keeps its position through a loading screen. Nothing
+  was putting it back — the flavour registered none of the events the others do
+- **All versions:** it also keeps its position when you go windowed, resize the
+  window, or change UI scale
+
+### Nameplates
+
+- Fixed an error that could repeat hundreds of times in a session, from asking a
+  nameplate for its parent when the thing passed to us was not a frame at all.
+  Reported with Plater
+
+### Under the hood
+
+- Escape closes our windows again without taking the keyboard with it. Movement
+  and casting stopped working while any window was open
+- Stopped leaking sixteen global names generic enough that another addon could
+  well have been using them
 
 ## 0.43.0 — Party frames and professions (13 August 2026)
 

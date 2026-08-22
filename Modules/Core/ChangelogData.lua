@@ -24,6 +24,58 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.44.0',
+        title = 'What 0.43.0 broke, and what it never fixed',
+        date = '23 August 2026',
+        intro = 'Three regressions from the last release, five long-standing bugs, and a checkbox that finally does something.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'TBC: the pet frame is back.', 'Action bar 1 is the right size again.',
+                    'Focus target shows up on TBC and MoP.', 'Bar dividers work, a year after the option appeared.'
+                }
+            }, {
+                title = 'Fixed from 0.43.0',
+                items = {
+                    'TBC: the pet frame is back. It was saved to the layout and then never actually placed.',
+                    'Action bar 1 is no longer oversized. It was inheriting Blizzard\'s Edit Mode scale on top of ours - the only bar that does, because its buttons stay parented to Blizzard\'s frame.',
+                    'Blizzard\'s own action bar no longer sits on screen next to ours.'
+                }
+            }, {
+                title = 'Unit frames',
+                items = {
+                    'Focus target is visible again on TBC and MoP. It was parented to a holder frame that was never shown, so it could not render at all.',
+                    'Era: the faction icon sits on the target frame instead of off the edge of it. The fix existed but only ran on TBC.',
+                    'No more error when reloading during combat, from target-of-target not being built yet.'
+                }
+            }, {
+                title = 'Action bars',
+                items = {
+                    'Bar dividers: the lines between buttons, using Blizzard\'s own art. The option has been in the settings since July 2025 and was wired to nothing.',
+                    'Flyout Direction: choosing Up works. It never did - the direction was left to Blizzard, which decides from where the bar sits on screen, and ours is parked off it.',
+                    'MoP: the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.'
+                }
+            }, {
+                title = 'Chat',
+                items = {
+                    'TBC: the chat window keeps its position through loading screens. Nothing was putting it back.',
+                    'All versions: it also keeps its position when you go windowed or resize the window.'
+                }
+            }, {
+                title = 'Nameplates',
+                items = {
+                    'Fixed an error that could repeat hundreds of times in a session, from asking a nameplate for its parent when it was not a frame at all. Reported with Plater.'
+                }
+            }, {
+                title = 'Under the hood',
+                items = {
+                    'Escape closes our windows again without taking the keyboard with it - movement and casting kept working while a window was open.',
+                    'Stopped leaking sixteen global names generic enough for any other addon to be using.'
+                }
+            }
+        }
+    }, {
         version = '0.43.0',
         title = 'Party frames and professions',
         date = '13 August 2026',
