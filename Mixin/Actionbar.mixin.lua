@@ -296,11 +296,18 @@ function DragonflightUIActionbarMixin:Update()
                 btn:SetPoint(anchor, self, anchor, dy, sgn * dx)
             end
 
-            if state.flyoutDirection == 'UP' then
-                btn:UpdateFlyoutDirection(nil)
-            else
-                btn:UpdateFlyoutDirection(state.flyoutDirection)
-            end
+            -- Always set it, UP included.
+            --
+            -- UP used to be passed as nil, leaving the choice to Blizzard on the
+            -- grounds that UP is its default. It is not a default - ActionBar.lua's
+            -- UpdateSpellFlyoutDirection works it out from where the bar sits on
+            -- screen: a horizontal bar whose centre is below the halfway line
+            -- flies UP, above it flies DOWN. And we park MainActionBar at
+            -- UIParent TOP +500 to get Blizzard's copy out of the way, so its
+            -- centre is a long way above the halfway line and the answer is
+            -- always DOWN. Picking UP therefore did nothing, which is
+            -- frostbitten_z's report.
+            btn:UpdateFlyoutDirection(state.flyoutDirection)
 
             -- btn:GetAttribute("showgrid") can be nil
             -- if state.alwaysShow then
