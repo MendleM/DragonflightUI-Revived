@@ -1305,6 +1305,39 @@ local SEED_CANDIDATES = {
     'UnitExists', 'UnitName', 'UnitGUID', 'UnitIsGroupLeader', 'C_PartyInfo', 'PartyMemberBuffTooltip'
 }
 
+-- Walk an object's fields and name every one this addon owns.
+--
+-- The global sweep came back with nothing: 270 globals are dirtied by us, and
+-- cross-referencing all of them against Blizzard's own party source found not
+-- one that the party path reads. So the taint arrives on a FIELD, which is what
+-- issecurevariable's two-argument form is for, and which taintLog cannot see at
+-- all - worth knowing before anyone spends an 85MB log on it.
+--
+-- The prime suspect is frame.OnEvent. UnitFrame.lua:904 caches the original
+-- handler onto the frame with
+--   unitFrame.OnEvent = unitFrame:GetScript("OnEvent") or false
+-- and UnitFrameThreatIndicator_OnEvent reads it back on every single event at
+-- line 911 - which is the exact top of the captured stack. Whoever is on the
+-- stack when that cache is written owns the field for the session, and then
+-- every event on that frame starts tainted. Same shape as the two seeds already
+-- found and fixed: a value Blizzard creates lazily, inside our execution.
+local function LogInsecureFields(label, obj)
+    if type(obj) ~= 'table' then return end
+
+    local hits = 0
+    for key in pairs(obj) do
+        if type(key) == 'string' then
+            local safe, blame = issecurevariable(obj, key)
+            if not safe then
+                hits = hits + 1
+                DF:Log('seed', 'FIELD %s.%s insecure, tainted by %s', label, key, tostring(blame or '?'))
+            end
+        end
+    end
+
+    if hits == 0 then DF:Log('seed', 'FIELD %s: every field secure', label) end
+end
+
 local function LogSeedCandidates()
     local hits = 0
 
@@ -1343,6 +1376,21 @@ local function ArmSeedWatcher()
         -- that means Blizzard read a variable we had dirtied. Name it now,
         -- while the evidence is still on the stack, rather than after the fact.
         LogSeedCandidates()
+
+        -- The fields, which is where the evidence now points. The member frame
+        -- itself, its pet frame (UpdatePet is on the tainted stretch), and the
+        -- container above it.
+        LogInsecureFields('member', frame)
+        LogInsecureFields('member.PetFrame', frame.PetFrame)
+        LogInsecureFields('parent', frame.GetParent and frame:GetParent())
+        LogInsecureFields('PartyFrame', _G['PartyFrame'])
+
+        -- Named outright, because it is the suspect and it may not survive a
+        -- pairs() walk if Blizzard cached it as false.
+        local okEvent, blameEvent = issecurevariable(frame, 'OnEvent')
+        DF:Log('seed', 'frame.OnEvent secure=%s blame=%s value=%s', tostring(okEvent), tostring(blameEvent or '-'),
+               type(rawget(frame, 'OnEvent')))
+
         DF:LogTaintedGlobals('seed')
 
         print(PREFIX .. 'party taint seed captured - run |cffffff78/df log seed|r')
