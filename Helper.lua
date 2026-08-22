@@ -385,34 +385,47 @@ end
 -- Handling the key ourselves costs nothing and takes us out of it entirely.
 -- Propagation stays ON except for the Escape we consume, so typing in the
 -- window still works and every other key reaches the game.
+-- Two rules make this safe, and the first version of it broke both.
+--
+-- SetPropagateKeyboardInput may only be called from inside a keyboard handler.
+-- Called anywhere else it does not take - and the first version called it at
+-- setup, on show and on hide, where it silently did nothing, inside a pcall
+-- that hid the failure. So the window came up holding the keyboard with
+-- propagation off, and every key it swallowed was a key that did not reach the
+-- game: no movement, no spells, for as long as the window was open. Reported
+-- as "any window open and I cannot move or cast", which is exactly what it is,
+-- and the frames this is applied to - character, spellbook, quest log, trade,
+-- inspect, talents - are exactly "any window".
+--
+-- A frame that is not shown should not hold the keyboard at all. Enabling it
+-- once at setup left every one of these windows holding it for the whole
+-- session, shown or not.
+--
+-- So: keyboard only while the window is up, and propagation touched only from
+-- the one place the API allows, where every key that is not the Escape we
+-- consume is explicitly passed through.
 function Helper:CloseWithEscape(frame)
     if not frame or frame.DFEscapeHandled then return end
     frame.DFEscapeHandled = true
 
-    local function propagate(f, on)
-        if f.SetPropagateKeyboardInput then
-            -- Refused on a protected frame in combat; none of ours are, but a
-            -- refusal here must not take the caller down with it.
-            pcall(f.SetPropagateKeyboardInput, f, on)
-        end
-    end
+    local function hold(f) f:EnableKeyboard(true) end
+    local function release(f) f:EnableKeyboard(false) end
 
-    frame:EnableKeyboard(true)
-    propagate(frame, true)
+    if frame:IsShown() then hold(frame) end
+    frame:HookScript('OnShow', hold)
+    frame:HookScript('OnHide', release)
 
     frame:HookScript('OnKeyDown', function(f, key)
+        -- The only legal place to call this, and it applies to the key being
+        -- handled right now - so the pass-through has to be set on every key,
+        -- not just once.
         if key == 'ESCAPE' then
-            propagate(f, false)
+            f:SetPropagateKeyboardInput(false)
             f:Hide()
         else
-            propagate(f, true)
+            f:SetPropagateKeyboardInput(true)
         end
     end)
-
-    -- A frame hidden while it was swallowing Escape would otherwise keep the
-    -- keyboard on its next show.
-    frame:HookScript('OnShow', function(f) propagate(f, true) end)
-    frame:HookScript('OnHide', function(f) propagate(f, true) end)
 end
 
 function Helper:CreateFrameEventCallback(event, fn)
