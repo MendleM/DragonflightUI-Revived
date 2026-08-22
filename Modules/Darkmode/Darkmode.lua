@@ -578,10 +578,19 @@ function Module:UpdateTargetFrame(state)
     TargetFrameBackground:SetDesaturated(state.unitframeDesaturate)
     TargetFrameBackground:SetVertexColor(c:GetRGB())
 
+    -- Target-of-target is built later than the target frame, and on a reload in
+    -- combat later still - the setup chain defers what it cannot do while the
+    -- player is in combat. Darkmode can arrive before the background texture
+    -- exists, which is what threw "attempt to index local
+    -- 'TargetFrameToTBackground' (a nil value)". Skip just this piece rather
+    -- than returning: the target frame below still wants darkening, and
+    -- ChangeTargetFrame calls us again on the next target change.
     local tot = unitModule.SubTargetOfTarget
-    local TargetFrameToTBackground = tot.TargetFrameToTBackground
-    TargetFrameToTBackground:SetDesaturated(state.unitframeDesaturate)
-    TargetFrameToTBackground:SetVertexColor(c:GetRGB())
+    local TargetFrameToTBackground = tot and tot.TargetFrameToTBackground
+    if TargetFrameToTBackground then
+        TargetFrameToTBackground:SetDesaturated(state.unitframeDesaturate)
+        TargetFrameToTBackground:SetVertexColor(c:GetRGB())
+    end
 
     -- TODO
     targetPortExtra:SetVertexColor(0.6, 0.6, 0.6)
