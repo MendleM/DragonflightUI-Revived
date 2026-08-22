@@ -876,10 +876,18 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
         unconsciousText:SetPoint('CENTER', healthBar, 'CENTER', 0, 0)
     end
 
-    if DF.API.Version.IsTBC then
-        local t = TargetFrame.pvpIcon;
-        t:ClearAllPoints()
-        t:SetPoint('LEFT', TargetFramePortrait, 'RIGHT', -22, -18)
+    -- Era needs this as much as TBC does. Blizzard anchors the faction icon to
+    -- its own target frame art, and we replace that art, so left alone it sits
+    -- off the frame - reported as "faction logo has the wrong position on
+    -- targets", with a screenshot from 1.15.9. The icon is the same region on
+    -- both (TargetFrameTextureFramePVPIcon, reached as TargetFrame.pvpIcon) and
+    -- both use the classic frame, so the TBC placement applies unchanged.
+    if DF.API.Version.IsTBC or DF.Era then
+        local t = TargetFrame.pvpIcon
+        if t then
+            t:ClearAllPoints()
+            t:SetPoint('LEFT', TargetFramePortrait, 'RIGHT', -22, -18)
+        end
     end
 
     -- Blizzard's own combat flash, however this flavour happens to expose it: a
