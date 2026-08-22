@@ -628,9 +628,23 @@ end
 -- which added it alongside hideBorder and implemented only hideBorder. It has
 -- been a checkbox wired to nothing ever since. Reported by frostbitten_z.
 --
--- Two textures per gap, not one: the line fades out at both ends, and a single
--- texture can only gradient one way.
-local DIVIDER_WIDTH, DIVIDER_ALPHA, DIVIDER_MAX_PADDING = 2, 0.35, 4
+-- The art is Blizzard's own, extracted the same way uiactionbarframe2x.blp
+-- already was, and packed into Textures/uiactionbardivider.blp: the three
+-- atlas members ui-hud-actionbar-frame-divider-bordertop/-bordercenter/
+-- -borderbottom at 2x, laid out top at y0, centre at y32, bottom at y64 of a
+-- 32x128 sheet. It is not a plain line - it has chevron caps at both ends that
+-- echo the octagonal corners of the bar frame, and the line itself is solid
+-- rather than faded. Three textures per gap, because the centre stretches and
+-- the caps must not.
+local DIVIDER_MAX_PADDING = 4
+local DIVIDER_TEX = 'Interface\\Addons\\DragonflightUI\\Textures\\uiactionbardivider'
+-- Slice height at 1x, and the texcoords of each piece in the packed sheet.
+local DIVIDER_W, DIVIDER_TOP_H, DIVIDER_BOT_H = 12, 14, 15
+local DIVIDER_COORDS = {
+    top = {0, 24 / 32, 0, 28 / 128},
+    centre = {0, 24 / 32, 32 / 128, 64 / 128},
+    bottom = {0, 24 / 32, 64 / 128, 94 / 128}
+}
 
 function DragonflightUIActionbarMixin:UpdateDividerArt(state)
     if not (state and self.buttonTable) then return end
@@ -641,6 +655,7 @@ function DragonflightUIActionbarMixin:UpdateDividerArt(state)
     local function hideAll()
         for _, piece in ipairs(pool) do
             piece.top:Hide()
+            piece.centre:Hide()
             piece.bottom:Hide()
         end
     end
@@ -656,21 +671,14 @@ function DragonflightUIActionbarMixin:UpdateDividerArt(state)
     end
 
     local function makePiece()
-        local function part(alphaAtTop)
+        local function part(which)
             local tex = self:CreateTexture(nil, 'BACKGROUND', nil, -5)
-            tex:SetColorTexture(1, 1, 1, 1)
-            tex:SetWidth(DIVIDER_WIDTH)
-            if tex.SetGradient and CreateColor then
-                local solid, clear = CreateColor(1, 1, 1, DIVIDER_ALPHA), CreateColor(1, 1, 1, 0)
-                -- VERTICAL runs bottom colour -> top colour.
-                tex:SetGradient('VERTICAL', alphaAtTop and clear or solid, alphaAtTop and solid or clear)
-            else
-                tex:SetAlpha(DIVIDER_ALPHA)
-            end
+            tex:SetTexture(DIVIDER_TEX)
+            tex:SetTexCoord(unpack(DIVIDER_COORDS[which]))
+            tex:SetWidth(DIVIDER_W)
             return tex
         end
-        -- top half is solid at the bottom (the button's middle) and fades going up
-        return {top = part(false), bottom = part(true)}
+        return {top = part('top'), centre = part('centre'), bottom = part('bottom')}
     end
 
     local function place()
@@ -705,23 +713,30 @@ function DragonflightUIActionbarMixin:UpdateDividerArt(state)
                 used = used + 1
                 pool[used] = pool[used] or makePiece()
                 local piece = pool[used]
-                local half = (height - 4) / 2
                 local x = -gap / 2
 
+                -- Caps at their own size, centre stretched between them, so the
+                -- chevrons keep their shape whatever the button height is.
                 piece.top:ClearAllPoints()
-                piece.top:SetPoint('TOP', btn, 'TOPLEFT', x, -2)
-                piece.top:SetHeight(half)
+                piece.top:SetPoint('TOP', btn, 'TOPLEFT', x, 0)
+                piece.top:SetHeight(DIVIDER_TOP_H)
                 piece.top:Show()
 
                 piece.bottom:ClearAllPoints()
-                piece.bottom:SetPoint('BOTTOM', btn, 'BOTTOMLEFT', x, 2)
-                piece.bottom:SetHeight(half)
+                piece.bottom:SetPoint('BOTTOM', btn, 'BOTTOMLEFT', x, 0)
+                piece.bottom:SetHeight(DIVIDER_BOT_H)
                 piece.bottom:Show()
+
+                piece.centre:ClearAllPoints()
+                piece.centre:SetPoint('TOP', piece.top, 'BOTTOM', 0, 0)
+                piece.centre:SetPoint('BOTTOM', piece.bottom, 'TOP', 0, 0)
+                piece.centre:SetShown(height > DIVIDER_TOP_H + DIVIDER_BOT_H)
             end
         end
 
         for i = used + 1, #pool do
             pool[i].top:Hide()
+            pool[i].centre:Hide()
             pool[i].bottom:Hide()
         end
 
