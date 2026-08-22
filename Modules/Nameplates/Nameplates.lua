@@ -456,13 +456,26 @@ function Module:OnEnable()
     -- plate was recycled.
     if CompactUnitFrame_UpdateLevel then
         hooksecurefunc('CompactUnitFrame_UpdateLevel', function(frame)
-            if not (frame and frame.GetParent) then return end
+            -- This hooks a global, so it fires for whatever anyone hands that
+            -- global - not only for Blizzard's own frames. Reaching up to the
+            -- plate with frame:GetParent() threw "calling 'GetParent' on bad
+            -- self" for two reporters, once 266 times in a session, and the
+            -- old guard could not catch it: frame.GetParent resolves through
+            -- the metatable on anything frame-shaped, so it says nothing about
+            -- whether the call will work.
+            --
+            -- Blizzard's own body reads frame.unit on its first line, and
+            -- CompactUnitFrame_SetUnit writes both fields before calling us, so
+            -- take the unit from there instead. A field read cannot bad-self,
+            -- whatever turns up.
+            if type(frame) ~= 'table' then return end
+            local unit = frame.displayedUnit or frame.unit
 
             -- CompactUnitFrame is shared with the raid and party frames; only a
-            -- nameplate's parent carries a unit token.
-            local plate = frame:GetParent()
-            local unit = plate and plate.namePlateUnitToken
-            if unit then UpdateLevelText(frame, unit) end
+            -- nameplate's unit is a nameplate token.
+            if type(unit) == 'string' and unit:sub(1, 9) == 'nameplate' then
+                UpdateLevelText(frame, unit)
+            end
         end)
     end
 
