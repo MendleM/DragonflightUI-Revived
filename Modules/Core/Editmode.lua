@@ -850,6 +850,32 @@ function Module:InitEditmodeOverride()
         end
         LibEditModeOverride:ReanchorFrame(f, ...)
         LibEditModeOverride:SaveOnly()
+
+        -- During login the application is refused and nothing is replayed, so
+        -- the anchor is saved and never put into effect. Whether the frame ends
+        -- up where we asked then depends on Blizzard's own PEW application
+        -- happening to run after our save - a race, and one we lose often
+        -- enough: TBC's pet frame went missing for five reporters in 0.43.0,
+        -- came back for one of them after a party change, and was gone again on
+        -- the next relog. That is what a race looks like from the outside.
+        --
+        -- So place it ourselves in that window. Moving a frame is not what
+        -- tainted the party frames - ApplyChanges was, because it re-runs
+        -- Blizzard's entire Edit Mode setup inside our call and every field it
+        -- assigns on the way through comes out owned by us. A SetPoint runs
+        -- none of that, and Blizzard's application later sets the same anchor
+        -- from the layout we just saved.
+        if not addonTable.BlizzEditmodeApplyAllowed and not Helper:IsCombatLocked() then
+            local ok, err = pcall(function(...)
+                f:ClearAllPoints()
+                f:SetPoint(...)
+            end, ...)
+            if not ok then
+                geterrorhandler()('DFUI Editmode direct anchor ' .. tostring(f and f.GetName and f:GetName()) ..
+                                      ': ' .. tostring(err))
+            end
+        end
+
         addonTable:ScheduleBlizzEditmodeApply()
     end
 

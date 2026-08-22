@@ -3584,6 +3584,22 @@ function Module:ForceMoveBlizzEditModeGhosts()
         -- The anchors are saved either way, and Blizzard's own
         -- PLAYER_ENTERING_WORLD application puts them into effect.
         lib:SaveOnly()
+
+        -- Park them now if the application is going to be refused, which it is
+        -- for the whole of login - and nothing is replayed afterwards. Saved but
+        -- never applied leaves Blizzard's bars sitting on screen alongside ours,
+        -- which is "Action bar 1 is scaling wrong since 0.43.0": the video shows
+        -- two bars side by side, not one bar at the wrong scale.
+        --
+        -- Same reasoning as OverrideBlizzEditmode - moving a frame is not what
+        -- taints the Edit Mode systems, a full ApplyChanges is.
+        if not addonTable.BlizzEditmodeApplyAllowed and not InCombatLockdown() then
+            for k, v in ipairs(t) do
+                v:ClearAllPoints()
+                v:SetPoint('BOTTOM', UIParent, 'TOP', 0, 0 + 500)
+            end
+        end
+
         if addonTable.ScheduleBlizzEditmodeApply then addonTable:ScheduleBlizzEditmodeApply() end
     else
         for k, v in ipairs(t) do
