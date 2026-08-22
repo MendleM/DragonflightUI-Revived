@@ -1284,6 +1284,44 @@ end
 -- Read it back with /df log seed.
 local seedArmed, seedFound = false, false
 
+-- The candidate seeds, and this is the whole list.
+--
+-- The watcher reports the FIRST insecure .unit it sees. In the log from
+-- 2026-08-22 that was PartyMemberFrame.lua:26, reached through UpdateArt at 194
+-- - but UpdateMember calls UnitFrame_SetUnit itself at 168 and 169, earlier in
+-- the very same pass, and .unit was still clean there. So the execution is
+-- tainted somewhere between line 169 and line 194, and every global the
+-- functions in between read is a suspect:
+--
+--   UpdatePet, UpdatePvPStatus, UpdateAuras, UpdateReadyCheck,
+--   UpdateOnlineStatus, UpdateNotPresentIcon, UpdateArt
+--
+-- Read straight off Blizzard's own source for 1.15.9.
+local SEED_CANDIDATES = {
+    'PartyFrame', 'PartyMemberFrameMixin', 'PartyMemberAuraMixin', 'PartyUtil', 'EditModeManagerFrame',
+    'VoiceActivityManager', 'CVarCallbackRegistry', 'UnitFrame_Update', 'UnitFrame_SetUnit', 'UnitFrame_OnEvent',
+    'ReadyCheck_Confirm', 'ReadyCheck_Start', 'GetReadyCheckStatus', 'PARTY_IN_PUBLIC_GROUP_MESSAGE',
+    'UnitFactionGroup', 'UnitIsPVPFreeForAll', 'UnitIsPVP', 'UnitInOtherParty', 'UnitPhaseReason', 'UnitIsConnected',
+    'UnitExists', 'UnitName', 'UnitGUID', 'UnitIsGroupLeader', 'C_PartyInfo', 'PartyMemberBuffTooltip'
+}
+
+local function LogSeedCandidates()
+    local hits = 0
+
+    for _, name in ipairs(SEED_CANDIDATES) do
+        local safe, blame = issecurevariable(name)
+        if not safe then
+            hits = hits + 1
+            DF:Log('seed', 'CANDIDATE %s is INSECURE, tainted by %s', name, tostring(blame or '?'))
+        end
+    end
+
+    if hits == 0 then
+        DF:Log('seed', 'none of the %d globals on that path are insecure - the seed is a field, not a global',
+               #SEED_CANDIDATES)
+    end
+end
+
 local function ArmSeedWatcher()
     if seedArmed or not UnitFrame_SetUnit then return end
     seedArmed = true
@@ -1299,6 +1337,14 @@ local function ArmSeedWatcher()
         DF:Log('seed', 'FIRST INSECURE .unit on %s (unit=%s), tainted by %s', (frame.GetName and frame:GetName()) or
                    '<pooled>', tostring(unit), tostring(who or '?'))
         DF:Log('seed', 'stack: %s', tostring(debugstack(2, 30, 0)):gsub('\n', ' | '):sub(1, 3000))
+
+        -- Ask the question at the only moment it can be answered. The stack is
+        -- pure Blizzard, so the execution arrived tainted, and in this engine
+        -- that means Blizzard read a variable we had dirtied. Name it now,
+        -- while the evidence is still on the stack, rather than after the fact.
+        LogSeedCandidates()
+        DF:LogTaintedGlobals('seed')
+
         print(PREFIX .. 'party taint seed captured - run |cffffff78/df log seed|r')
     end)
 end
