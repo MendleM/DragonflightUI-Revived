@@ -525,6 +525,22 @@ function SubModuleMixin:SetupModern()
             -- and any Show() refused on the way leaves a member missing. Same
             -- recovery, so listen for both.
             regen:RegisterEvent('GROUP_ROSTER_UPDATE')
+
+            -- The rest of the ways a member goes missing.
+            --
+            -- Every one of these drives UpdateMember, so every one of them can
+            -- lose a member to a refused Show(). Chasing them one report at a
+            -- time is a losing game - a ding, a boss kill and someone leaving
+            -- were three separate reports of one bug - so cover the paths we
+            -- know and let the state check below catch the ones we do not.
+            --
+            -- Vehicles matter more than they look: ToPlayerArt and ToVehicleArt
+            -- are the two halves of UpdateArt, and ToPlayerArt is the exact
+            -- function in the captured stack.
+            for _, ev in ipairs({
+                'PLAYER_ENTERING_WORLD', 'PARTY_LEADER_CHANGED', 'PLAYER_ROLES_ASSIGNED', 'UNIT_PET',
+                'UNIT_CONNECTION', 'UNIT_ENTERED_VEHICLE', 'UNIT_EXITED_VEHICLE', 'UPDATE_ACTIVE_BATTLEFIELD'
+            }) do pcall(regen.RegisterEvent, regen, ev) end
             regen:SetScript('OnEvent', function()
                 if not (PartyFrame and self.PartyMoveFrame) then return end
                 if PartyFrame:GetParent() ~= self.PartyMoveFrame then
@@ -554,9 +570,26 @@ function SubModuleMixin:SetupModern()
                 -- and PLAYER_REGEN_ENABLED will bring us straight back.
                 C_Timer.After(0, function()
                     if InCombatLockdown() then return end
-                    if PartyFrame and PartyFrame.UpdatePartyFrames then
-                        pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
+                    if not (PartyFrame and PartyFrame.UpdatePartyFrames and PartyFrame.PartyMemberFramePool) then
+                        return
                     end
+
+                    -- Only redraw when a member is actually missing.
+                    --
+                    -- This is the part that does not depend on us having
+                    -- guessed the right events: however the member was lost,
+                    -- fewer are on screen than are in the group, and that is
+                    -- checkable. It also keeps us from doing protected work on
+                    -- every roster event for no reason.
+                    local expected = GetNumSubgroupMembers and GetNumSubgroupMembers() or 0
+                    if expected == 0 then return end
+
+                    local shown = 0
+                    for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+                        if pf:IsShown() then shown = shown + 1 end
+                    end
+
+                    if shown < expected then pcall(PartyFrame.UpdatePartyFrames, PartyFrame) end
                 end)
             end)
             self.PartyAnchorRegenWatcher = regen
