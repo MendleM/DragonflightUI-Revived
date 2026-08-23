@@ -23,15 +23,25 @@ local PAD = 26
 local ICON = 'Interface\\Icons\\INV_Misc_Head_Dragon_01'
 
 local COL_GOLD = {1, 0.82, 0}
-local COL_WHITE = {0.95, 0.95, 0.95}
-local COL_GREY = {0.62, 0.62, 0.62}
-local COL_BLUE = {0.35, 0.80, 1}
-local COL_GREEN = {0.30, 0.88, 0.45}
+-- Warm rather than pure gold for the release name, and a heading gold a shade
+-- down from it: two golds a step apart read as a hierarchy, where gold against
+-- bright blue read as two unrelated things shouting.
+local COL_TITLE = {1, 0.91, 0.66}
+local COL_HEAD = {0.97, 0.80, 0.38}
+local COL_WHITE = {0.87, 0.87, 0.89}
+local COL_GREY = {0.55, 0.55, 0.58}
+
+-- One spacing scale, used everywhere. The old layout mixed 18/10/6/2/8 by feel,
+-- which is what made it look busy: nothing lined up with anything else.
+local SP = {tight = 3, item = 4, block = 10, section = 16, release = 26}
 
 -- Plain ASCII, deliberately. This started as Interface\Scenarios\ScenarioIcon-
 -- Dash, which draws nothing on Classic Era: Scenarios are a later asset folder
 -- and nothing in the classic UI references it, so the bullets were invisible.
-local BULLET = '|cffffd100-|r  '
+-- A dot at the weight of the surrounding text rather than a bright gold dash.
+-- The bullet is punctuation; it should not be the first thing the eye lands on
+-- in a list of twenty.
+local BULLET = '|cff7a6c48\226\128\162|r  '
 
 -- ---------------------------------------------------------------------------
 -- Layout helpers. The body is built from real widgets rather than one long
@@ -64,45 +74,55 @@ local function AddRule(content, y, indent, width, alpha)
     return y + 1
 end
 
+-- A section heading, marked with a short gold tick in the margin instead of a
+-- rule underneath it.
+--
+-- The old layout drew a full-width line under every heading. With seven sections
+-- that is seven horizontal bars competing with the one that actually divides the
+-- releases, and the page reads as a stack of boxes. A 2px tick in the margin
+-- says "new section" just as clearly and leaves the page quiet.
+local function AddHeading(content, y, text, width)
+    local newY, fs = AddText(content, y, text, 'GameFontNormal', 12, COL_HEAD, width)
+
+    local tick = content:CreateTexture(nil, 'ARTWORK')
+    tick:SetColorTexture(COL_GOLD[1], COL_GOLD[2], COL_GOLD[3], 0.65)
+    tick:SetPoint('TOPLEFT', content, 'TOPLEFT', 0, -y - 2)
+    tick:SetSize(2, math.max(fs:GetStringHeight() - 2, 8))
+
+    return newY
+end
+
 local function BuildBody(content, width)
     local y = 0
 
     for index, release in ipairs(DF.ChangelogData or {}) do
-        if index > 1 then y = y + 18 end
+        if index > 1 then y = y + SP.release end
 
-        -- Release banner
-        y = AddText(content, y, string.upper(release.title), 'GameFontNormalHuge', 0, COL_GOLD, width)
+        -- The release name at large rather than huge, and in mixed case. Shouted
+        -- capitals at GameFontNormalHuge took three lines for a title of five
+        -- words and set the visual weight of the whole page.
+        y = AddText(content, y, release.title, 'GameFontNormalLarge', 0, COL_TITLE, width)
 
         local meta = release.version
-        if release.date then meta = meta .. '   |   ' .. release.date end
-        y = AddText(content, y, meta, 'GameFontHighlightSmall', 0, COL_GREY, width)
+        if release.date then meta = meta .. '  \194\183  ' .. release.date end
+        y = AddText(content, y, meta, 'GameFontHighlightSmall', 0, COL_GREY, width) + SP.tight
 
-        y = y + 6
-        y = AddRule(content, y, 0, width, 0.5)
-        y = y + 10
+        -- The only rule on the page, and it belongs to the release.
+        y = AddRule(content, y, 0, width, 0.40) + SP.block
 
-        if release.intro then
-            y = AddText(content, y, release.intro, 'GameFontHighlight', 0, COL_WHITE, width)
-            y = y + 6
-        end
+        if release.intro then y = AddText(content, y, release.intro, 'GameFontHighlight', 0, COL_WHITE, width) end
 
         for _, section in ipairs(release.sections or {}) do
-            y = y + 10
+            y = y + SP.section
 
             local heading = section.title
-            if section.new then heading = heading .. '   |cff4ce066[NEW]|r' end
-            y = AddText(content, y, heading, 'GameFontNormalLarge', 0, COL_BLUE, width)
-
-            y = y + 2
-            y = AddRule(content, y, 0, width, 0.18)
-            y = y + 6
+            if section.new then heading = heading .. '  |cff4ce066NEW|r' end
+            y = AddHeading(content, y, heading, width) + SP.item
 
             for _, item in ipairs(section.items or {}) do
-                y = AddText(content, y, BULLET .. item, 'GameFontHighlight', 12, COL_WHITE, width)
+                y = AddText(content, y, BULLET .. item, 'GameFontHighlight', 14, COL_WHITE, width) + SP.tight
             end
         end
-
-        y = y + 8
     end
 
     return y
@@ -140,28 +160,34 @@ local function CreateWindow()
     band:SetColorTexture(0, 0, 0, 0.55)
     band:SetPoint('TOPLEFT', f, 'TOPLEFT', 14, -14)
     band:SetPoint('TOPRIGHT', f, 'TOPRIGHT', -14, -14)
-    band:SetHeight(96)
+    -- A slimmer band. At 96 tall behind a 64px icon and a Huge title this was a
+    -- seventh of the window before a word of the notes, which is the same fault
+    -- the body had: everything competing to be the loudest thing on screen.
+    band:SetHeight(64)
 
     local icon = f:CreateTexture(nil, 'ARTWORK')
-    icon:SetSize(64, 64)
-    icon:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -30)
+    icon:SetSize(38, 38)
+    icon:SetPoint('LEFT', band, 'LEFT', PAD - 14, 0)
     icon:SetTexture(ICON)
     -- trim the icon's built-in border so it sits flush
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     local iconRing = f:CreateTexture(nil, 'OVERLAY')
-    iconRing:SetPoint('TOPLEFT', icon, 'TOPLEFT', -3, 3)
-    iconRing:SetPoint('BOTTOMRIGHT', icon, 'BOTTOMRIGHT', 3, -3)
-    iconRing:SetColorTexture(1, 0.82, 0, 0.25)
+    iconRing:SetPoint('TOPLEFT', icon, 'TOPLEFT', -1, 1)
+    iconRing:SetPoint('BOTTOMRIGHT', icon, 'BOTTOMRIGHT', 1, -1)
+    iconRing:SetColorTexture(1, 0.82, 0, 0.22)
 
-    local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormalHuge')
-    title:SetPoint('TOPLEFT', icon, 'TOPRIGHT', 16, -2)
+    -- Title and version on one line: the version is a detail about the title,
+    -- not a second heading, and stacking them made two lines of shouting.
+    local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormalLarge')
+    title:SetPoint('LEFT', icon, 'RIGHT', 14, 7)
     title:SetTextColor(1, 0.82, 0)
     title:SetText("What's New")
 
-    local product = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormalLarge')
-    product:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -4)
-    product:SetText('DragonflightUI |cff9d9d9d' .. DF:GetVersion() .. '|r')
+    local product = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+    product:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 1, -3)
+    product:SetTextColor(0.55, 0.55, 0.58)
+    product:SetText('DragonflightUI ' .. DF:GetVersion())
 
     local credits = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
     credits:SetPoint('TOPLEFT', product, 'BOTTOMLEFT', 0, -4)
@@ -169,8 +195,10 @@ local function CreateWindow()
     credits:SetText('Maintained by MendleM  -  originally by Karl-Heinz Schneider')
 
     local headRule = f:CreateTexture(nil, 'OVERLAY')
-    headRule:SetColorTexture(1, 0.82, 0, 0.6)
-    headRule:SetHeight(2)
+    -- A hairline, not a 2px gold bar. This is the edge between chrome and
+    -- content; it needs to be crisp, not loud.
+    headRule:SetColorTexture(1, 0.82, 0, 0.35)
+    headRule:SetHeight(1)
     headRule:SetPoint('TOPLEFT', band, 'BOTTOMLEFT', 0, -1)
     headRule:SetPoint('TOPRIGHT', band, 'BOTTOMRIGHT', 0, -1)
 
@@ -185,7 +213,7 @@ local function CreateWindow()
     footer:SetText("Reopen any time from Settings > General > What's New, or /df whatsnew")
 
     local scroll = CreateFrame('ScrollFrame', 'DragonflightUIWhatsNewScroll', f, 'UIPanelScrollFrameTemplate')
-    scroll:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -124)
+    scroll:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -96)
     scroll:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -(PAD + 16), 78)
 
     local content = CreateFrame('Frame', nil, scroll)
