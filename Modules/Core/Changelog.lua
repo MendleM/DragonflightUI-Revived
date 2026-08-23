@@ -20,7 +20,6 @@ local ALWAYS_SHOW = false
 
 local WIDTH, HEIGHT = 780, 660
 local PAD = 26
-local ICON = 'Interface\\Icons\\INV_Misc_Head_Dragon_01'
 
 local COL_GOLD = {1, 0.82, 0}
 -- Warm rather than pure gold for the release name, and a heading gold a shade
@@ -133,7 +132,7 @@ end
 local function CreateWindow()
     if Changelog.Frame then return Changelog.Frame end
 
-    local f = CreateFrame('Frame', 'DragonflightUIWhatsNewFrame', UIParent, 'BackdropTemplate')
+    local f = CreateFrame('Frame', 'DragonflightUIWhatsNewFrame', UIParent)
     f:SetSize(WIDTH, HEIGHT)
     f:SetPoint('CENTER')
     f:SetFrameStrata('DIALOG')
@@ -145,62 +144,37 @@ local function CreateWindow()
     f:SetClampedToScreen(true)
     f:Hide()
 
-    f:SetBackdrop({
-        bgFile = 'Interface\\DialogFrame\\UI-DialogBox-Background-Dark',
-        edgeFile = 'Interface\\DialogFrame\\UI-DialogBox-Border',
-        tile = true,
-        tileSize = 32,
-        edgeSize = 32,
-        insets = {left = 11, right = 12, top = 12, bottom = 11}
-    })
+    -- The frame art is the addon's own Dragonflight metal nineslice, the same
+    -- one it puts on Blizzard's panels - so this window is built the way every
+    -- other window in the game is, rather than being a dark box with gold text
+    -- on it. AddNineSliceTextures builds the pieces, ButtonFrameTemplateNoPortrait
+    -- textures them and adds the flat panel background.
+    DragonflightUIMixin:AddNineSliceTextures(f)
 
-    -- Header band, so the title reads as a banner rather than text floating at
-    -- the top of a box.
-    local band = f:CreateTexture(nil, 'BORDER')
-    band:SetColorTexture(0, 0, 0, 0.55)
-    band:SetPoint('TOPLEFT', f, 'TOPLEFT', 14, -14)
-    band:SetPoint('TOPRIGHT', f, 'TOPRIGHT', -14, -14)
-    -- A slimmer band. At 96 tall behind a 64px icon and a Huge title this was a
-    -- seventh of the window before a word of the notes, which is the same fault
-    -- the body had: everything competing to be the loudest thing on screen.
-    band:SetHeight(64)
+    -- Handed over as ClosePanelButton before the skin runs, so it gets the
+    -- addon's own close button art rather than the stock one.
+    local closeX = CreateFrame('Button', nil, f, 'UIPanelCloseButton')
+    closeX:SetScript('OnClick', function() Changelog:Hide() end)
+    f.ClosePanelButton = closeX
 
-    local icon = f:CreateTexture(nil, 'ARTWORK')
-    icon:SetSize(38, 38)
-    icon:SetPoint('LEFT', band, 'LEFT', PAD - 14, 0)
-    icon:SetTexture(ICON)
-    -- trim the icon's built-in border so it sits flush
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    DragonflightUIMixin:ButtonFrameTemplateNoPortrait(f)
 
-    local iconRing = f:CreateTexture(nil, 'OVERLAY')
-    iconRing:SetPoint('TOPLEFT', icon, 'TOPLEFT', -1, 1)
-    iconRing:SetPoint('BOTTOMRIGHT', icon, 'BOTTOMRIGHT', 1, -1)
-    iconRing:SetColorTexture(1, 0.82, 0, 0.22)
-
-    -- Title and version on one line: the version is a detail about the title,
-    -- not a second heading, and stacking them made two lines of shouting.
-    local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormalLarge')
-    title:SetPoint('LEFT', icon, 'RIGHT', 14, 7)
+    -- Title centred on the top bar, which is where the game puts it on every
+    -- panel it owns. The previous header - a black band with a 38px icon, a
+    -- title, a version and a credit line stacked beside it - was four pieces of
+    -- chrome doing the work of one.
+    local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormal')
+    title:SetPoint('TOP', f, 'TOP', 0, -5)
     title:SetTextColor(1, 0.82, 0)
     title:SetText("What's New")
 
+    -- Version and credit sit under the bar as one quiet line, in the inset
+    -- rather than on the frame: it is content, not chrome.
     local product = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
-    product:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 1, -3)
+    product:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -34)
     product:SetTextColor(0.55, 0.55, 0.58)
-    product:SetText('DragonflightUI ' .. DF:GetVersion())
-
-    local credits = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
-    credits:SetPoint('TOPLEFT', product, 'BOTTOMLEFT', 0, -4)
-    credits:SetTextColor(0.62, 0.62, 0.62)
-    credits:SetText('Maintained by MendleM  -  originally by Karl-Heinz Schneider')
-
-    local headRule = f:CreateTexture(nil, 'OVERLAY')
-    -- A hairline, not a 2px gold bar. This is the edge between chrome and
-    -- content; it needs to be crisp, not loud.
-    headRule:SetColorTexture(1, 0.82, 0, 0.35)
-    headRule:SetHeight(1)
-    headRule:SetPoint('TOPLEFT', band, 'BOTTOMLEFT', 0, -1)
-    headRule:SetPoint('TOPRIGHT', band, 'BOTTOMRIGHT', 0, -1)
+    product:SetText('DragonflightUI ' .. DF:GetVersion() ..
+                        '  |cff4a4a4d|||r  Maintained by MendleM, originally by Karl-Heinz Schneider')
 
     local close = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate')
     close:SetSize(170, 28)
@@ -213,7 +187,7 @@ local function CreateWindow()
     footer:SetText("Reopen any time from Settings > General > What's New, or /df whatsnew")
 
     local scroll = CreateFrame('ScrollFrame', 'DragonflightUIWhatsNewScroll', f, 'UIPanelScrollFrameTemplate')
-    scroll:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -96)
+    scroll:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -56)
     scroll:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -(PAD + 16), 78)
 
     local content = CreateFrame('Frame', nil, scroll)
