@@ -520,6 +520,11 @@ function SubModuleMixin:SetupModern()
             -- Anything the fight refused is put right here.
             local regen = CreateFrame('Frame')
             regen:RegisterEvent('PLAYER_REGEN_ENABLED')
+            -- Someone leaving the group does the same damage as a boss kill:
+            -- it drives UpdateMember, the pool releases and reacquires frames,
+            -- and any Show() refused on the way leaves a member missing. Same
+            -- recovery, so listen for both.
+            regen:RegisterEvent('GROUP_ROSTER_UPDATE')
             regen:SetScript('OnEvent', function()
                 if not (PartyFrame and self.PartyMoveFrame) then return end
                 if PartyFrame:GetParent() ~= self.PartyMoveFrame then
@@ -542,7 +547,17 @@ function SubModuleMixin:SetupModern()
                 -- members are still lost for the duration of a fight, and the
                 -- seed hunt continues. But it turns "broken until I reload"
                 -- into "back the moment the fight ends".
-                if PartyFrame.UpdatePartyFrames then pcall(PartyFrame.UpdatePartyFrames, PartyFrame) end
+                -- Next frame, not this one: on a roster change Blizzard is
+                -- part way through its own pass and the pool is still being
+                -- rearranged, so redrawing now would be undone immediately.
+                -- In combat this is pointless anyway - the calls are refused -
+                -- and PLAYER_REGEN_ENABLED will bring us straight back.
+                C_Timer.After(0, function()
+                    if InCombatLockdown() then return end
+                    if PartyFrame and PartyFrame.UpdatePartyFrames then
+                        pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
+                    end
+                end)
             end)
             self.PartyAnchorRegenWatcher = regen
         end
