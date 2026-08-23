@@ -4362,16 +4362,28 @@ function DragonflightUIMixin:AddNineSliceTextures(frame, portrait)
     frame.NineSlice = {}
     local slice = frame.NineSlice
 
-    slice.TopLeftCorner = frame:CreateTexture('TopLeftCorner')
-    slice.TopRightCorner = frame:CreateTexture('TopRightCorner')
-    slice.BottomLeftCorner = frame:CreateTexture('BottomLeftCorner')
-    slice.BottomRightCorner = frame:CreateTexture('BottomRightCorner')
+    -- Anonymous, deliberately.
+    --
+    -- These were created with bare names - CreateTexture('TopLeftCorner') - which
+    -- puts a global called TopLeftCorner in _G, owned by us and tainted by us.
+    -- This function runs on every panel the addon skins, so the addon was
+    -- claiming eight of the most collision-prone names in the namespace, and
+    -- every one of them turned up in /df log globals as dirtied by
+    -- DragonflightUI. Any other addon using the same obvious names was fighting
+    -- us for them.
+    --
+    -- Nothing reads them by name: every use is the field on the frame, either
+    -- frame.NineSlice.TopLeftCorner here or a prefixed global elsewhere.
+    slice.TopLeftCorner = frame:CreateTexture(nil)
+    slice.TopRightCorner = frame:CreateTexture(nil)
+    slice.BottomLeftCorner = frame:CreateTexture(nil)
+    slice.BottomRightCorner = frame:CreateTexture(nil)
 
-    slice.TopEdge = frame:CreateTexture('TopEdge')
-    slice.BottomEdge = frame:CreateTexture('BottomEdge')
+    slice.TopEdge = frame:CreateTexture(nil)
+    slice.BottomEdge = frame:CreateTexture(nil)
 
-    slice.LeftEdge = frame:CreateTexture('LeftEdge')
-    slice.RightEdge = frame:CreateTexture('RightEdge')
+    slice.LeftEdge = frame:CreateTexture(nil)
+    slice.RightEdge = frame:CreateTexture(nil)
 
     frame.Bg = CreateFrame('FRAME', nil, frame, 'FlatPanelBackgroundTemplate')
     frame.Bg:SetPoint('TOPLEFT', frame, 'TOPLEFT', 7, -18)
