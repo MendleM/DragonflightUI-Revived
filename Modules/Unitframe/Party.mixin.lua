@@ -511,10 +511,34 @@ function SubModuleMixin:SetupModern()
                 if self.PartyAnchorPending then return end
 
                 self.PartyAnchorPending = true
-                C_Timer.After(0, function()
-                    self.PartyAnchorPending = nil
-                    ReanchorPartyFrame()
-                end)
+                -- Check a few times over the next second and a half, not just
+                -- once on the next frame.
+                --
+                -- Once was enough to bring the members back, but the user
+                -- reported it taking "a few seconds" - which is the single
+                -- check running while Blizzard's own pass is still settling,
+                -- finding the counts agree, and doing nothing. The frames then
+                -- waited for some later event to notice. Retrying briefly turns
+                -- that into an immediate repair, and each attempt stops as soon
+                -- as the count is healthy so the common case costs one compare.
+                for _, delay in ipairs({0, 0.1, 0.3, 0.7, 1.5}) do
+                    C_Timer.After(delay, function()
+                        if InCombatLockdown() then return end
+                        if not (PartyFrame and PartyFrame.UpdatePartyFrames and PartyFrame.PartyMemberFramePool) then
+                            return
+                        end
+
+                        local expected = GetNumSubgroupMembers and GetNumSubgroupMembers() or 0
+                        if expected == 0 then return end
+
+                        local shown = 0
+                        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+                            if pf:IsShown() then shown = shown + 1 end
+                        end
+
+                        if shown < expected then pcall(PartyFrame.UpdatePartyFrames, PartyFrame) end
+                    end)
+                end
             end)
 
             -- Anything the fight refused is put right here.
