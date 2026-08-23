@@ -526,6 +526,23 @@ function SubModuleMixin:SetupModern()
                     PartyFrame:SetParent(self.PartyMoveFrame)
                 end
                 ReanchorPartyFrame()
+
+                -- And ask Blizzard to redraw the members.
+                --
+                -- Show() and SetAttribute() on a party member are protected, so
+                -- while .unit is tainted they are refused for the whole of
+                -- combat - which is why members vanish on a level-up or a boss
+                -- kill and stay gone afterwards. Nothing re-runs UpdateMember
+                -- once combat drops, so the frames sit hidden until the next
+                -- roster change or a /reload.
+                --
+                -- Out of combat those same calls are allowed even from tainted
+                -- code, so simply running Blizzard's own update here puts the
+                -- missing members back. This treats the symptom, not the taint:
+                -- members are still lost for the duration of a fight, and the
+                -- seed hunt continues. But it turns "broken until I reload"
+                -- into "back the moment the fight ends".
+                if PartyFrame.UpdatePartyFrames then pcall(PartyFrame.UpdatePartyFrames, PartyFrame) end
             end)
             self.PartyAnchorRegenWatcher = regen
         end
