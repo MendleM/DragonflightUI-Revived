@@ -2377,7 +2377,7 @@ function DragonflightUIActionbarMixin:StyleFlyoutButton(btn)
 
     icon:AddMaskTexture(mask)
 
-    local border = btn:CreateTexture('border', 'OVERLAY')
+    local border = btn:CreateTexture(nil, 'OVERLAY')
     border:SetSize(28, 28)
     border:SetPoint('CENTER')
     border:SetTexture(textureRefTwo)

@@ -593,38 +593,38 @@ function DFEditModeSystemSelectionBaseMixin:AddNineslice()
     self.NineSlice = {}
     local slice = self.NineSlice
 
-    slice.TopLeftCorner = self:CreateTexture('TopLeftCorner')
+    slice.TopLeftCorner = self:CreateTexture(nil)
     slice.TopLeftCorner:SetSize(16, 16)
     slice.TopLeftCorner:SetPoint('TOPLEFT', -8, 8)
 
-    slice.TopRightCorner = self:CreateTexture('TopRightCorner')
+    slice.TopRightCorner = self:CreateTexture(nil)
     slice.TopRightCorner:SetSize(16, 16)
     slice.TopRightCorner:SetPoint('TOPRIGHT', 8, 8)
     slice.TopRightCorner:SetRotation(-math.pi / 2)
 
-    slice.BottomLeftCorner = self:CreateTexture('BottomLeftCorner')
+    slice.BottomLeftCorner = self:CreateTexture(nil)
     slice.BottomLeftCorner:SetSize(16, 16)
     slice.BottomLeftCorner:SetPoint('BOTTOMLEFT', -8, -8)
     slice.BottomLeftCorner:SetRotation(math.pi / 2)
 
-    slice.BottomRightCorner = self:CreateTexture('BottomRightCorner')
+    slice.BottomRightCorner = self:CreateTexture(nil)
     slice.BottomRightCorner:SetSize(16, 16)
     slice.BottomRightCorner:SetPoint('BOTTOMRIGHT', 8, -8)
     slice.BottomRightCorner:SetRotation(-math.pi)
 
-    slice.TopEdge = self:CreateTexture('TopEdge')
+    slice.TopEdge = self:CreateTexture(nil)
     slice.TopEdge:SetPoint('TOPLEFT', slice.TopLeftCorner, 'TOPRIGHT')
     slice.TopEdge:SetPoint('BOTTOMRIGHT', slice.TopRightCorner, 'BOTTOMLEFT')
 
-    slice.BottomEdge = self:CreateTexture('BottomEdge')
+    slice.BottomEdge = self:CreateTexture(nil)
     slice.BottomEdge:SetPoint('TOPLEFT', slice.BottomLeftCorner, 'TOPRIGHT')
     slice.BottomEdge:SetPoint('BOTTOMRIGHT', slice.BottomRightCorner, 'BOTTOMLEFT')
 
-    slice.LeftEdge = self:CreateTexture('LeftEdge')
+    slice.LeftEdge = self:CreateTexture(nil)
     slice.LeftEdge:SetPoint('TOPLEFT', slice.TopLeftCorner, 'BOTTOMLEFT')
     slice.LeftEdge:SetPoint('BOTTOMRIGHT', slice.BottomLeftCorner, 'TOPRIGHT')
 
-    slice.RightEdge = self:CreateTexture('RightEdge')
+    slice.RightEdge = self:CreateTexture(nil)
     slice.RightEdge:SetPoint('TOPLEFT', slice.TopRightCorner, 'BOTTOMLEFT')
     slice.RightEdge:SetPoint('BOTTOMRIGHT', slice.BottomRightCorner, 'TOPRIGHT')
 

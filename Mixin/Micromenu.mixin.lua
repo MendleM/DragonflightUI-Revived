@@ -515,7 +515,7 @@ function DragonflightUIMicroMenuMixin:ChangeCharacterMicroButton()
         local dx, dy = -1, 1
 
         -- ["UI-HUD-MicroMenu-ButtonBG-Down"]={32, 41, 0.0654297, 0.12793, 0.330078, 0.490234, false, false, "1x"},
-        local bg = frame:CreateTexture('Background', 'BACKGROUND')
+        local bg = frame:CreateTexture(nil, 'BACKGROUND')
         bg:SetTexture(microTexture)
         bg:SetSize(sizeX, sizeY + 1)
         bg:SetTexCoord(0.0654297, 0.12793, 0.330078, 0.490234)
@@ -523,7 +523,7 @@ function DragonflightUIMicroMenuMixin:ChangeCharacterMicroButton()
         frame.Background = bg
 
         --	["UI-HUD-MicroMenu-ButtonBG-Up"]={32, 41, 0.0654297, 0.12793, 0.494141, 0.654297, false, false, "1x"},
-        local bgPushed = frame:CreateTexture('Background', 'BACKGROUND')
+        local bgPushed = frame:CreateTexture(nil, 'BACKGROUND')
         bgPushed:SetTexture(microTexture)
         bgPushed:SetSize(sizeX, sizeY + 1)
         bgPushed:SetTexCoord(0.0654297, 0.12793, 0.494141, 0.654297)
@@ -712,7 +712,7 @@ function DragonflightUIMicroMenuMixin:ChangeMicroMenuButton(frame, name)
     local offX, offY = frame:GetPushedTextOffset()
 
     -- ["UI-HUD-MicroMenu-ButtonBG-Down"]={32, 41, 0.0654297, 0.12793, 0.330078, 0.490234, false, false, "1x"},
-    local bg = frame:CreateTexture('Background', 'BACKGROUND')
+    local bg = frame:CreateTexture(nil, 'BACKGROUND')
     bg:SetTexture(microTexture)
     bg:SetSize(sizeX, sizeY + 1)
     bg:SetTexCoord(0.0654297, 0.12793, 0.330078, 0.490234)
@@ -720,7 +720,7 @@ function DragonflightUIMicroMenuMixin:ChangeMicroMenuButton(frame, name)
     frame.Background = bg
 
     --	["UI-HUD-MicroMenu-ButtonBG-Up"]={32, 41, 0.0654297, 0.12793, 0.494141, 0.654297, false, false, "1x"},
-    local bgPushed = frame:CreateTexture('Background', 'BACKGROUND')
+    local bgPushed = frame:CreateTexture(nil, 'BACKGROUND')
     bgPushed:SetTexture(microTexture)
     bgPushed:SetSize(sizeX, sizeY + 1)
     bgPushed:SetTexCoord(0.0654297, 0.12793, 0.494141, 0.654297)

@@ -33,7 +33,7 @@ function DragonflightUIXPBarMixin:CreateBar()
 
     local f = self
 
-    local tex = f:CreateTexture('Background', 'BACKGROUND')
+    local tex = f:CreateTexture(nil, 'BACKGROUND')
     tex:SetAllPoints()
     tex:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\XP\\Background')
     tex:SetTexCoord(0, 0.55517578, 0, 1)
@@ -88,7 +88,7 @@ function DragonflightUIXPBarMixin:CreateBar()
     -- local Path, Size, Flags = MainMenuBarExpText:GetFont()
     f.Bar:EnableMouse(true)
 
-    f.Text = f.Bar:CreateFontString('XPBarText', 'HIGHLIGHT', 'SystemFont_Outline_Small')
+    f.Text = f.Bar:CreateFontString(nil, 'HIGHLIGHT', 'SystemFont_Outline_Small')
 
     f.Text:SetTextColor(1, 1, 1, 1)
     f.Text:SetText('')
@@ -96,7 +96,7 @@ function DragonflightUIXPBarMixin:CreateBar()
     f.Text:SetParent(f.Bar)
     f.Text:SetPoint('CENTER', 0, 1.5)
 
-    f.TextPercent = f.Bar:CreateFontString('Text', 'HIGHLIGHT', 'SystemFont_Outline_Small')
+    f.TextPercent = f.Bar:CreateFontString(nil, 'HIGHLIGHT', 'SystemFont_Outline_Small')
     f.TextPercent:SetTextColor(1, 1, 1, 1)
     f.TextPercent:SetText('69%')
     f.TextPercent:ClearAllPoints()
@@ -408,7 +408,7 @@ function DragonflightUIRepBarMixin:CreateBar()
     self:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
     -- print('BARS')
 
-    local tex = f:CreateTexture('Background', 'BACKGROUND')
+    local tex = f:CreateTexture(nil, 'BACKGROUND')
     tex:SetAllPoints()
     tex:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\XP\\Background')
     tex:SetTexCoord(0, 0.55517578, 0, 1)
@@ -421,7 +421,7 @@ function DragonflightUIRepBarMixin:CreateBar()
     f.Bar:SetStatusBarTexture('Interface\\Addons\\DragonflightUI\\Textures\\Reputation\\Rep')
 
     -- border
-    local border = f.Bar:CreateTexture('Border', 'OVERLAY')
+    local border = f.Bar:CreateTexture(nil, 'OVERLAY')
     border:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\XP\\Overlay')
     border:SetTexCoord(0, 0.55517578, 0, 1)
     -- border:SetSize(sizeX, sizeY)
@@ -431,7 +431,7 @@ function DragonflightUIRepBarMixin:CreateBar()
     f.Border = border
 
     f.Bar:EnableMouse(true)
-    f.Text = f.Bar:CreateFontString('Text', 'HIGHLIGHT', 'SystemFont_Outline_Small')
+    f.Text = f.Bar:CreateFontString(nil, 'HIGHLIGHT', 'SystemFont_Outline_Small')
 
     f.Text:SetTextColor(1, 1, 1, 1)
     f.Text:SetText('')

@@ -4364,7 +4364,7 @@ function DragonflightUIMixin:AddNineSliceTextures(frame, portrait)
 
     -- Anonymous, deliberately.
     --
-    -- These were created with bare names - CreateTexture('TopLeftCorner') - which
+    -- These were created with bare names - CreateTexture(nil) - which
     -- puts a global called TopLeftCorner in _G, owned by us and tainted by us.
     -- This function runs on every panel the addon skins, so the addon was
     -- claiming eight of the most collision-prone names in the namespace, and
