@@ -539,9 +539,34 @@ function SubModuleMixin:SetupModern()
         RUNIC_POWER = 'RunicPower'
     }
 
+    -- Our bookkeeping about a party member frame, kept beside the frame rather
+    -- than on it.
+    --
+    -- /df log seed finally named the seed on 2026-08-23, after seven theories
+    -- and three instrumentation passes. At the moment a pooled member's .unit
+    -- first comes back insecure:
+    --
+    --   FIELD member.DFRoleIcon         insecure, tainted by DragonflightUI
+    --   FIELD member.DFPartyFrameBorder insecure, tainted by DragonflightUI
+    --   FIELD member.DFStyled           insecure, tainted by Atlas
+    --   FIELD member.unit               insecure, tainted by DragonflightUI
+    --   frame.OnEvent                   secure
+    --
+    -- Three of those four are ours, written straight onto a frame the client
+    -- owns. DFStyled being blamed on Atlas is the tell that makes the mechanism
+    -- plain: the blame is whoever owned the execution at the moment of the
+    -- write, not whoever wrote it - so any addon on the stack when we touch
+    -- these frames ends up owning part of Blizzard's party member.
+    --
+    -- Weak keys, so a released pooled frame is not held alive by this table.
+    local memberState = setmetatable({}, {__mode = 'k'})
+
     local function styleMember(pf)
-        if pf.DFStyled then return end
-        pf.DFStyled = true
+        local st = memberState[pf]
+        if st and st.styled then return end
+        st = st or {}
+        memberState[pf] = st
+        st.styled = true
 
         pf:SetSize(120, 53)
         pf:SetHitRectInsets(0, 0, 0, 12)
@@ -587,7 +612,7 @@ function SubModuleMixin:SetupModern()
         border:SetTexture(ATLAS)
         border:SetTexCoord(0.480469, 0.949219, 0.222656, 0.414062)
         border:SetPoint('TOPLEFT', pf, 'TOPLEFT', 1, -2)
-        pf.DFPartyFrameBorder = border
+        st.border = border
 
         if pf.Flash then
             pf.Flash:SetSize(114, 47)
@@ -717,13 +742,13 @@ function SubModuleMixin:SetupModern()
             roleIcon:SetSize(12, 12)
             roleIcon:SetPoint('TOPRIGHT', pf, 'TOPRIGHT', -5, -5)
             roleIcon:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\roleicons')
-            pf.DFRoleIcon = roleIcon
+            st.roleIcon = roleIcon
             UpdateRoleIcon(pf)
         end
     end
 
     function UpdateRoleIcon(pf)
-        local roleIcon = pf.DFRoleIcon
+        local roleIcon = memberState[pf] and memberState[pf].roleIcon
         if not roleIcon then return end
         local unit = pf.unitToken or ('party' .. (pf.layoutIndex or 1))
         local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit)
@@ -834,7 +859,8 @@ function SubModuleMixin:SetupModern()
             if not (state and state.gradient) then return end
             if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
             for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
-                if pf.DFStyled and (pf.unit == unit or pf.unitToken == unit) then pcall(UpdateBars, pf) end
+                local st = memberState[pf]
+                if st and st.styled and (pf.unit == unit or pf.unitToken == unit) then pcall(UpdateBars, pf) end
             end
         end)
     end
@@ -854,7 +880,7 @@ function SubModuleMixin:SetupModern()
         local barsOnly = (event == 'UNIT_DISPLAYPOWER' or event == 'UNIT_CONNECTION')
         if barsOnly and not (unit and unit:find('party', 1, true)) then return end
         for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
-            if pf.DFStyled then
+            if memberState[pf] and memberState[pf].styled then
                 if not barsOnly then pcall(UpdateRoleIcon, pf) end
                 pcall(UpdateBars, pf)
             end
