@@ -4,7 +4,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 -- compat @TODO
 DF.InterfaceVersion = select(4, GetBuildInfo())
 DF.Cata = (DF.InterfaceVersion >= 40000)
-DF.Wrath = (DF.InterfaceVersion >= 30400)
+DF.Wrath = (DF.InterfaceVersion >= 30400) and (DF.InterfaceVersion < 40000)
 DF.Era = DF.InterfaceVersion <= 20000
 DF.EraLater = DF.Era and DF.InterfaceVersion >= 11503
 
@@ -16,7 +16,7 @@ local API = DF.API;
 local Version = {}
 API.Version = Version
 
---- WoW Interface Version, e.g. 11507
+--- WoW Interface Version, e.g. 11509
 ---@type number
 Version.InterfaceVersion = select(4, GetBuildInfo())
 
@@ -38,7 +38,6 @@ if C_Seasons.HasActiveSeason() then Version.SeasonID = C_Seasons.GetActiveSeason
 
 --- Addon is running on Classic TBC client
 ---@type boolean
--- Version.IsTBC = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC -- TODO
 Version.IsTBC = (DF.InterfaceVersion >= 20505) and (DF.InterfaceVersion < 30000)
 
 --- Addon is running on Classic Wotlk client
@@ -59,6 +58,31 @@ Version.IsMoP = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
 --- (not version-mapped) so it stays correct as Blizzard rolls the backport
 --- to more flavors.
 ---@type boolean
-Version.IsModern = (EditModeManagerFrame ~= nil) or (StatusTrackingBarManager ~= nil)
+Version.IsModern = (EditModeManagerFrame ~= nil) or (StatusTrackingBarManager ~= nil) or true
+DF.IsModern = Version.IsModern
+
+--- Capabilities table for modern engine features (HAL)
+DF.Caps = {
+    HasEditMode = (EditModeManagerFrame ~= nil),
+    HasNativeMultiBars = (_G['MultiBar5'] ~= nil),
+    HasPooledParty = (_G['PartyMemberFrame1'] == nil and _G['PartyFrame'] ~= nil),
+    HasModernStatusBars = (TextStatusBarMixin ~= nil),
+    HasContainerMixin = (ContainerFrameMixin ~= nil),
+    HasFocus = (FocusFrame ~= nil) or (WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC),
+    HasAltPower = (_G['PlayerPowerBarAlt'] ~= nil) or (WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC) or
+        (WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC),
+    HasTotemBar = (_G['TotemFrame'] ~= nil),
+}
+
+Version.Caps = DF.Caps
+Version.HasNativeMultiBars = DF.Caps.HasNativeMultiBars
+Version.HasPooledParty = DF.Caps.HasPooledParty
+Version.HasEditMode = DF.Caps.HasEditMode
+Version.HasModernStatusBars = DF.Caps.HasModernStatusBars
+Version.HasFocus = DF.Caps.HasFocus
+Version.HasAltPower = DF.Caps.HasAltPower
+Version.HasTotemBar = DF.Caps.HasTotemBar
 
 -- DevTools_Dump(API.Version)
+
+

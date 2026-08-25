@@ -1,9 +1,9 @@
-## Interface: 50504, 50503, 40402, 30405, 30404, 20506, 20505, 11509, 11508
-## Interface-Mists: 50504, 50503
+## Interface: 50504, 40402, 30405, 30404, 20506, 11509
+## Interface-Mists: 50504
 ## Interface-Cata: 40402
 ## Interface-Wrath: 30405, 30404
-## Interface-TBC: 20506, 20505
-## Interface-Classic: 11508
+## Interface-TBC: 20506
+## Interface-Classic: 11509
 ## Title: DragonflightUI |cff8080ff0.43.0|r
 ## Notes: Brings the modern retail UI to classic.|n|cffbbbbbbMaintained by MendleM|r|n|cffbbbbbbOriginally by Karl-Heinz Schneider|r
 ## Notes-esES: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r
