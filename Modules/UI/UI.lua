@@ -486,13 +486,15 @@ function Module:ApplySettingsInternal(sub, key)
         end)
     end)
 
-    if not DF.Cata and not DF.API.Version.IsMoP then
-        self:ConditionalOption('changeTalents', 'first', 'Change Talentframe', function()
-            Module:FuncOrWaitframe('Blizzard_TalentUI', function()
+    self:ConditionalOption('changeTalents', 'first', 'Change Talentframe', function()
+        Module:FuncOrWaitframe('Blizzard_TalentUI', function()
+            if not DF.Cata and not DF.API.Version.IsMoP then
                 DragonflightUIMixin:ChangeTalentsEra()
-            end)
+            else
+                DragonflightUIMixin:ChangeTalents()
+            end
         end)
-    end
+    end)
 
     self:ConditionalOption('questLevel', 'first', 'Show Questlevel', function()
         DragonflightUIMixin:AddQuestLevel()

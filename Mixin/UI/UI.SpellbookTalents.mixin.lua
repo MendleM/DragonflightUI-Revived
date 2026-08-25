@@ -110,6 +110,12 @@ function DragonflightUIMixin:ChangeTalentsEra()
     end)
 end
 
+function DragonflightUIMixin:ChangeTalents()
+    if DragonflightUITalentsMoPMixin and DragonflightUITalentsMoPMixin.SkinMoPTalentFrame then
+        DragonflightUITalentsMoPMixin:SkinMoPTalentFrame(PlayerTalentFrame)
+    end
+end
+
 function DragonflightUIMixin:ChangeSpellbookEra()
     local frame = SpellBookFrame
     if not frame then return end
