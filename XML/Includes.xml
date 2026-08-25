@@ -1,8 +1,15 @@
 <UI xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/">
 	<Include file="Mixin/Modules.mixin.lua" />
 	<Include file="Mixin/LFG.mixin.lua" />
-	<Include file="Mixin/UI.mixin.lua" />
 	<Include file="Mixin/UI.Tabs.mixin.lua" />
+	<Include file="Mixin/UI/UI.Templates.mixin.lua" />
+	<Include file="Mixin/UI/UI.Bags.mixin.lua" />
+	<Include file="Mixin/UI/UI.Inspect.mixin.lua" />
+	<Include file="Mixin/UI/UI.Character.mixin.lua" />
+	<Include file="Mixin/UI/UI.QuestGossip.mixin.lua" />
+	<Include file="Mixin/UI/UI.SpellbookTalents.mixin.lua" />
+	<Include file="Mixin/UI/UI.MiscFrames.mixin.lua" />
+	<Include file="Mixin/UI.mixin.lua" />
 	<Include file="Mixin/ItemColor.mixin.lua" />
 	<Include file="Mixin/StateHandler.mixin.lua" />
 </UI>
