@@ -2,6 +2,9 @@
 	<Include file="VehicleLeaveButton.mixin.lua" />
 	<Include file="ActionbarRange.mixin.lua" />
 	<Include file="Actionbar.lua" />
+	<Include file="Actionbar.Options.lua" />
+	<Include file="Actionbar.Styler.lua" />
+	<Include file="Actionbar.Controller.lua" />
 	<Frame name="DragonflightUIVehicleLeaveButton" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
 		<Size x="32" y="32" />
 	</Frame>
