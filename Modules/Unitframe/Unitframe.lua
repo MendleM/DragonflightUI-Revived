@@ -146,18 +146,16 @@ function Module:RegisterSettings()
     register('targetoftarget',
              {order = 0, name = self.SubTargetOfTarget.Options.name, descr = 'Targetss', isNew = false})
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus then
         register('focus', {order = 0, name = self.SubFocus.Options.name, descr = 'Focusss', isNew = false})
         register('focusTarget', {order = 0, name = self.SubFocusTarget.Options.name, descr = 'Focusss', isNew = false})
     end
-    if DF.Cata then
+    if DF.Caps.HasAltPower then
         register('altpower', {order = 0, name = self.SubAltPower.Options.name, descr = 'Focusss', isNew = false})
     end
 end
 
 function Module:RefreshOptionScreens()
-    -- print('Module:RefreshOptionScreens()')
-
     local configFrame = DF.ConfigModule.ConfigFrame
 
     local refreshCat = function(name)
@@ -172,7 +170,7 @@ function Module:RefreshOptionScreens()
     refreshCat('Target')
     refreshCat('TargetOfTarget')
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and _G['DragonflightUIFocusFrame'] then
         refreshCat('Focus')
         refreshCat('focusTarget')
 
@@ -291,11 +289,11 @@ function Module:ApplySettingsInternal(sub, key)
     updateSub('tot', self.SubTargetOfTarget, db.tot)
     updateSub('raid', self.SubRaid, db.raid)
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus then
         updateSub('focus', self.SubFocus, db.focus)
         updateSub('focusTarget', self.SubFocusTarget, db.focusTarget)
     end
-    if DF.Cata then updateSub('altpower', self.SubAltPower, db.altpower) end
+    if DF.Caps.HasAltPower then updateSub('altpower', self.SubAltPower, db.altpower) end
 end
 
 function Module:FixBlizzardBug()
@@ -432,18 +430,11 @@ function Module:AddPortraitMasks()
 
     addMask(PetFrame, PetPortrait)
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and FocusFrame then
         addMask(FocusFrame, FocusFramePortrait)
-        addMask(self.SubFocus.PreviewFocus, self.SubFocus.PreviewFocus.TargetFramePortrait)
-        addMask(FocusFrameToT, FocusFrameToTPortrait)
-        addMask(self.SubFocusTarget.PreviewFocusTarget, self.SubFocusTarget.PreviewFocusTarget.TargetFramePortrait)
-    end
-
-    for i = 1, 4 do
-        local pf = _G['PartyMemberFrame' .. i]
-        local port = _G['PartyMemberFrame' .. i .. 'Portrait']
-
-        addMask(pf, port)
+        if self.SubFocus.PreviewFocus then addMask(self.SubFocus.PreviewFocus, self.SubFocus.PreviewFocus.TargetFramePortrait) end
+        if FocusFrameToT then addMask(FocusFrameToT, FocusFrameToTPortrait) end
+        if self.SubFocusTarget.PreviewFocusTarget then addMask(self.SubFocusTarget.PreviewFocusTarget, self.SubFocusTarget.PreviewFocusTarget.TargetFramePortrait) end
     end
 
     -- fix portraits
@@ -457,8 +448,6 @@ end
 function Module:HookEnergyBar()
     hooksecurefunc("UnitFrameManaBar_UpdateType", function(manaBar, dontcall)
         if manaBar.DFUpdateFunc and type(manaBar.DFUpdateFunc) == 'function' and not dontcall then
-            --
-            -- print('~UnitFrameManaBar_UpdateType:', manaBar:GetName())
             manaBar.DFUpdateFunc()
         end
     end)
@@ -489,7 +478,6 @@ function Module:ChangeFonts()
     changeFont(PlayerFrameHealthBarText, std)
     changeFont(PlayerFrameHealthBarTextLeft, std)
     changeFont(PlayerFrameHealthBarTextRight, std)
-
     changeFont(PlayerFrameManaBarText, std)
     changeFont(PlayerFrameManaBarTextLeft, std)
     changeFont(PlayerFrameManaBarTextRight, std)
@@ -497,40 +485,23 @@ function Module:ChangeFonts()
     changeFont(PetFrameHealthBarText, std)
     changeFont(PetFrameHealthBarTextLeft, std)
     changeFont(PetFrameHealthBarTextRight, std)
-
     changeFont(PetFrameManaBarText, std)
     changeFont(PetFrameManaBarTextLeft, std)
     changeFont(PetFrameManaBarTextRight, std)
 
-    changeFont(TargetFrameTextureFrame.HealthBarText, std)
-    changeFont(TargetFrameTextureFrame.HealthBarTextLeft, std)
-    changeFont(TargetFrameTextureFrame.HealthBarTextRight, std)
-
-    changeFont(TargetFrameTextureFrame.ManaBarText, std)
-    changeFont(TargetFrameTextureFrame.ManaBarTextLeft, std)
-    changeFont(TargetFrameTextureFrame.ManaBarTextRight, std)
-
-    for i = 1, 4 do
-        local healthbar = _G['PartyMemberFrame' .. i .. 'HealthBar']
-        if healthbar then
-            changeFont(healthbar.DFHealthBarText, std)
-            changeFont(healthbar.DFHealthBarTextLeft, std)
-            changeFont(healthbar.DFHealthBarTextRight, std)
-        end
-
-        local manabar = _G['PartyMemberFrame' .. i .. 'ManaBar']
-        if manabar then
-            changeFont(manabar.DFManaBarText, std)
-            changeFont(manabar.DFManaBarTextLeft, std)
-            changeFont(manabar.DFManaBarTextRight, std)
-        end
+    if TargetFrameTextureFrame then
+        changeFont(TargetFrameTextureFrame.HealthBarText, std)
+        changeFont(TargetFrameTextureFrame.HealthBarTextLeft, std)
+        changeFont(TargetFrameTextureFrame.HealthBarTextRight, std)
+        changeFont(TargetFrameTextureFrame.ManaBarText, std)
+        changeFont(TargetFrameTextureFrame.ManaBarTextLeft, std)
+        changeFont(TargetFrameTextureFrame.ManaBarTextRight, std)
     end
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and FocusFrameTextureFrame then
         changeFont(FocusFrameTextureFrame.HealthBarText, std)
         changeFont(FocusFrameTextureFrame.HealthBarTextLeft, std)
         changeFont(FocusFrameTextureFrame.HealthBarTextRight, std)
-
         changeFont(FocusFrameTextureFrame.ManaBarText, std)
         changeFont(FocusFrameTextureFrame.ManaBarTextLeft, std)
         changeFont(FocusFrameTextureFrame.ManaBarTextRight, std)

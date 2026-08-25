@@ -250,17 +250,16 @@ function SubModuleMixin:Update()
         f:SetScale(state.scale)
 
         -- taint from parent
-        if DF.API.Version.IsMoP then
+        if _G['PriestBarFrame'] then
             _G['PriestBarFrame']:SetIgnoreParentScale(false)
             _G['PriestBarFrame']:SetScale(1.0)
         end
     else
         f:SetParent(UIParent)
-        -- f:SetScale(PlayerFrame:GetScale() * state.scale)
         f:SetScale(state.scale)
 
         -- taint from parent
-        if DF.API.Version.IsMoP then
+        if _G['PriestBarFrame'] then
             _G['PriestBarFrame']:SetIgnoreParentScale(true)
             _G['PriestBarFrame']:SetScale(UIParent:GetEffectiveScale() * state.scale)
         end
@@ -268,11 +267,8 @@ function SubModuleMixin:Update()
 
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
-    -- f:SetUserPlaced(true)
 
     self:HideSecondaryRes(not state.activate)
-
-    -- f:UpdateStateHandler(state)
 end
 
 function SubModuleMixin:CreateSecondaryResFrame()
@@ -281,61 +277,50 @@ function SubModuleMixin:CreateSecondaryResFrame()
     fakeWidget.unit = 'player'
     self.PreviewFrame = fakeWidget
 
-    -- if DF.Wrath then RuneFrame:SetPoint('TOP', PlayerFrame, 'BOTTOM', 54 - 3, 34 - 3) end
-
-    -- if DF.Cata then PaladinPowerBar:SetPoint('TOP', PlayerFrame, 'BOTTOM', 43, 39 - 2) end
-
-    -- if DF.API.Version.IsCata then ShardBarFrame:SetPoint('TOP', PlayerFrame, 'BOTTOM', 50, 34 - 1) end
-    -- if DF.API.Version.IsMoP then
-    -- _G['MonkHarmonyBar']:SetPoint('TOP', 49 - 5, -46);
-    -- _G['WarlockPowerFrame']:SetPoint('TOP', PlayerFrame, 'BOTTOM', 50, 34 - 3);
-    -- _G['ShardBarFrame']:SetPoint('TOPLEFT', _G['WarlockPowerFrame'], 'TOPLEFT', 0, 0 + 2)
-    -- _G['BurningEmbersBarFrame']:SetPoint('TOPLEFT', _G['WarlockPowerFrame'], 'TOPLEFT', -21, 1 + 2)
-    -- _G['PriestBarFrame']:SetPoint('TOP', PlayerFrame, 'BOTTOM', 53 - 3, 37 - 1)
-    -- end
-
-    if DF.Wrath then
+    if _G['RuneFrame'] then
         _G['RuneFrame']:SetWidth(123)
         _G['RuneFrame']:ClearAllPoints()
         _G['RuneFrame']:SetParent(self.PreviewFrame)
         _G['RuneFrame']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, -6)
-
     end
 
-    if DF.Cata then
+    if _G['PaladinPowerBar'] then
         _G['PaladinPowerBar']:SetParent(self.PreviewFrame)
         _G['PaladinPowerBar']:ClearAllPoints()
         _G['PaladinPowerBar']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, 5)
+    end
 
+    if _G['EclipseBarFrame'] then
         _G['EclipseBarFrame']:SetParent(self.PreviewFrame)
         _G['EclipseBarFrame']:ClearAllPoints()
         _G['EclipseBarFrame']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, -1)
     end
 
-    if DF.API.Version.IsCata then
-        _G['ShardBarFrame']:SetParent(self.PreviewFrame)
-        _G['ShardBarFrame']:ClearAllPoints()
-        _G['ShardBarFrame']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, -9)
-    elseif DF.API.Version.IsMoP then
+    if _G['MonkHarmonyBar'] then
         _G['MonkHarmonyBar']:SetParent(self.PreviewFrame)
         _G['MonkHarmonyBar']:ClearAllPoints()
         _G['MonkHarmonyBar']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, 18)
+    end
 
-        -- WarlockPowerFrame
+    if _G['WarlockPowerFrame'] then
         _G['WarlockPowerFrame']:SetParent(self.PreviewFrame)
         _G['WarlockPowerFrame']:ClearAllPoints()
         _G['WarlockPowerFrame']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, -7)
+    end
 
+    if _G['ShardBarFrame'] then
         _G['ShardBarFrame']:SetParent(self.PreviewFrame)
         _G['ShardBarFrame']:ClearAllPoints()
-        _G['ShardBarFrame']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, -2)
+        _G['ShardBarFrame']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, _G['WarlockPowerFrame'] and -2 or -9)
+    end
 
+    if _G['BurningEmbersBarFrame'] then
         _G['BurningEmbersBarFrame']:SetParent(self.PreviewFrame)
         _G['BurningEmbersBarFrame']:ClearAllPoints()
         _G['BurningEmbersBarFrame']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, -0.5)
+    end
 
-        -- PriestBarFrame
-        -- _G['PriestBarFrame']:SetParent(self.PreviewFrame)
+    if _G['PriestBarFrame'] then
         _G['PriestBarFrame']:ClearAllPoints()
         _G['PriestBarFrame']:SetPoint('TOP', self.PreviewFrame, 'TOP', 0, 0.5)
     end
@@ -347,59 +332,54 @@ function SubModuleMixin:HideSecondaryRes(hide)
     local _, class = UnitClass('player');
 
     if class == 'WARLOCK' then
-        if DF.API.Version.IsCata then
+        if not (C_SpecializationInfo and C_SpecializationInfo.GetSpecialization) then
             if UnitLevel("player") >= (SHARDBAR_SHOW_LEVEL or 10) then
-                _G['ShardBarFrame']:SetShown(not hide);
+                if _G['ShardBarFrame'] then _G['ShardBarFrame']:SetShown(not hide) end
             end
         else
-            -- MoP onwards; 
+            -- MoP onwards
             local spec = C_SpecializationInfo.GetSpecialization()
 
             if spec == SPEC_WARLOCK_AFFLICTION then
                 if IsPlayerSpell(WARLOCK_SOULBURN) then
-                    _G['ShardBarFrame']:SetShown(not hide);
+                    if _G['ShardBarFrame'] then _G['ShardBarFrame']:SetShown(not hide) end
                 else
-                    _G['ShardBarFrame']:SetShown(false);
+                    if _G['ShardBarFrame'] then _G['ShardBarFrame']:SetShown(false) end
                 end
-                _G['BurningEmbersBarFrame']:SetShown(false);
-                _G['DemonicFuryBarFrame']:SetShown(false);
+                if _G['BurningEmbersBarFrame'] then _G['BurningEmbersBarFrame']:SetShown(false) end
+                if _G['DemonicFuryBarFrame'] then _G['DemonicFuryBarFrame']:SetShown(false) end
             elseif spec == SPEC_WARLOCK_DESTRUCTION then
                 if IsPlayerSpell(WARLOCK_BURNING_EMBERS) then
-                    _G['BurningEmbersBarFrame']:SetShown(not hide);
+                    if _G['BurningEmbersBarFrame'] then _G['BurningEmbersBarFrame']:SetShown(not hide) end
                 else
-                    _G['BurningEmbersBarFrame']:SetShown(false);
+                    if _G['BurningEmbersBarFrame'] then _G['BurningEmbersBarFrame']:SetShown(false) end
                 end
-                _G['ShardBarFrame']:SetShown(false);
-                _G['DemonicFuryBarFrame']:SetShown(false);
+                if _G['ShardBarFrame'] then _G['ShardBarFrame']:SetShown(false) end
+                if _G['DemonicFuryBarFrame'] then _G['DemonicFuryBarFrame']:SetShown(false) end
             elseif spec == SPEC_WARLOCK_DEMONOLOGY then
-                _G['ShardBarFrame']:SetShown(false);
-                _G['BurningEmbersBarFrame']:SetShown(false);
-                _G['DemonicFuryBarFrame']:SetShown(not hide);
+                if _G['ShardBarFrame'] then _G['ShardBarFrame']:SetShown(false) end
+                if _G['BurningEmbersBarFrame'] then _G['BurningEmbersBarFrame']:SetShown(false) end
+                if _G['DemonicFuryBarFrame'] then _G['DemonicFuryBarFrame']:SetShown(not hide) end
             else
-                _G['ShardBarFrame']:SetShown(false);
-                _G['BurningEmbersBarFrame']:SetShown(false);
-                _G['DemonicFuryBarFrame']:SetShown(false);
+                if _G['ShardBarFrame'] then _G['ShardBarFrame']:SetShown(false) end
+                if _G['BurningEmbersBarFrame'] then _G['BurningEmbersBarFrame']:SetShown(false) end
+                if _G['DemonicFuryBarFrame'] then _G['DemonicFuryBarFrame']:SetShown(false) end
             end
         end
     elseif class == 'DRUID' then
         if hide then
-            _G['EclipseBarFrame']:Hide()
+            if _G['EclipseBarFrame'] then _G['EclipseBarFrame']:Hide() end
         else
-            if DF.API.Version.IsMoP then
-                _G['EclipseBarFrame']:UpdateShown()
-            else
-                EclipseBar_UpdateShown(_G['EclipseBarFrame'])
+            if _G['EclipseBarFrame'] then
+                if _G['EclipseBarFrame'].UpdateShown then
+                    _G['EclipseBarFrame']:UpdateShown()
+                elseif EclipseBar_UpdateShown then
+                    EclipseBar_UpdateShown(_G['EclipseBarFrame'])
+                end
             end
         end
     elseif class == 'PALADIN' then
-        if DF.API.Version.IsCata then
-            if UnitLevel("player") >= (PALADINPOWERBAR_SHOW_LEVEL or 9) then
-                _G['PaladinPowerBar']:SetShown(not hide);
-            else
-                _G['PaladinPowerBar']:SetShown(false);
-            end
-        else
-            -- MoP onwards
+        if _G['PaladinPowerBar'] then
             if UnitLevel("player") >= (PALADINPOWERBAR_SHOW_LEVEL or 9) then
                 _G['PaladinPowerBar']:SetShown(not hide);
             else
@@ -407,30 +387,24 @@ function SubModuleMixin:HideSecondaryRes(hide)
             end
         end
     elseif class == 'DEATHKNIGHT' then
-        _G['RuneFrame']:SetShown(not hide);
+        if _G['RuneFrame'] then _G['RuneFrame']:SetShown(not hide) end
     elseif class == 'MONK' then
-        _G['MonkHarmonyBar']:SetShown(not hide)
+        if _G['MonkHarmonyBar'] then _G['MonkHarmonyBar']:SetShown(not hide) end
 
-        local spec = C_SpecializationInfo.GetSpecialization()
-
+        local spec = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization and C_SpecializationInfo.GetSpecialization()
         if spec == SPEC_MONK_BREWMASTER then
-            _G['MonkStaggerBar']:SetShown(not hide)
+            if _G['MonkStaggerBar'] then _G['MonkStaggerBar']:SetShown(not hide) end
         else
-            _G['MonkStaggerBar']:SetShown(false)
+            if _G['MonkStaggerBar'] then _G['MonkStaggerBar']:SetShown(false) end
         end
     elseif class == 'PRIEST' then
-        -- _G['PriestBarFrame']:SetShown(not hide)
-        -- _G['PriestBarFrame']:CheckAndShow();
-        local spec = C_SpecializationInfo.GetSpecialization();
-        if (spec == SPEC_PRIEST_SHADOW) then
-            if (_G['PriestBarFrame'].hasReqLevel) then
-                --
+        if _G['PriestBarFrame'] then
+            local spec = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization and C_SpecializationInfo.GetSpecialization()
+            if (spec == SPEC_PRIEST_SHADOW) and (_G['PriestBarFrame'].hasReqLevel) then
                 _G['PriestBarFrame']:SetShown(not hide)
             else
                 _G['PriestBarFrame']:SetShown(false)
             end
-        else
-            _G['PriestBarFrame']:SetShown(false)
         end
     end
 end
@@ -454,18 +428,18 @@ function SubModuleMixin:HookSecondaryRes()
 
     if not self.SecondaryResToHide then return end
 
-    if self.SecondaryResToHide == _G['ShardBarFrame'] and not DF.API.Version.IsCata then
+    if _G['BurningEmbersBarFrame'] or _G['DemonicFuryBarFrame'] then
         -- warlock MoP onwards
         self:RegisterEvent('PLAYER_SPECIALIZATION_CHANGED')
 
         local t = {_G['ShardBarFrame'], _G['BurningEmbersBarFrame'], _G['DemonicFuryBarFrame']}
 
         for k, v in ipairs(t) do
-            v:HookScript('OnShow', function()
-                --
-                -- print('onshow')
-                if not self.ModuleRef.db.profile.playerSecondaryRes.activate then v:Hide() end
-            end)
+            if v then
+                v:HookScript('OnShow', function()
+                    if not self.ModuleRef.db.profile.playerSecondaryRes.activate then v:Hide() end
+                end)
+            end
         end
     elseif self.SecondaryResToHide == _G['PriestBarFrame'] then
         self.SecondaryResToHide:HookScript('OnShow', function()

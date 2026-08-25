@@ -480,15 +480,11 @@ function SubModuleMixin:SetupOptions()
                     return false
                 end
             elseif sub == 'buffsOnTop' then
-                if DF.API.Version.IsTBC then
+                if Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.BuffsOnTop and addonTable.GetBlizzEditmodeFrameSettingBool then
                     return addonTable:GetBlizzEditmodeFrameSettingBool(TargetFrame,
                                                                        Enum.EditModeUnitFrameSetting.BuffsOnTop);
                 else
-                    if TARGET_FRAME_BUFFS_ON_TOP then
-                        return true;
-                    else
-                        return false;
-                    end
+                    return TARGET_FRAME_BUFFS_ON_TOP and true or false
                 end
             else
                 return getOption(info)
@@ -513,10 +509,8 @@ function SubModuleMixin:SetupOptions()
                     TARGET_FRAME_BUFFS_ON_TOP = false
                     TargetFrame.buffsOnTop = false
                 end
-                if DF.API.Version.IsTBC then
-                    local b = 0;
-                    if value then b = 1; end
-                    addonTable:SetBlizzEditmodeFrameSetting(TargetFrame, Enum.EditModeUnitFrameSetting.BuffsOnTop, b);
+                if Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.BuffsOnTop and addonTable.SetBlizzEditmodeFrameSetting then
+                    addonTable:SetBlizzEditmodeFrameSetting(TargetFrame, Enum.EditModeUnitFrameSetting.BuffsOnTop, value and 1 or 0, true);
                 end
                 -- Not TargetFrame_UpdateAuras directly: driving it from here
                 -- can make Blizzard create a TargetFrameDebuffN global inside
@@ -633,8 +627,7 @@ function SubModuleMixin:Setup()
 
     f:Hide()
 
-    if DF.API.Version.IsTBC then
-        --
+    if addonTable.OverrideBlizzEditmode then
         addonTable:OverrideBlizzEditmode(TargetFrame, 'CENTER', f, 'CENTER', 0, 0)
     end
 
@@ -700,8 +693,6 @@ function SubModuleMixin:Update()
     local f_orig = TargetFrame
     local f = _G['DragonflightUITargetFrame']
 
-    if DF.API.Version.IsTBC then state.customAnchorFrame = ''; end
-
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -713,17 +704,9 @@ function SubModuleMixin:Update()
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    -- f_orig:SetParent(f)
     f_orig:ClearAllPoints()
     f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
     f_orig:SetScale(state.scale)
-
-    if DF.API.Version.IsTBC then
-    else
-        f:SetUserPlaced(true)
-        f_orig:SetMovable(true)
-        f_orig:SetUserPlaced(true)
-    end
 
     self:ReApplyTargetFrame()
     -- Module.ReApplyToT()
@@ -882,12 +865,10 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
     -- targets", with a screenshot from 1.15.9. The icon is the same region on
     -- both (TargetFrameTextureFramePVPIcon, reached as TargetFrame.pvpIcon) and
     -- both use the classic frame, so the TBC placement applies unchanged.
-    if DF.API.Version.IsTBC or DF.Era then
-        local t = TargetFrame.pvpIcon
-        if t then
-            t:ClearAllPoints()
-            t:SetPoint('LEFT', TargetFramePortrait, 'RIGHT', -22, -18)
-        end
+    local t = TargetFrame and TargetFrame.pvpIcon
+    if t and TargetFramePortrait then
+        t:ClearAllPoints()
+        t:SetPoint('LEFT', TargetFramePortrait, 'RIGHT', -22, -18)
     end
 
     -- Blizzard's own combat flash, however this flavour happens to expose it: a
@@ -1133,50 +1114,51 @@ function SubModuleMixin:ChangeTargetFrame()
         end)
     end
 
-    if DF.Era then
-        local parent = TargetFrameTextureFrame
+    local parent = TargetFrameTextureFrame
+    if parent then
         -- health
         if not parent.HealthBarText then
             parent.HealthBarText = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            TargetFrameHealthBar.TextString = parent.HealthBarText
+            if TargetFrameHealthBar then TargetFrameHealthBar.TextString = parent.HealthBarText end
         end
 
         if not parent.HealthBarTextLeft then
             parent.HealthBarTextLeft = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            TargetFrameHealthBar.LeftText = parent.HealthBarTextLeft
+            if TargetFrameHealthBar then TargetFrameHealthBar.LeftText = parent.HealthBarTextLeft end
         end
 
         if not parent.HealthBarTextRight then
             parent.HealthBarTextRight = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            TargetFrameHealthBar.RightText = parent.HealthBarTextRight
+            if TargetFrameHealthBar then TargetFrameHealthBar.RightText = parent.HealthBarTextRight end
         end
         -- mana
         if not parent.ManaBarText then
             parent.ManaBarText = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            TargetFrameManaBar.TextString = parent.ManaBarText
+            if TargetFrameManaBar then TargetFrameManaBar.TextString = parent.ManaBarText end
         end
         if not parent.ManaBarTextLeft then
             parent.ManaBarTextLeft = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            TargetFrameManaBar.LeftText = parent.ManaBarTextLeft
+            if TargetFrameManaBar then TargetFrameManaBar.LeftText = parent.ManaBarTextLeft end
         end
         if not parent.ManaBarTextRight then
             parent.ManaBarTextRight = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            TargetFrameManaBar.RightText = parent.ManaBarTextRight
+            if TargetFrameManaBar then TargetFrameManaBar.RightText = parent.ManaBarTextRight end
         end
-    end
 
-    if DF.Wrath or DF.Era or DF.API.Version.IsTBC then
-        local dx = 5
-        -- health vs mana bar
-        local deltaSize = 134 - 125
+        if parent.HealthBarText and TargetFrameHealthBar then
+            local dx = 5
+            local deltaSize = 134 - 125
 
-        TargetFrameTextureFrame.HealthBarText:SetPoint('CENTER', TargetFrameHealthBar, 'CENTER', 0, 0)
-        TargetFrameTextureFrame.HealthBarTextLeft:SetPoint('LEFT', TargetFrameHealthBar, 'LEFT', dx, 0)
-        TargetFrameTextureFrame.HealthBarTextRight:SetPoint('RIGHT', TargetFrameHealthBar, 'RIGHT', -dx, 0)
+            parent.HealthBarText:SetPoint('CENTER', TargetFrameHealthBar, 'CENTER', 0, 0)
+            if parent.HealthBarTextLeft then parent.HealthBarTextLeft:SetPoint('LEFT', TargetFrameHealthBar, 'LEFT', dx, 0) end
+            if parent.HealthBarTextRight then parent.HealthBarTextRight:SetPoint('RIGHT', TargetFrameHealthBar, 'RIGHT', -dx, 0) end
 
-        TargetFrameTextureFrame.ManaBarText:SetPoint('CENTER', TargetFrameManaBar, 'CENTER', -deltaSize / 2, 0)
-        TargetFrameTextureFrame.ManaBarTextLeft:SetPoint('LEFT', TargetFrameManaBar, 'LEFT', dx, 0)
-        TargetFrameTextureFrame.ManaBarTextRight:SetPoint('RIGHT', TargetFrameManaBar, 'RIGHT', -deltaSize - dx, 0)
+            if parent.ManaBarText and TargetFrameManaBar then
+                parent.ManaBarText:SetPoint('CENTER', TargetFrameManaBar, 'CENTER', -deltaSize / 2, 0)
+                if parent.ManaBarTextLeft then parent.ManaBarTextLeft:SetPoint('LEFT', TargetFrameManaBar, 'LEFT', dx, 0) end
+                if parent.ManaBarTextRight then parent.ManaBarTextRight:SetPoint('RIGHT', TargetFrameManaBar, 'RIGHT', -dx - deltaSize, 0) end
+            end
+        end
     end
 
     if not TargetFrame.DFRangeHooked then

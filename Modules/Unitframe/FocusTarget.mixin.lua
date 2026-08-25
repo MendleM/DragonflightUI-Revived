@@ -375,13 +375,6 @@ function SubModuleMixin:Update()
     -- SetSmallSize, do not multiply into it either.
     f_orig:SetScale(1)
 
-    if DF.API.Version.IsTBC then
-    else
-        f:SetUserPlaced(true)
-        f_orig:SetMovable(true)
-        f_orig:SetUserPlaced(true)
-    end
-
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 
     self:ReApplyFocusToT()
