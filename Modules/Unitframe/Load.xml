@@ -5,6 +5,12 @@
 	<Include file="Party.mixin.lua" />
 	<Include file="Pet.mixin.lua" />
 	<Include file="Player.mixin.lua" />
+	<Include file="SecondaryRes/Res_DeathKnight.lua" />
+	<Include file="SecondaryRes/Res_Paladin.lua" />
+	<Include file="SecondaryRes/Res_Druid.lua" />
+	<Include file="SecondaryRes/Res_Warlock.lua" />
+	<Include file="SecondaryRes/Res_Monk.lua" />
+	<Include file="SecondaryRes/Res_Priest.lua" />
 	<Include file="PlayerSecondaryRes.mixin.lua" />
 	<Include file="Player.TotemFrame.mixin.lua" />
 	<Include file="Raid.mixin.lua" />
