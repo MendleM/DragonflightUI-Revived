@@ -1,5 +1,8 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 UI_shared.xsd">
+	<Script file="Mixin/Profession/ProfessionFrame.Core.mixin.lua" />
+	<Script file="Mixin/Profession/ProfessionFrame.Schematics.mixin.lua" />
+	<Script file="Mixin/Profession/ProfessionFrame.RecipeList.mixin.lua" />
 	<Script file="Mixin/ProfessionFrame.mixin.lua" />
 	<Frame name="DFProfessionFrameTemplate" mixin="DFProfessionMixin" inherits="SettingsFrameTemplate" toplevel="true" hidden="true" movable="true" enableMouse="true" resizable="true" frameStrata="HIGH" virtual="true">
 		<Size x="942" y="658" />
