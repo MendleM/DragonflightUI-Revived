@@ -434,8 +434,7 @@ function Module:AddEditMode()
     local EditModeModule = DF:GetModule('Editmode');
 
     -- QuestTracker
-    local trackerFrame = (DF.Era and QuestWatchFrame) or (DF.API.Version.IsTBC and QuestWatchFrame) or
-                             (DF.Wrath and WatchFrame) or (DF.Cata and WatchFrame);
+    local trackerFrame = _G['WatchFrame'] or _G['QuestWatchFrame'] or _G['ObjectiveTrackerFrame'];
     if trackerFrame then
         Module.TrackerFrameRef = trackerFrame;
         EditModeModule:AddEditModeToFrame(trackerFrame)
@@ -520,6 +519,7 @@ function Module.UpdateTrackerState(state)
     -- Opted out: never touch the tracker, so third-party quest trackers can
     -- own the frame without us yanking it back on every SetPoint.
     if state.enabled == false then return end
+
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -527,45 +527,26 @@ function Module.UpdateTrackerState(state)
         parent = _G[state.anchorFrame]
     end
 
-    if DF.Era then
+    if QuestWatchFrame then
         QuestWatchFrame:SetClampedToScreen(false)
-
         QuestWatchFrame:SetScale(state.scale)
         QuestWatchFrame:ClearAllPoints()
         QuestWatchFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-        -- QuestWatchFrame:SetHeight(800)
-        -- QuestWatchFrame:SetWidth(204)    
-
-        QuestTimerFrame:ClearAllPoints()
-        -- QuestTimerFrame:SetPoint('TOP', Minimap, 'BOTTOMLEFT', 0, 0)
-        QuestTimerFrame:SetPoint('BOTTOMRIGHT', QuestWatchFrame, 'TOPRIGHT', -25, 0)
-    elseif DF.API.Version.IsTBC then
-        QuestWatchFrame:SetClampedToScreen(false)
-
-        QuestWatchFrame:SetScale(state.scale)
-        QuestWatchFrame:ClearAllPoints()
-        QuestWatchFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
-
-        -- QuestWatchFrame:SetHeight(800)
-        -- QuestWatchFrame:SetWidth(204)    
-
-        QuestTimerFrame:ClearAllPoints()
-        -- QuestTimerFrame:SetPoint('TOP', Minimap, 'BOTTOMLEFT', 0, 0)
-        QuestTimerFrame:SetPoint('BOTTOMRIGHT', QuestWatchFrame, 'TOPRIGHT', -25, 0)
-    elseif DF.Cata then
-        if not WatchFrame then return end
-        WatchFrame:SetClampedToScreen(false)
-
-        WatchFrame:SetScale(state.scale)
-        WatchFrame:ClearAllPoints()
-        WatchFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
-    elseif DF.Wrath then
-        if not WatchFrame then return end
+        if QuestTimerFrame then
+            QuestTimerFrame:ClearAllPoints()
+            QuestTimerFrame:SetPoint('BOTTOMRIGHT', QuestWatchFrame, 'TOPRIGHT', -25, 0)
+        end
+    elseif WatchFrame then
         WatchFrame:SetClampedToScreen(false)
         WatchFrame:SetScale(state.scale)
         WatchFrame:ClearAllPoints()
         WatchFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
+    elseif ObjectiveTrackerFrame then
+        ObjectiveTrackerFrame:SetClampedToScreen(false)
+        ObjectiveTrackerFrame:SetScale(state.scale)
+        ObjectiveTrackerFrame:ClearAllPoints()
+        ObjectiveTrackerFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     end
 end
 
@@ -634,50 +615,17 @@ end
 
 function Module.MoveTracker()
     local setting
+    local tracker = QuestWatchFrame or WatchFrame or ObjectiveTrackerFrame
 
-    if DF.Era then
-        hooksecurefunc(QuestWatchFrame, 'SetPoint', function(self)
-            if not setting then
-                setting = true
-                -- print('WatchFrame SetPoint')
-                local state = Module.db.profile.tracker
-                Module.UpdateTrackerState(state)
-                setting = nil
-            end
-        end)
-    elseif DF.API.Version.IsTBC then
-        hooksecurefunc(QuestWatchFrame, 'SetPoint', function(self)
-            if not setting then
-                setting = true
-                -- print('WatchFrame SetPoint')
-                local state = Module.db.profile.tracker
-                Module.UpdateTrackerState(state)
-                setting = nil
-            end
-        end)
-    elseif DF.Cata then
+    if tracker then
         if WatchFrame then
             WatchFrame:SetHeight(800)
             WatchFrame:SetWidth(204)
         end
-        hooksecurefunc(WatchFrame, 'SetPoint', function(self)
+
+        hooksecurefunc(tracker, 'SetPoint', function(self)
             if not setting then
                 setting = true
-                -- print('WatchFrame SetPoint')
-                local state = Module.db.profile.tracker
-                Module.UpdateTrackerState(state)
-                setting = nil
-            end
-        end)
-    elseif DF.Wrath then
-        if WatchFrame then
-            WatchFrame:SetHeight(800)
-            WatchFrame:SetWidth(204)
-        end
-        hooksecurefunc(WatchFrame, 'SetPoint', function(self)
-            if not setting then
-                setting = true
-                -- print('WatchFrame SetPoint')
                 local state = Module.db.profile.tracker
                 Module.UpdateTrackerState(state)
                 setting = nil

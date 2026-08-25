@@ -487,12 +487,10 @@ function Module:UpdateUnitframe(state)
     self:UpdatePartyFrame(state)
 
     -- focus
-    if DF.Wrath or DF.API.Version.IsTBC then
-        --      
+    if DF.Caps.HasFocus and unitModule.SubFocus then
         if not f.DarkmodeFocusHooked then
             f.DarkmodeFocusHooked = true
             hooksecurefunc(unitModule.SubFocus, 'ChangeFocusFrame', function()
-                --  
                 self:UpdateFocusFrame(state)
             end)
         end
@@ -500,9 +498,8 @@ function Module:UpdateUnitframe(state)
     end
 
     -- boss
-    if DF.Wrath then
-        local bossModule = DF:GetModule('Bossframe')
-        if not bossModule then return end
+    local bossModule = DF:GetModule('Bossframe', true)
+    if bossModule then
 
         if not bossModule.DarkmodeBossHooked then
             bossModule.DarkmodeBossHooked = true;
