@@ -2118,110 +2118,60 @@ function Module:EnableOutOfCombat()
 
     Module.Temp = {}
 
-    if DF.Era or DF.API.Version.IsTBC then
-        -- era-1159: the 1.15.9 watchdog budget is small AND variable
-        -- (observed kills between ~350ms and ~1s of cumulative work), and an
-        -- uncaught error used to sever the setup chain entirely. So: many
-        -- tiny steps, one per frame, each pcall-isolated. The Era/TBC flavor
-        -- body (EnableAddonSpecific) is inlined as individual steps.
-        local steps = {}
-        local add = function(label, fn) steps[#steps + 1] = {label, fn} end
+    -- Watchdog budget & pcall-isolated batching across all modern clients
+    local steps = {}
+    local add = function(label, fn) steps[#steps + 1] = {label, fn} end
 
-        add('ChangeActionbar', Module.ChangeActionbar)
-        add('NewBars', function()
-            Module.CreateNewXPBar()
-            Module.CreateNewRepBar()
-            Module:RemoveActionbarAnimations()
-        end)
-        add('PetHookAndGryphon', function()
-            Module.HookPetBar()
-            -- Module.Frame, NOT the file-local 'frame': that local is
-            -- declared further down the file, so this closure (unlike the
-            -- original Era() defined below it) cannot capture it.
-            Module.Frame:RegisterEvent('PLAYER_REGEN_ENABLED')
-            Module.Frame:RegisterEvent('PLAYER_ENTERING_WORLD')
-            Module.ChangeGryphon()
-        end)
-        add('ChangeMicroMenu', Module.ChangeMicroMenu)
-        add('ChangeBackpack', Module.ChangeBackpack)
-        add('BagsAndFPS', function()
-            Module.ChangeFramerate()
-            Module.CreateBagExpandButton()
-            Module.RefreshBagBarToggle()
-            Module.HookBags()
-        end)
-        add('SubModules', function()
-            self.SubVehicleLeave:Setup()
-            self.SubActionbarRange:Setup()
-        end)
-        for _, step in ipairs(self:GetSetupActionbarSteps()) do
-            steps[#steps + 1] = step
+    add('ChangeActionbar', Module.ChangeActionbar)
+    add('NewBars', function()
+        Module.CreateNewXPBar()
+        Module.CreateNewRepBar()
+        Module:RemoveActionbarAnimations()
+    end)
+    add('PetHookAndGryphon', function()
+        Module.HookPetBar()
+        Module.Frame:RegisterEvent('PLAYER_REGEN_ENABLED')
+        Module.Frame:RegisterEvent('PLAYER_ENTERING_WORLD')
+        Module.ChangeGryphon()
+    end)
+    add('ChangeMicroMenu', Module.ChangeMicroMenu)
+    add('ChangeBackpack', Module.ChangeBackpack)
+    add('BagsAndFPS', function()
+        Module.ChangeFramerate()
+        Module.CreateBagExpandButton()
+        Module.RefreshBagBarToggle()
+        Module.HookBags()
+    end)
+    add('SubModules', function()
+        self.SubVehicleLeave:Setup()
+        self.SubActionbarRange:Setup()
+    end)
+    for _, step in ipairs(self:GetSetupActionbarSteps()) do
+        steps[#steps + 1] = step
+    end
+    add('AddStateUpdater', Module.AddStateUpdater)
+    add('AddEditMode', function() self:AddEditMode() end)
+    add('RegisterOptionScreens', function() self:RegisterOptionScreens() end)
+    add('ApplySettingsALL', function() Module:ApplySettings('ALL') end)
+    add('UnitframeReapply', function()
+        local uf = DF:GetModule('Unitframe', true)
+        if uf and uf.GetWasEnabled and uf:GetWasEnabled() then
+            uf:ApplySettings()
         end
-        add('AddStateUpdater', Module.AddStateUpdater)
-        add('AddEditMode', function() self:AddEditMode() end)
-        add('RegisterOptionScreens', function() self:RegisterOptionScreens() end)
-        add('ApplySettingsALL', function() Module:ApplySettings('ALL') end)
-        add('UnitframeReapply', function()
-            -- Layout applications during this chain (InitEditmodeOverride's
-            -- ApplyChanges, ForceMoveBlizzEditModeGhosts) re-apply the
-            -- Blizzard EditMode layout AFTER the Unitframe module already
-            -- placed player/target - and DFUI's positions are not stored in
-            -- that layout, so they land at the layout's spots. Re-place them
-            -- once the chain is done.
-            local uf = DF:GetModule('Unitframe', true)
-            if uf and uf.GetWasEnabled and uf:GetWasEnabled() then
-                uf:ApplySettings()
-            end
-        end)
-        add('DarkmodeReapply', function()
-            -- era-1159: Darkmode (enabled before this async chain) styles
-            -- the buttons, then the StyleBar/ApplySettings steps above
-            -- re-texture them with default art - upstream's After(0) hack
-            -- raced the same problem and loses badly against a chain that
-            -- finishes many frames after enable. Re-apply once, at the
-            -- actual end of the chain.
-            local dm = DF:GetModule('Darkmode', true)
-            if dm and dm.GetWasEnabled and dm:GetWasEnabled() then
-                dm:ApplySettings()
-            end
-        end)
-        add('RefreshConfigHook', function()
-            self:SecureHook(DF, 'RefreshConfig', function()
-                Module:ApplySettings('ALL')
-                Module:RefreshOptionScreens()
-            end)
-        end)
-        Helper:RunSteps(steps, self, 'Actionbar')
-    else
-        -- Isolate each phase. These ran as five bare calls in a row, so an error
-        -- anywhere in the first one took the rest with it - and the first is
-        -- EnableAddonSpecific, all the per-flavour restyling. A single refused
-        -- SetPoint in the MoP micro menu therefore meant SetupActionbarFrames
-        -- never ran and the player had no action bars at all, while the options
-        -- still reported them as on.
-        --
-        -- The Era path gets this for free: RunSteps pcalls every step, for
-        -- exactly this reason. Cosmetic work must not be able to stop the bars
-        -- from being built.
-        local function step(label, fn)
-            Helper:Benchmark(label, function()
-                local ok, err = pcall(fn)
-                if not ok then geterrorhandler()('DFUI Actionbar enable (' .. label .. '): ' .. tostring(err)) end
-            end, 0, self)
+    end)
+    add('DarkmodeReapply', function()
+        local dm = DF:GetModule('Darkmode', true)
+        if dm and dm.GetWasEnabled and dm:GetWasEnabled() then
+            dm:ApplySettings()
         end
-
-        step('EnableAddonSpecific', function() self:EnableAddonSpecific() end)
-        step('SetupActionbarFrames', function() self:SetupActionbarFrames() end)
-        step('AddStateUpdater', function() Module.AddStateUpdater() end)
-        step('AddEditMode', function() self:AddEditMode() end)
-        step('RegisterOptionScreens', function() self:RegisterOptionScreens() end)
-
-        step('ApplySettingsALL', function() Module:ApplySettings('ALL') end)
+    end)
+    add('RefreshConfigHook', function()
         self:SecureHook(DF, 'RefreshConfig', function()
             Module:ApplySettings('ALL')
             Module:RefreshOptionScreens()
         end)
-    end
+    end)
+    Helper:RunSteps(steps, self, 'Actionbar')
 end
 
 function Module:OnDisable()
@@ -2370,109 +2320,14 @@ function Module:GetSetupActionbarSteps()
     --     print('~~~')
     -- end)
 
-    local createExtra = function(n)
-        local btns = {}
-
-        local extraParent = CreateFrame('FRAME', 'DragonflightUIMultiactionBar' .. n .. 'VisParent', UIParent)
-        extraParent:SetFrameLevel(0)
-
-        for i = 1, 12 do
-            --
-            local btn = CreateFrame("CheckButton", "DragonflightUIMultiactionBar" .. n .. "Button" .. i, extraParent,
-                                    "ActionBarButtonTemplate")
-            btn:SetSize(64, 64)
-            btn:SetPoint("CENTER", UIParent, "CENTER", 64 * i, 0)
-            btn:SetAttribute("type", "action")
-            btn:SetAttribute("action", 144 + (n - 6) * 12 + i) -- Action slot 1
-            -- btn:SetAttribute("DFaction", 144 + (n - 6) * 12 + i) -- Action slot 1
-            btn:SetFrameLevel(3)
-
-            btn:EnableMouseWheel()
-
-            if DF.API.Version.IsTBC then
-                btn:RegisterForClicks('AnyDown', 'AnyUp')
-                -- btn:SetAttribute('downbutton', 'LeftButton')
-            else
-                btn:RegisterForClicks('AnyDown', 'AnyUp')
-
-                handler:WrapScript(btn, "OnClick", [[
-                -- print('OnClick',self:GetName(),button, down)
-                if self:GetAttribute("type") == "action" then
-                    local type, action = GetActionInfo(self:GetAttribute("action"))
-
-                    local flyoutHandler = owner:GetFrameRef("flyoutHandler")
-                    if flyoutHandler then
-                        flyoutHandler:Hide()
-                    end                               
-
-                    if button == 'Keybind' then
-                        -- era-1159: upstream gates this on down == useKeyDown
-                        -- (fire on key press, cvar default). On this client
-                        -- that edge never fires the binding - "CLICK x:Keybind"
-                        -- was completely dead while "CLICK x:LeftButton"
-                        -- (which takes the release-edge path below) works.
-                        -- Mirror that proven path: swallow down, act on
-                        -- release. Single fire regardless of which edges the
-                        -- client actually delivers.
-                        if down then return false end
-                        return "LeftButton"
-                    end
-
-                    if IsModifiedClick("PICKUPACTION") then
-                        -- print('PICKUPACTION')
-                        return false;
-                    end  
-
-                    if down then 
-                        return false
-                    else
-                        return "LeftButton"    
-                    end                                     
-                end
-
-                local flyoutHandler = owner:GetFrameRef("flyoutHandler")
-                if flyoutHandler and (not down or self:GetParent() ~= flyoutHandler) then
-                    flyoutHandler:Hide()
-                end
-
-                return "LeftButton"               
-            ]])
-            end
-
-            btn.command = "CLICK DragonflightUIMultiactionBar" .. n .. "Button" .. i .. ":Keybind"
-            btn.commandHuman = "Action Bar " .. n .. ' Button ' .. i
-
-            btn:SetAttributeNoHandler("commandName", btn.command)
-
-            btns[i] = btn
-            btn:Hide()
-        end
-
-        local bar = CreateFrame('FRAME', 'DragonflightUIActionbarFrame' .. n, UIParent,
-                                'DragonflightUIActionbarFrameTemplate')
-
-        bar:Init()
-        bar:SetButtons(btns, n)
-        Module['bar' .. n] = bar
-
-        bar:StyleButtons()
-        bar:HookQuickbindMode()
-        bar:ReplaceNormalTexture2()
-    end
-
     local extraBases = {[6] = 'MultiBar5Button', [7] = 'MultiBar6Button', [8] = 'MultiBar7Button'}
     for n = 6, 8 do
         steps[#steps + 1] = {'ExtraBar' .. n, function()
-            if DF.API.Version.IsTBC then
-                createStuff(n, extraBases[n])
-            else
-                createExtra(n)
-            end
+            createStuff(n, extraBases[n])
         end}
     end
 
     steps[#steps + 1] = {'ExtraBarsFinish', function()
-    if DF.API.Version.IsTBC then
         for i = 6, 8 do
             local bar = Module['bar' .. i]
             if bar then
@@ -2497,29 +2352,20 @@ function Module:GetSetupActionbarSteps()
         for i = 1, 8 do
             local bar = Module['bar' .. i]
             if bar then
-                --
                 bar.BlizzEditmodeFrame = actionbarToBlizzEditmodeFrame[i];
             end
         end
-    else
-        DragonFlightUIQuickKeybindMixin:HookExtraButtons()
-    end
     end} -- ExtraBarsFinish step
 
     steps[#steps + 1] = {'MigrateKeybinds', function()
-    -- DragonflightUIActionbarMixin:HookGlow()
-    DragonflightUIActionbarMixin:MigrateOldKeybinds()
+        DragonflightUIActionbarMixin:MigrateOldKeybinds()
+        DragonflightUIActionbarMixin:MigrateOldKeybindsTBC()
 
-    if DF.API.Version.IsTBC then DragonflightUIActionbarMixin:MigrateOldKeybindsTBC(); end
-
-    -- TODOTBC
-    if ActionButton_UpdateHotkeys then
-        hooksecurefunc('ActionButton_UpdateHotkeys', function(self, actionButtonType)
-            -- print('ActionButton_UpdateHotkeys')
-            if self.DragonflightFixHotkey then self:DragonflightFixHotkey() end
-        end)
-    end
-
+        if ActionButton_UpdateHotkeys then
+            hooksecurefunc('ActionButton_UpdateHotkeys', function(self, actionButtonType)
+                if self.DragonflightFixHotkey then self:DragonflightFixHotkey() end
+            end)
+        end
     end} -- MigrateKeybinds step
 
     for i = 1, 8 do
@@ -4262,28 +4108,7 @@ function Module.UpdateBagState(state)
 end
 
 function Module.MoveBars()
-    MainMenuBarBackpackButton:ClearAllPoints()
-    MainMenuBarBackpackButton:SetPoint('BOTTOMRIGHT', UIParent, 0, 26)
-
-    if DF.Wrath then
-        CharacterMicroButton:ClearAllPoints()
-        CharacterMicroButton:SetPoint('BOTTOMRIGHT', UIParent, -300 + 5, 0)
-    elseif DF.Era then
-        CharacterMicroButton:ClearAllPoints()
-        CharacterMicroButton:SetPoint('BOTTOMRIGHT', UIParent, -300 + 95, 0)
-    elseif DF.API.Version.IsTBC then
-    else
-        CharacterMicroButton:ClearAllPoints()
-        CharacterMicroButton:SetPoint('BOTTOMRIGHT', UIParent, -300 + 5, 0)
-    end
-
-    -- CharacterMicroButton.SetPoint = noop
-    -- CharacterMicroButton.ClearAllPoints = noop
-
-    if DF.Wrath then
-        PVPMicroButton.SetPoint = noop
-        PVPMicroButton.ClearAllPoints = noop
-    end
+    -- Legacy noop: MicroMenu and Bags are managed independently via dedicated Holder frames.
 end
 
 local frameBagToggle = CreateFrame('Button', 'DragonflightUIBagToggleFrame', MainMenuBarBackpackButton)

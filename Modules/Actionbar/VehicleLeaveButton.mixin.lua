@@ -541,38 +541,14 @@ function SubModuleMixin:CreateVehicleLeaveButton()
     fakeWidget.FakePreviewGlow = fakeGlow;
 
     local btn = _G['MainMenuBarVehicleLeaveButton'];
-    if DF.API.Version.IsTBC then
-        addonTable:OverrideBlizzEditmode(btn, 'CENTER', f, 'CENTER', 0, 0)
-    else
+    if btn then
         btn:UnregisterAllEvents()
-        -- btn:SetParent(f)
         btn:ClearAllPoints()
         btn:SetPoint('CENTER', f, 'CENTER', 0, 0)
-        -- btn:Show()
 
-        -- era-1159: the plain SetPoint above is not enough. The Classic
-        -- panel manager (UIParentManageFramePositions) re-anchors this
-        -- button to UIParent/BOTTOM whenever the bars update - which is
-        -- exactly when a taxi shows it - because IsInDefaultPosition()
-        -- still reports true. Move its EditMode layout anchor as well
-        -- (the same trick ForceMoveBlizzEditModeGhosts uses for the
-        -- parked bars, and the TBC branch below already does): the
-        -- manager then skips the button and the dock anchor sticks.
-        -- SaveOnly, never ApplyChanges: ApplyChanges works by Show/Hiding
-        -- EditModeManagerFrame, which re-applies the whole Blizzard layout
-        -- mid-chain - it stomped the unitframe positions set moments
-        -- earlier, fired DFUI's EditMode enter/exit hooks against
-        -- half-built bars, and left the reskinned editmode panels stuck
-        -- open on screen. The saved anchor is applied by the next natural
-        -- layout application (and by InitEditmodeOverride's own early
-        -- ApplyChanges on every following login).
         local lib = addonTable.LibEditModeOverride
         if lib then
-            -- Re-read before writing: SaveOnly puts back the whole layout
-            -- table the library read at login, so a stale copy silently undoes
-            -- anything the player changed in Blizzard's Edit Mode since then.
             if addonTable.RefreshBlizzEditmodeLayouts then addonTable:RefreshBlizzEditmodeLayouts() end
-
             lib:ReanchorFrame(btn, 'CENTER', f, 'CENTER', 0, 0)
             lib:SaveOnly()
         end

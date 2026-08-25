@@ -451,37 +451,21 @@ function DragonflightUIActionbarMixin:UpdateBlizzEditmodeState()
     if btnCount < 1 then return end
 
     if not self.BlizzEditmodeFrame then return end
-    if not DF.API.Version.IsTBC then return end
 
-    local editmodeAlwaysShow = addonTable:GetBlizzEditmodeFrameSettingBool(self.BlizzEditmodeFrame,
-                                                                           Enum.EditModeActionBarSetting
-                                                                               .AlwaysShowButtons)
-    if editmodeAlwaysShow ~= state.alwaysShow then
-        -- print('diff')
-        if state.alwaysShow then
-            -- btn:SetAttribute("showgrid", 1)
-            addonTable:SetBlizzEditmodeFrameSetting(self.BlizzEditmodeFrame,
-                                                    Enum.EditModeActionBarSetting.AlwaysShowButtons, 1, true)
-        else
-            -- btn:SetAttribute("showgrid", 0)
-            addonTable:SetBlizzEditmodeFrameSetting(self.BlizzEditmodeFrame,
-                                                    Enum.EditModeActionBarSetting.AlwaysShowButtons, 0, true)
+    if Enum and Enum.EditModeActionBarSetting and addonTable.GetBlizzEditmodeFrameSettingBool then
+        local editmodeAlwaysShow = addonTable:GetBlizzEditmodeFrameSettingBool(self.BlizzEditmodeFrame,
+                                                                               Enum.EditModeActionBarSetting
+                                                                                   .AlwaysShowButtons)
+        if editmodeAlwaysShow ~= state.alwaysShow then
+            if state.alwaysShow then
+                addonTable:SetBlizzEditmodeFrameSetting(self.BlizzEditmodeFrame,
+                                                        Enum.EditModeActionBarSetting.AlwaysShowButtons, 1, true)
+            else
+                addonTable:SetBlizzEditmodeFrameSetting(self.BlizzEditmodeFrame,
+                                                        Enum.EditModeActionBarSetting.AlwaysShowButtons, 0, true)
+            end
         end
-        -- self.BlizzEditmodeFrame:UpdateSystemSettingAlwaysShowButtons()
-    else
-        -- print('same')
     end
-
-    -- Button visibility belongs to UpdateGridState and nowhere else.
-    --
-    -- This used to end with its own show/hide loop keyed on state.alwaysShow
-    -- alone. UpdateGridState calls this function as its last step, so on TBC -
-    -- the only flavor that gets here - that loop ran immediately after the grid
-    -- had been applied and undid it: with "Always Show" off, every empty button
-    -- was hidden again the instant a drag showed them, so no empty slots
-    -- appeared while dragging a spell and nothing could be dropped on the bar.
-    -- It also knew nothing about combat lockdown, unlike the grid pass, so the
-    -- same loop tried to Show/Hide protected buttons mid-fight.
 end
 
 function DragonflightUIActionbarMixin:UpdateGridState()
@@ -492,20 +476,12 @@ function DragonflightUIActionbarMixin:UpdateGridState()
     local btnCount = #buttonTable
     if btnCount < 1 then return end
 
-    -- Apply Blizzard's visibility formula (showgrid attribute or
-    -- HasAction) per button ourselves. Do NOT call bar:UpdateShownButtons()
-    -- here - running it tainted trips ADDON_ACTION_FORBIDDEN. Blizzard's
-    -- secure re-evaluations use the same formula off the showgrid
-    -- attribute we set, so the two never fight.
     local canTouchProtected = not Helper:IsCombatLocked()
     local showAll = state.alwaysShow or self.DragGridActive
     local gridAttr = showAll and 1 or 0
     for i = 1, btnCount do
         local btn = buttonTable[i]
 
-        -- print(btn:GetName(), state.alwaysShow)
-        -- Only write when changed: every SetAttribute fires
-        -- OnAttributeChanged -> UpdateAction on the button.
         if btn:GetAttribute("showgrid") ~= gridAttr then
             btn:SetAttribute("showgrid", gridAttr)
             if ActionButton_ShowGrid then ActionButton_ShowGrid(btn) end
@@ -519,7 +495,7 @@ function DragonflightUIActionbarMixin:UpdateGridState()
         end
     end
 
-    if DF.API.Version.IsTBC then self:UpdateBlizzEditmodeState(); end
+    if self.BlizzEditmodeFrame then self:UpdateBlizzEditmodeState(); end
 end
 
 function DragonflightUIActionbarMixin:HookQuickbindMode()
@@ -1350,21 +1326,23 @@ function DragonflightUIActionbarMixin:AddGryphons()
 
     self.gryphonRight = gryphonRight
 
-    if DF.API.Version.IsTBC then
-        --
+    if _G['MainActionBar'] and _G['MainActionBar'].EndCaps then
         _G['MainActionBar'].EndCaps:Hide()
-        _G['MainActionBar'].EndCaps.LeftEndCap:Hide()
-        _G['MainActionBar'].EndCaps.RightEndCap:Hide()
+        if _G['MainActionBar'].EndCaps.LeftEndCap then _G['MainActionBar'].EndCaps.LeftEndCap:Hide() end
+        if _G['MainActionBar'].EndCaps.RightEndCap then _G['MainActionBar'].EndCaps.RightEndCap:Hide() end
+    end
 
+    if _G['MainMenuBarMaxLevelBar'] then
         _G['MainMenuBarMaxLevelBar']:Hide()
         _G['MainMenuBarMaxLevelBar']:ClearAllPoints()
+    end
 
-        _G['MainMenuMaxLevelBar0']:Hide()
-        _G['MainMenuMaxLevelBar0']:ClearAllPoints()
-        _G['MainMenuMaxLevelBar1']:Hide()
-        _G['MainMenuMaxLevelBar1']:ClearAllPoints()
-        _G['MainMenuMaxLevelBar2']:Hide()
-        _G['MainMenuMaxLevelBar2']:ClearAllPoints()
+    for k = 0, 3 do
+        local maxBar = _G['MainMenuMaxLevelBar' .. k]
+        if maxBar then
+            maxBar:Hide()
+            maxBar:ClearAllPoints()
+        end
     end
 end
 
