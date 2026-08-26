@@ -81,6 +81,8 @@ function Module:OnEnable()
     self:SetWasEnabled(true)
 
     Module:HideBlizzardDefaultBars()
+    Module.ChangeGryphon()
+    Module.ChangeActionbar()
 
     if not self.ActionbarSetupDone then
         self.ActionbarSetupDone = true

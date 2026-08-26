@@ -342,50 +342,48 @@ function Module.ChangeActionbar()
         StanceButton1.ignoreFramePositionManager = true
     end
 
-    if DF.API.Version.IsModern then
-        if _G['StatusTrackingBarManager'] then _G['StatusTrackingBarManager']:Hide() end
+    Module.ChangeGryphon()
 
-        local stancebar = _G['StanceBar'];
-        if stancebar then
-            local t = {'BackgroundArtLeft', 'BackgroundArtMiddle', 'BackgroundArtRight'}
-            for k, v in ipairs(t) do
-                if stancebar[v] then
-                    stancebar[v]:Hide()
-                    stancebar[v]:ClearAllPoints()
-                    stancebar[v]:SetTexture('')
-                end
+    if _G['StatusTrackingBarManager'] then _G['StatusTrackingBarManager']:Hide() end
+
+    local stancebar = _G['StanceBar'];
+    if stancebar then
+        local t = {'BackgroundArtLeft', 'BackgroundArtMiddle', 'BackgroundArtRight'}
+        for k, v in ipairs(t) do
+            if stancebar[v] then
+                stancebar[v]:Hide()
+                stancebar[v]:ClearAllPoints()
+                stancebar[v]:SetTexture('')
             end
         end
+    end
 
-        local mab = _G['MainActionBar']
-        if mab then
-            mab:UnregisterAllEvents()
-            mab:ClearAllPoints()
-            mab:SetSize(1, 1)
-            if mab.EndCaps then mab.EndCaps:Hide() end
-            if mab.BorderArt then mab.BorderArt:Hide() end
-            if mab.Background then mab.Background:Hide() end
-            if mab.ActionBarPageNumber then mab.ActionBarPageNumber:Hide() end
-            mab:Show()
-        end
+    if StanceBarLeft then
+        StanceBarLeft:Hide()
+        StanceBarMiddle:Hide()
+        StanceBarRight:Hide()
+    end
 
+    local mab = _G['MainActionBar']
+    if mab then
+        mab:UnregisterAllEvents()
+        mab:ClearAllPoints()
+        mab:SetSize(1, 1)
+        if mab.EndCaps then mab.EndCaps:Hide() end
+        if mab.BorderArt then mab.BorderArt:Hide() end
+        if mab.Background then mab.Background:Hide() end
+        if mab.ActionBarPageNumber then mab.ActionBarPageNumber:Hide() end
+        mab:Show()
+    end
+
+    if MainMenuBar then
+        MainMenuBar:SetSize(1, 1)
+    end
+
+    Module:HideBlizzardDefaultBars()
+
+    if DF.API.Version.IsModern then
         Module:ForceMoveBlizzEditModeGhosts()
-    else
-        if StanceBarLeft then
-            StanceBarLeft:Hide()
-            StanceBarMiddle:Hide()
-            StanceBarRight:Hide()
-
-            hooksecurefunc(StanceBarRight, 'Show', function()
-                StanceBarLeft:Hide()
-                StanceBarMiddle:Hide()
-                StanceBarRight:Hide()
-            end)
-        end
-
-        if MainMenuBar then MainMenuBar:SetSize(1, 1) end
-
-        Module:HideBlizzardDefaultBars()
     end
 end
 

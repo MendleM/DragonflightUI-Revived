@@ -33,12 +33,20 @@ function Module.CreateFrameFromAtlas(atlas, name, textureRef, frameName)
 end
 
 function Module.ChangeGryphon()
-    if MainMenuBarLeftEndCap then MainMenuBarLeftEndCap:Hide() end
-    if MainMenuBarRightEndCap then MainMenuBarRightEndCap:Hide() end
-    if MainMenuBarTexture0 then MainMenuBarTexture0:Hide() end
-    if MainMenuBarTexture1 then MainMenuBarTexture1:Hide() end
-    if MainMenuBarTexture2 then MainMenuBarTexture2:Hide() end
-    if MainMenuBarTexture3 then MainMenuBarTexture3:Hide() end
+    local textures = {
+        MainMenuBarLeftEndCap, MainMenuBarRightEndCap,
+        MainMenuBarTexture0, MainMenuBarTexture1, MainMenuBarTexture2, MainMenuBarTexture3,
+        MainMenuMaxLevelBar0, MainMenuMaxLevelBar1, MainMenuMaxLevelBar2, MainMenuMaxLevelBar3
+    }
+    for _, tex in ipairs(textures) do
+        if tex then
+            tex:Hide()
+            if not tex.DFHooked then
+                tex.DFHooked = true
+                hooksecurefunc(tex, 'Show', function(self) self:Hide() end)
+            end
+        end
+    end
 end
 
 function Module.DrawActionbarDeco()

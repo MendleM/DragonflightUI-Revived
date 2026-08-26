@@ -65,28 +65,20 @@ function DragonflightUIMicroMenuMixin:OnLoad()
         self:SetSize(width, height)
     end
 
-    if DF.API.Version.IsTBC then
-    else
+    if UpdateMicroButtons then
         hooksecurefunc('UpdateMicroButtons', function()
-            -- print('#UpdateMicroButtons')
             self:UpdateLayout(true)
         end)
+    end
 
-        if UpdateMicroButtonsParent then
-            hooksecurefunc('UpdateMicroButtonsParent', function(parent)
-                -- print('#UpdateMicroButtonsParent')
-                self:OnUpdateMicroButtonsParent(parent)
-            end)
-        end
+    if UpdateMicroButtonsParent then
+        hooksecurefunc('UpdateMicroButtonsParent', function(parent)
+            self:OnUpdateMicroButtonsParent(parent)
+        end)
+    end
 
-        -- inside calls UpdateMicroButtons
-        -- hooksecurefunc('MoveMicroButtons', function()
-        --     -- print('#MoveMicroButtons')
-        --     self:UpdateLayout(true)
-        -- end)
-
+    if ActionBarController_UpdateAll then
         hooksecurefunc('ActionBarController_UpdateAll', function(force)
-            -- print('#ActionBarController_UpdateAll')
             self:OnActionBarController_UpdateAll()
         end)
     end
