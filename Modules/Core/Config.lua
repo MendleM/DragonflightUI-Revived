@@ -23,7 +23,8 @@ local defaults = {
             ['UI'] = true,
             ['Unitframe'] = true,
             ['Utility'] = false,
-            ['Compatibility'] = true
+            ['Compatibility'] = true,
+            ['GroupLoot'] = true
         },
         bestnumber = 42
     }
@@ -163,6 +164,14 @@ local modulesOptions = {
             desc = L["ModuleTooltipCompatibility"] .. getDefaultStr('Compatibility', 'modules'),
             order = 25,
             new = false,
+            group = 'headerModules'
+        },
+        GroupLoot = {
+            type = 'toggle',
+            name = L["ModuleGroupLoot"],
+            desc = L["ModuleTooltipGroupLoot"] .. getDefaultStr('GroupLoot', 'modules'),
+            order = 9,
+            new = true,
             group = 'headerModules'
         }
     }

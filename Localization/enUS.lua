@@ -28,6 +28,7 @@ do
     L["ModuleTooltipUnitframe"] =
         "This module overhauls the default Unitframes, and adds new features like ClassColor or MobHealth(Era).\nAdds seperate options for Player-, Pet-, Target-, Focus-, and PartyUnitframes."
     L["ModuleTooltipUtility"] = "This module adds general UI features and tweaks.\nWORK IN PROGRESS"
+    L["ModuleTooltipGroupLoot"] = "Restyle and reposition the group loot roll frames with a modern Dragonflight look."
 
     L["ModuleFlyout"] = "Flyout"
     L["ModuleNameplates"] = "Nameplates"
@@ -44,6 +45,7 @@ do
     L["ModuleUtility"] = "Utility"
     L["ModuleCompatibility"] = "Compatibility"
     L["ModuleBossframe"] = "Bossframe"
+    L["ModuleGroupLoot"] = "Group Loot Container"
 
     L["ModuleAlreadyLoadedWasDeactivated"] = "Already loaded module was deactivated, please '/reload'!"
     L["ModuleAlreadyLoadedWasDeactivatedMultiple"] =
