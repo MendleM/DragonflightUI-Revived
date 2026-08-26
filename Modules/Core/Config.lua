@@ -313,7 +313,17 @@ function Module:ApplySettingsInternal(sub, key)
     if modules['Darkmode'] then
         Helper:Benchmark(string.format(strFormat, 'Darkmode'), function()
             DF:EnableModule('Darkmode')
+            local darkmod = DF:GetModule('Darkmode', true)
+            if darkmod then darkmod:ApplySettings() end
         end)
+    else
+        local darkmod = DF:GetModule('Darkmode', true)
+        if darkmod then
+            Helper:Benchmark(string.format('DisableModule(%s)', 'Darkmode'), function()
+                DF:DisableModule('Darkmode')
+                darkmod:ApplySettings()
+            end)
+        end
     end
 
     Module.DontRefresh = true;
