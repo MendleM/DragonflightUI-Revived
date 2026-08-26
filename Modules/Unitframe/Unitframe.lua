@@ -702,10 +702,15 @@ function Module:SetupSubmodules()
     self:AddPortraitMasks()
     self:HookClassIcon()
 
-    if DF.API.Version.IsTBC then
+    if Menu and Menu.ModifyMenu then
         self:AddRoleSelectDropdownOption()
+    end
+
+    if DF.Caps.HasEditMode and DF.Caps.HasFocus then
         local EditModeModule = DF:GetModule('Editmode')
-        EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+        if EditModeModule and EditModeModule.ShowEditmodeWarning then
+            EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+        end
     end
 end
 
