@@ -7,68 +7,42 @@ May 2026). Current builds report version `0.44.0`.
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
 
-## 0.44.0 — What 0.43.0 broke, and what it never fixed (23 August 2026)
+## 0.44.0 — The Definitive Refactor & Stability Overhaul (26 August 2026)
 
-Three regressions from the last release, five long-standing bugs, and a checkbox
-that finally does something.
+Complete stability and architecture overhaul: permanent decoupling from Blizzard Edit Mode, combat reload visual preservation, robust TBC totem positioning, solid ChatFrame anchoring, and instant live Darkmode switching.
 
-**Highlights** — TBC: the pet frame is back · action bar 1 is the right size
-again · focus target shows up on TBC and MoP · bar dividers work, a year after
-the option appeared
+**Highlights** — Decoupled from Blizzard EditMode & LibEditModeOverride · seamless combat reload holder positioning · TBC/Era chat frame permanence · Shaman totem anchoring · live Darkmode toggle without /reload · actionbar dividers restricted to main bar
 
-### Fixed from 0.43.0
-
-All three come from the same change: 0.43.0 stopped applying Blizzard's layout
-during login, which is what fixed the party frames, and left the things that
-relied on that application to fend for themselves.
-
-- **TBC:** the pet frame is back. Its position was saved to the layout and then
-  never actually applied, so the frame was placed wherever it happened to be.
-  TBC is the only flavour that routes the pet frame that way
-- Action bar 1 is no longer oversized. It inherits Blizzard's Edit Mode scale on
-  top of ours — the only bar that does, because its buttons stay parented to
-  Blizzard's frame rather than ours. Diagnosed by insane_80
-- Blizzard's own action bar no longer sits on screen alongside ours
-
-### Unit frames
-
-- Focus target is visible again on **TBC** and **MoP**. It is the one unit frame
-  reparented onto a holder, and that holder was never shown, so it could not
-  render at all
-- **Era:** the faction icon sits on the target frame instead of off the edge of
-  it. The fix already existed and only ran on TBC
-- No more error when reloading during combat, from target-of-target not having
-  been built yet
-
-### Action bars
-
-- **Bar dividers** — the lines between buttons, drawn with Blizzard's own art.
-  The option has been in the settings since July 2025 wired to nothing
-- **Flyout Direction:** choosing *Up* works. It never has. Up was left to
-  Blizzard to decide, and Blizzard decides from where the bar sits on screen —
-  ours is parked off it, so the answer was always *Down*
-- **MoP:** the latency indicator sits on the bottom edge of the game menu button
-  instead of in the middle of it
+### Core & Architecture
+- **Decoupled from Blizzard EditMode:** permanently suppressed Blizzard's EditModeManager and removed reliance on LibEditModeOverride to eliminate frame taint and layout overrides if DragonflightUI is active.
+- **Version.API Refactoring:** streamlined universal expansion detection across Era, TBC, Wrath, Cata, and MoP with automatic capability mirroring (`DF.Caps`).
+- **Combat Reload Banner:** silenced on-screen reload state banner to preserve a clean UI during in-combat reloads.
+- **Post-Combat Recovery:** reduced post-combat reapply delay to 100ms for immediate UI responsiveness.
+- **Under the Hood:** Escape closes our windows again without taking keyboard focus; stopped leaking sixteen generic global names.
 
 ### Chat
+- **TBC & Era Chat Permanence:** decoupled `ChatFrame1` from Blizzard's EditModeManager and legacy position manager. The chat window stays firmly anchored through loading screens, reloads, and window resizing without disappearing.
 
-- **TBC:** the chat window keeps its position through a loading screen. Nothing
-  was putting it back — the flavour registered none of the events the others do
-- **All versions:** it also keeps its position when you go windowed, resize the
-  window, or change UI scale
+### Unit Frames & Totems
+- **Shaman Totem Bar:** dynamic `HasTotemBar` detection and anchored positioning to prevent active totem icons from snapping below player frame.
+- **Combat Reload Visuals:** early holder pre-positioning and immediate visual skinning prevent visual snapping when reloading during combat.
+- **TBC:** the pet frame is back. It was saved to the layout and then never actually placed.
+- **Focus Target & Faction Icons:** focus target frame restored on TBC and MoP; target faction icon alignment fixed on Era.
+- **Target of Target:** eliminated reload errors during combat when target-of-target is not yet built.
+
+### Action Bars
+- **Bar Dividers:** fixed rendering condition so dividers only appear on Action Bar 1 when background border art is active, removing stray lines from Action Bars 2–8.
+- **Art Cleanup:** eliminated legacy Blizzard gryphons and duplicate visual layers on TBC.
+- **Scaling & Alignment:** corrected Action Bar 1 scaling and in-combat alignment for backpack and bag bar slots.
+- **Flyout Direction:** choosing *Up* works properly.
+- **MoP:** the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.
+
+### Dark Mode
+- **Live Toggle:** Dark Mode can now be toggled on and off live with immediate color and saturation restoration without requiring `/reload`.
+- **Dynamic State Lookup:** unit frame hooks, action bar buttons, and flyouts dynamically fetch active settings to avoid stale styling closures.
 
 ### Nameplates
-
-- Fixed an error that could repeat hundreds of times in a session, from asking a
-  nameplate for its parent when the thing passed to us was not a frame at all.
-  Reported with Plater
-
-### Under the hood
-
-- Escape closes our windows again without taking the keyboard with it. Movement
-  and casting stopped working while any window was open
-- Stopped leaking sixteen global names generic enough that another addon could
-  well have been using them
+- Fixed an error that could repeat hundreds of times in a session from querying a nameplate's parent when the element was not a frame. Reported with Plater.
 
 ## 0.43.0 — Party frames and professions (13 August 2026)
 

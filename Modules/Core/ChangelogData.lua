@@ -24,54 +24,63 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
-        version = '0.44.0-rakStar-refactor',
-        title = 'What 0.43.0 broke, and what it never fixed',
-        date = '23 August 2026',
-        intro = 'Three regressions from the last release, five long-standing bugs, and a checkbox that finally does something.',
+        version = '0.44.0',
+        title = 'The Definitive Refactor & Stability Overhaul',
+        date = '26 August 2026',
+        intro = 'Complete stability overhaul: permanent decoupling from Blizzard Edit Mode, combat reload visual preservation, robust TBC totem positioning, solid ChatFrame anchoring, and instant live Darkmode switching.',
         sections = {
             {
                 title = 'Highlights',
                 items = {
-                    'TBC: the pet frame is back.', 'Action bar 1 is the right size again.',
-                    'Focus target shows up on TBC and MoP.', 'Bar dividers work, a year after the option appeared.'
+                    'Decoupled from Blizzard EditMode & LibEditModeOverride: No more taint or frame interference.',
+                    'Seamless combat reloads: Holder pre-positioning and immediate visual skinning prevent visual snapping.',
+                    'Chat frame fix: Anchored permanently on TBC and Era without disappearing or resetting on reload.',
+                    'Totem bar fix: Dynamic capability detection and anchored positioning for Shamans.',
+                    'Darkmode toggle: Switch on and off live with zero reloads required.',
+                    'Action bar dividers: Fixed logic so dividers only appear on the main bar frame with border art.'
                 }
             }, {
-                title = 'Fixed from 0.43.0',
+                title = 'Core & Architecture',
                 items = {
-                    'TBC: the pet frame is back. It was saved to the layout and then never actually placed.',
-                    'Action bar 1 is no longer oversized. It was inheriting Blizzard\'s Edit Mode scale on top of ours - the only bar that does, because its buttons stay parented to Blizzard\'s frame.',
-                    'Blizzard\'s own action bar no longer sits on screen next to ours.'
-                }
-            }, {
-                title = 'Unit frames',
-                items = {
-                    'Focus target is visible again on TBC and MoP. It was parented to a holder frame that was never shown, so it could not render at all.',
-                    'Era: the faction icon sits on the target frame instead of off the edge of it. The fix existed but only ran on TBC.',
-                    'No more error when reloading during combat, from target-of-target not being built yet.'
-                }
-            }, {
-                title = 'Action bars',
-                items = {
-                    'Bar dividers: the lines between buttons, using Blizzard\'s own art. The option has been in the settings since July 2025 and was wired to nothing.',
-                    'Flyout Direction: choosing Up works. It never did - the direction was left to Blizzard, which decides from where the bar sits on screen, and ours is parked off it.',
-                    'MoP: the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.'
+                    'Decoupled EditMode completely from LibEditModeOverride and permanently blocked Blizzard EditMode if DF UI is active.',
+                    'Streamlined Version.API.lua with universal expansion detection (Era, TBC, Wrath, Cata, MoP) and capability mirroring.',
+                    'Removed on-screen combat reload warning banner to keep UI clean during reloads.',
+                    'Reduced post-combat reapply delay to 100ms for faster responsiveness.'
                 }
             }, {
                 title = 'Chat',
                 items = {
-                    'TBC: the chat window keeps its position through loading screens. Nothing was putting it back.',
-                    'All versions: it also keeps its position when you go windowed or resize the window.'
+                    'TBC: the chat window keeps its position through loading screens and reloads without disappearing.',
+                    'All versions: decoupled ChatFrame1 from Blizzard EditModeManager and legacy position manager so position is preserved through window resizing and scaling.'
+                }
+            }, {
+                title = 'Unit frames & Totems',
+                items = {
+                    'Shaman TotemFrame: added dynamic HasTotemBar capability detection and hooked positioning to keep active totems attached to DragonflightUI.',
+                    'Added early holder pre-positioning and immediate visual skinning in combat reloads.',
+                    'Focus target is visible on TBC and MoP.',
+                    'Era: faction icon sits on target frame properly.',
+                    'No more error when reloading during combat from target-of-target not being built yet.'
+                }
+            }, {
+                title = 'Action bars',
+                items = {
+                    'Bar dividers: restricted dividers strictly to Action Bar 1 with active border art, preventing stray divider lines across Action Bars 2-8.',
+                    'Eliminated legacy Blizzard gryphon textures and duplicate visual elements on TBC.',
+                    'Fixed Action Bar 1 scaling and in-combat alignment for backpack and bag bars.',
+                    'Flyout Direction: choosing Up works properly.',
+                    'MoP: the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.'
+                }
+            }, {
+                title = 'Dark Mode',
+                items = {
+                    'Live toggle: Darkmode can now be turned on and off live without requiring a /reload.',
+                    'Dynamic state retrieval across unitframe hooks, actionbar buttons, and flyouts to cleanly restore original colors and saturation.'
                 }
             }, {
                 title = 'Nameplates',
                 items = {
                     'Fixed an error that could repeat hundreds of times in a session, from asking a nameplate for its parent when it was not a frame at all. Reported with Plater.'
-                }
-            }, {
-                title = 'Under the hood',
-                items = {
-                    'Escape closes our windows again without taking the keyboard with it - movement and casting kept working while a window was open.',
-                    'Stopped leaking sixteen global names generic enough for any other addon to be using.'
                 }
             }
         }
