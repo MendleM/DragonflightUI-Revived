@@ -5,6 +5,8 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 local Module = DF:GetModule('Actionbar')
 
+local PossessBarFrame = _G['PossessBarFrame'] or CreateFrame('Frame', 'PossessBarFrame', UIParent)
+
 local defaults = {
     profile = {
         vehicleLeave = Module.SubVehicleLeave.Defaults,

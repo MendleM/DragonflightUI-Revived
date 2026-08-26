@@ -5,7 +5,7 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 local Module = DF:GetModule('Actionbar')
 
-local PossessBarFrame = PossessBarFrame or CreateFrame('Frame', 'FAKEPOSSES', UIParent)
+local PossessBarFrame = _G['PossessBarFrame'] or CreateFrame('Frame', 'PossessBarFrame', UIParent)
 
 -- Runs the builder synchronously - used by non-modern flavors.
 function Module:SetupActionbarFrames()
