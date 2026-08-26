@@ -113,37 +113,13 @@ local function SetAnimating(panel, animating)
 end
 
 function LoadingState:ShowWaiting(labels)
-    local panel = CreatePanel()
-
-    local what = (labels and #labels > 0) and table.concat(labels, ', ') or 'part of the interface'
-    panel.Status:SetText(GOLD .. 'Waiting for combat to end.|r Reloading mid-fight leaves ' .. what
-                             .. ' unfinished - the game blocks addons from moving protected frames in combat.')
-
-    SetAnimating(panel, true)
-    panel:SetAlpha(1)
-    panel:Show()
+    -- Disabled: UI is now fully aligned and functional during in-combat reloads
 end
 
 function LoadingState:ShowFinishing(labels)
-    if not self.Panel or not self.Panel:IsShown() then return end
-
-    local what = (labels and #labels > 0) and table.concat(labels, ', ') or 'the interface'
-    self.Panel.Status:SetText(GOLD .. 'Combat over - finishing setup.|r ' .. what)
-    SetAnimating(self.Panel, true)
 end
 
 function LoadingState:Complete()
-    local panel = self.Panel
-    if not panel or not panel:IsShown() then return end
-
-    panel.Status:SetText(GOLD .. 'Setup complete.|r Everything the fight blocked has been applied.')
-    SetAnimating(panel, false)
-
-    C_Timer.After(4, function()
-        if not panel:IsShown() then return end
-        UIFrameFadeOut(panel, 1, panel:GetAlpha(), 0)
-        C_Timer.After(1.1, function() LoadingState:Hide() end)
-    end)
 end
 
 function LoadingState:Hide()
