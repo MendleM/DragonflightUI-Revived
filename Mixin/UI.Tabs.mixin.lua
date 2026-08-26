@@ -1,12 +1,11 @@
+local addonName, addonTable = ...;
+DragonflightUIMixin = DragonflightUIMixin or {};
+
 function DragonflightUIMixin:ResizeTab(tab, padding, absoluteSize, minWidth, maxWidth, absoluteTextSize)
     local tabName = tab:GetName();
 
-    -- local buttonMiddle = tab.Middle or tab.middleTexture or envTable[tabName .. "Middle"];
-    -- local buttonMiddleDisabled = tab.MiddleDisabled or (tabName and envTable[tabName .. "MiddleDisabled"]);
-    -- local left = tab.Left or tab.leftTexture or envTable[tabName .. "Left"];
-    -- local sideWidths = 2 * left:GetWidth();
     local tabText = tab.Text or _G[tabName .. "Text"];
-    -- local highlightTexture = tab.HighlightTexture or (tabName and envTable[tabName .. "HighlightTexture"]);
+    if not tabText then return end
 
     tabText:SetWidth(0)
     local textWidth = tabText:GetWidth()
