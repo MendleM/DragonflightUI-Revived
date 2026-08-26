@@ -21,7 +21,7 @@ In the meantime, Classic Era **1.15.9** backported the Midnight-era UI (Edit Mod
 
 The compatibility overhaul for that patch was developed as [PR #693](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/pull/693) against the original repository, tested and iterated on with players in the field — but with nobody upstream to merge it, there was nowhere for the work to live.
 
-This repository is that home. It carries the **full commit history of the original project** plus every fix since, and it is maintained by [@MendleM](https://github.com/MendleM) together with the community.
+This repository is that home. It carries the **full commit history of the original project** plus every fix since, and it is maintained by [@MendleM](https://github.com/MendleM) and [@rakStar91](https://github.com/rakStar91) together with the community.
 
 ## Install
 
@@ -61,7 +61,7 @@ A good report includes:
 2. Make your change (match the surrounding code style — the repo ships a `LuaFormatter.config`)
 3. Open a PR against `main` describing what it fixes and how you tested it
 
-`main` is protected: contributions land through pull requests, and only [@MendleM](https://github.com/MendleM) can merge them. Force-pushes and branch deletion are blocked. No approval count is enforced, so small fixes do not get stuck waiting on a second reviewer.
+`main` is protected: contributions land through pull requests, and only [@MendleM](https://github.com/MendleM) and [@rakStar91](https://github.com/rakStar91) can merge them. Force-pushes and branch deletion are blocked. No approval count is enforced, so small fixes do not get stuck waiting on a second reviewer.
 
 Useful to know when working on Era 1.15.9:
 
@@ -95,6 +95,7 @@ Configure in-game with `/df` (or `/dragonflight`), with full profile support, or
 ## Credits
 
 - **[MendleM](https://github.com/MendleM)** — maintainer of DragonflightUI Revived.
+- **[rakStar91](https://github.com/rakStar91)** — maintainer of DragonflightUI Revived.
 - **[Karl-Heinz Schneider](https://github.com/Karl-HeinzSchneider)** — original author of DragonflightUI Classic. This project is his work continued; all of it stands on that foundation. If you got years of use out of the addon, he still has a [tip jar](https://www.buymeacoffee.com/karlheinzschneider).
 - **[@insanerage80](https://github.com/insanerage80)** — packaging and publishing the revived build on CurseForge, and running the Discord.
 - **[@icebreethe](https://github.com/icebreethe)** — TBC 2.5.6 / MoP 5.5.4 compatibility work.
