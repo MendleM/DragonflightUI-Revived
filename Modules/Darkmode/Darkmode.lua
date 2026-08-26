@@ -594,9 +594,13 @@ function Module:UpdateTargetFrame(state)
 
     -- editmode
     local e = f.PreviewTarget
-    e.TargetFrameBackground:SetDesaturated(state.unitframeDesaturate)
-    e.TargetFrameBackground:SetVertexColor(c:GetRGB())
-    e.PortraitExtra:SetVertexColor(0.6, 0.6, 0.6)
+    if e and e.TargetFrameBackground then
+        e.TargetFrameBackground:SetDesaturated(state.unitframeDesaturate)
+        e.TargetFrameBackground:SetVertexColor(c:GetRGB())
+        if e.PortraitExtra then
+            e.PortraitExtra:SetVertexColor(0.6, 0.6, 0.6)
+        end
+    end
 end
 
 function Module:UpdatePartyFrame(state)
@@ -618,7 +622,7 @@ function Module:UpdatePartyFrame(state)
 
     -- editmode
     local e = f.PreviewParty
-    if e then
+    if e and e.PartyFrames then
         for k, v in ipairs(e.PartyFrames) do
             --
             v.TargetFrameBorder:SetDesaturated(state.unitframeDesaturate)
@@ -631,7 +635,7 @@ function Module:UpdateFocusFrame(state)
     local unitModule = DF:GetModule('Unitframe')
     local f = unitModule.SubFocus
 
-    if not f.TargetFrameBackground then return end
+    if not f or not f.TargetFrameBackground then return end
 
     local focusBackground = f.TargetFrameBackground
     local focusPortExtra = f.PortraitExtra
@@ -642,18 +646,23 @@ function Module:UpdateFocusFrame(state)
     focusBackground:SetVertexColor(c:GetRGB())
 
     local tot = unitModule.SubFocusTarget
-    local FocusFrameToTBackground = tot.FocusFrameToTBackground
-
-    FocusFrameToTBackground:SetDesaturated(state.unitframeDesaturate)
-    FocusFrameToTBackground:SetVertexColor(c:GetRGB())
+    local FocusFrameToTBackground = tot and tot.FocusFrameToTBackground
+    if FocusFrameToTBackground then
+        FocusFrameToTBackground:SetDesaturated(state.unitframeDesaturate)
+        FocusFrameToTBackground:SetVertexColor(c:GetRGB())
+    end
 
     -- TODO
-    focusPortExtra:SetVertexColor(0.6, 0.6, 0.6)
+    if focusPortExtra then
+        focusPortExtra:SetVertexColor(0.6, 0.6, 0.6)
+    end
 
     -- editmode
     local e = f.PreviewFocus
-    e.TargetFrameBackground:SetDesaturated(state.unitframeDesaturate)
-    e.TargetFrameBackground:SetVertexColor(c:GetRGB())
+    if e and e.TargetFrameBackground then
+        e.TargetFrameBackground:SetDesaturated(state.unitframeDesaturate)
+        e.TargetFrameBackground:SetVertexColor(c:GetRGB())
+    end
 end
 
 function Module:UpdateBossFrame(state)
