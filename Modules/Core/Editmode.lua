@@ -130,14 +130,6 @@ local generalOptions = {
             desc = '' .. getDefaultStr('snapGrid', 'general'),
             order = 102,
             small = true
-        },
-        blockBlizzardEditMode = {
-            type = 'toggle',
-            name = "Disable Blizzard's Edit Mode",
-            desc = "Blizzard's Edit Mode moves the same frames this one does, and saving in it writes its whole layout over ours. With this on, the game hides its own way in - the Escape menu entry, the right-click menu on a unit frame, the raid manager button. " ..
-                getDefaultStr('blockBlizzardEditMode', 'general'),
-            order = 103,
-            width = 'double'
         }
         -- snapElements = {
         --     type = 'toggle',
@@ -417,7 +409,7 @@ function Module:SetBlizzEditmodeBlocked(blocked)
 end
 
 function Module:IsBlizzEditmodeBlocked()
-    return Module.db and Module.db.profile.general.blockBlizzardEditMode and true or false
+    return true
 end
 
 function Module:ApplySettingsInternal(sub, key)
@@ -433,10 +425,9 @@ function Module:ApplySettingsInternal(sub, key)
         f.Grid:SetShown(false)
     end
 
-    -- Driven from here rather than from its own lifecycle so that it follows
-    -- the setting, survives a profile switch, and re-asserts itself if
-    -- EditModeManagerFrame was not there the first time we asked.
-    Module:SetBlizzEditmodeBlocked(state.blockBlizzardEditMode)
+    if not InCombatLockdown() then
+        Module:SetBlizzEditmodeBlocked(true)
+    end
 end
 
 local frame = CreateFrame('FRAME')
@@ -598,338 +589,61 @@ function Module:SelectFrame(frameRef)
 end
 
 function Module:InitEditmodeOverride()
-    -- print('InitEditmodeOverride')
-
-    local LibEditModeOverride = LibStub("LibEditModeOverride-1.0");
-    LibEditModeOverride:LoadLayouts();
-
-    addonTable.LibEditModeOverride = LibEditModeOverride;
-
-    local DFLayoutName = 'DragonflightUI_Layout'
-    if not LibEditModeOverride:DoesLayoutExist(DFLayoutName) then
-        --
-        LibEditModeOverride:AddLayout(Enum.EditModeLayoutType.Character, DFLayoutName)
+    Module:SetBlizzEditmodeBlocked(true)
+    if EditModeManagerFrame and EditModeManagerFrame.BlockEnteringEditMode then
+        local blocker = blockerFrame or CreateFrame('Frame', 'DragonflightUIEditModeBlocker')
+        EditModeManagerFrame:BlockEnteringEditMode(blocker)
     end
 
-    -- force edit profile - TODO?
-    LibEditModeOverride:SetActiveLayout(DFLayoutName)
+    addonTable.BlizzEditmodeReapply = {}
+    addonTable.BlizzEditmodeReapplyTimer = nil
+    addonTable.BlizzEditmodeApplyAllowed = true
 
-    -- if not LibEditModeOverride:CanEditActiveLayout() then
-    --     --
-    --     LibEditModeOverride:SetActiveLayout(DFLayoutName)
-    -- end
-    --
-    -- Deliberately NOT ApplyChanges() here. See BlizzEditmodeApplyAllowed
-    -- below: applying the layout from our own code during login is what
-    -- tainted the party frames for the whole session. Saving is enough -
-    -- Blizzard applies the layout itself at PLAYER_ENTERING_WORLD, securely,
-    -- and picks this up.
-    LibEditModeOverride:SaveOnly()
-
-    -- ApplyChanges() show/hides EditModeManagerFrame, which is a FULL
-    -- Blizzard layout application: it re-anchors every managed system,
-    -- fires EditMode enter/exit hooks and resets frames whose positions
-    -- DFUI owns but the layout does not know about. Calling it once per
-    -- re-anchored frame - as this did - meant a burst of full layout
-    -- applications during setup, which is where "frames move after a
-    -- loading screen", the vanishing LFG eye, and the MicroMenuContainer
-    -- anchor-family errors come from. Save every change immediately, and
-    -- collapse the applications into one debounced pass.
-    local applyScheduled = false
-    local combatGate
-
-    -- A layout application resets every frame whose position DFUI owns but the
-    -- Blizzard layout has no record of - player and target above all. Without
-    -- this the frames sit correctly for a moment after login and then jump to
-    -- the layout's spots.
-    --
-    -- Chat belongs on this list for the same reason: ChatFrame1 is a Blizzard
-    -- edit-mode system on 1.15.9+, so an application re-anchors and re-sizes it
-    -- from the layout. That is why toggling a frame's edit-mode visibility -
-    -- which broadcasts OnEditMode, which makes a module re-anchor, which
-    -- schedules an application - dragged the chat window off its configured
-    -- spot.
-    --
-    -- This runs after ANY application, not only ours. Opening Blizzard's own
-    -- Edit Mode shows EditModeManagerFrame, and showing that frame IS a full
-    -- application - the very property LibEditModeOverride:ApplyChanges() relies
-    -- on. So the player opening it displaced the unit frames exactly as one of
-    -- our own applications would, and nothing put them back until the next
-    -- PLAYER_REGEN_ENABLED, where Unitframe's own re-apply happens to catch it.
-    -- That is the "opening edit mode moves my frames, leaving combat fixes
-    -- them" report.
-    local function ReapplyOwnedPositions()
-        -- Positioning these is protected work; in combat it is refused
-        -- silently. Unitframe's own regen re-apply is the safety net.
-        if Helper:IsCombatLocked() then return end
-
-        for _, name in ipairs(addonTable.BlizzEditmodeReapply) do
-            local m = DF:GetModule(name, true)
-            if m and m.GetWasEnabled and m:GetWasEnabled() then
-                local ok, err = pcall(function() m:ApplySettings() end)
-                if not ok then geterrorhandler()('DFUI Editmode reapply ' .. name .. ': ' .. tostring(err)) end
-            end
-        end
-    end
-
-    local function applyNow()
-        applyScheduled = false
-        if not (LibEditModeOverride and LibEditModeOverride.ApplyChanges) then return end
-        if not (LibEditModeOverride:GetActiveLayout() == DFLayoutName) then return end
-
-        if Helper:IsCombatLocked() then
-            -- Protected work is blocked in combat; retry once it drops.
-            if not combatGate then
-                combatGate = CreateFrame('Frame')
-                combatGate:SetScript('OnEvent', function(g)
-                    g:UnregisterAllEvents()
-                    applyNow()
-                end)
-            end
-            combatGate:RegisterEvent('PLAYER_REGEN_ENABLED')
-            return
-        end
-
-        -- ApplyChanges works by showing and immediately hiding
-        -- EditModeManagerFrame. If the player has Blizzard's Edit Mode open
-        -- right now, that slams their session shut mid-edit and discards what
-        -- they were doing. Wait for them to leave it.
-        if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
-            addonTable.BlizzApplyPending = true
-            return
-        end
-
-        -- ApplyChanges saves before it applies, so it writes the cached layout
-        -- table like any other write. This one matters most: it is debounced,
-        -- and BlizzApplyPending above deliberately holds it until the player
-        -- leaves Blizzard's Edit Mode - which means it ran immediately after
-        -- they had finished changing something, with a copy that predated the
-        -- change.
-        addonTable:RefreshBlizzEditmodeLayouts()
-
-        -- Our own application fires Blizzard's EditMode.Enter and .Exit as a
-        -- side effect of that show/hide. Flag it, so the handlers that react to
-        -- the player opening the native edit mode do not react to us.
-        addonTable.ApplyingBlizzLayout = true
-        LibEditModeOverride:ApplyChanges()
-        addonTable.ApplyingBlizzLayout = false
-
-        ReapplyOwnedPositions()
-    end
-
-    -- Applications are refused until login is over. This is the party-frame
-    -- taint fix, and it is worth spelling out.
-    --
-    -- ApplyChanges works by showing and hiding EditModeManagerFrame, and that is
-    -- a FULL layout application: Blizzard re-sets-up every Edit Mode system
-    -- inside our call. The field assignments it makes on the way through belong
-    -- to whoever is on the stack, so CompactPartyFrameMemberN.optionTable and
-    -- .isLootObject came out tainted by DragonflightUI and stayed that way for
-    -- the session. Every later CompactUnitFrame_UpdateAll then tainted itself on
-    -- the optionTable read and had its SetSize/SetAttribute/Show refused - party
-    -- members that never appear, a party that collapses to one, "Interface
-    -- action failed because of an AddOn". Proven with /df log party: those two
-    -- fields insecure on all five members, with PartyFrame, CompactPartyFrame
-    -- and every EditModeManagerFrame field clean.
-    --
-    -- OverrideBlizzEditmode is called at enable from about ten places, so this
-    -- fired on every single login. It does not need to. SaveOnly writes the
-    -- anchors, and Blizzard applies the layout itself at PLAYER_ENTERING_WORLD -
-    -- from its own execution, so the same setup happens without our taint on it.
-    --
-    -- After that first application the gate opens, because an application from
-    -- then on is the player having just changed something: rare, deliberate, and
-    -- gone at the next reload.
-    -- Nothing is replayed when the gate opens. Everything that asked for an
-    -- application during login had already saved its anchors, and Blizzard's own
-    -- PEW application is what puts them into effect - running ours afterwards
-    -- would re-taint the frames for exactly no gain, which is the whole bug.
-    local function OpenApplyGate()
-        addonTable.BlizzEditmodeApplyAllowed = true
-    end
-
-    if not addonTable.BlizzEditmodeApplyGateInstalled then
-        addonTable.BlizzEditmodeApplyGateInstalled = true
-
-        local gate = CreateFrame('Frame')
-        gate:RegisterEvent('PLAYER_ENTERING_WORLD')
-        gate:SetScript('OnEvent', function(g)
-            g:UnregisterAllEvents()
-            -- After Blizzard's own application for this PEW, not before it.
-            C_Timer.After(2, OpenApplyGate)
-        end)
+    function addonTable:RefreshBlizzEditmodeLayouts()
     end
 
     function addonTable:ScheduleBlizzEditmodeApply()
-        if not addonTable.BlizzEditmodeApplyAllowed then
-            if DF and DF.Log then
-                DF:Log('editmode', 'layout apply skipped during login - saved only, Blizzard applies it at PEW')
-            end
-            return
-        end
-
-        if applyScheduled then return end
-        applyScheduled = true
-        C_Timer.After(0.5, applyNow)
     end
 
-    -- One edit mode at a time, and hands off theirs. Registered once: this
-    -- function runs per flavour entry point and must stay re-entrant.
-    if not addonTable.BlizzEditmodeHooksInstalled then
-        addonTable.BlizzEditmodeHooksInstalled = true
-
-        EventRegistry:RegisterCallback('EditMode.Enter', function()
-            if addonTable.ApplyingBlizzLayout then return end
-
-            -- CanEnterEditMode gates the ways a player gets in, but not
-            -- ShowUIPanel itself - Blizzard_DamageMeter calls that directly,
-            -- and so can any addon. Close it again rather than let it apply
-            -- its layout over ours. Hiding a panel is protected work, so in
-            -- combat we can only let it stand and repair afterwards.
-            if Module:IsBlizzEditmodeBlocked() and not Helper:IsCombatLocked() then
-                Module:Print("Blizzard's Edit Mode is turned off by DragonflightUI - use /editmode instead. " ..
-                                 'The setting is under EditMode options.')
-                HideUIPanel(EditModeManagerFrame)
-                C_Timer.After(0, ReapplyOwnedPositions)
-                return
-            end
-
-            if Module.IsEditMode then
-                Module:Print("Blizzard's Edit Mode opened - closing Dragonflight edit mode so the two do not fight"
-                                 .. ' over the same frames.')
-                Module:SetEditMode(false)
-            end
-
-            -- Opening it applied the layout and displaced our frames. Next
-            -- frame, so the application has finished before we answer it.
-            C_Timer.After(0, ReapplyOwnedPositions)
-        end)
-
-        EventRegistry:RegisterCallback('EditMode.Exit', function()
-            if addonTable.ApplyingBlizzLayout then return end
-
-            -- Leaving applies the layout again, Save or no Save.
-            C_Timer.After(0, ReapplyOwnedPositions)
-
-            -- a layout application we deferred while their session was open
-            if addonTable.BlizzApplyPending then
-                addonTable.BlizzApplyPending = nil
-                addonTable:ScheduleBlizzEditmodeApply()
-            end
-        end)
+    function addonTable:SetBlizzEditmodeFrameSetting(frame, setting, value, apply)
     end
 
-    -- LibEditModeOverride reads every layout once, in LoadLayouts, and keeps
-    -- that table; SaveOnly writes the whole of it back with
-    -- C_EditMode.SaveLayouts. So the copy we save is the one we read at login,
-    -- and anything the player changed in Blizzard's Edit Mode since then is not
-    -- in it - saving quietly replaces their change with our stale value.
-    --
-    -- That is what "Use Raid-Style Party Frames turns itself back off" was.
-    -- The setting is not a CVar; it lives in the layout
-    -- (Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames on the Party unit
-    -- frame system), so ticking the box edits the same table we are holding a
-    -- stale copy of. The next re-anchor - entering a dungeon, a module
-    -- re-applying - wrote our copy over it, and the frames reverted at the next
-    -- layout application, which is why it looked like a reload did it.
-    --
-    -- Re-read immediately before touching the table. Every writer here saves
-    -- straight after mutating, so there is never an unsaved change of ours to
-    -- lose by refreshing.
-    function addonTable:RefreshBlizzEditmodeLayouts()
-        if LibEditModeOverride and LibEditModeOverride.LoadLayouts and LibEditModeOverride:IsReady() then
-            LibEditModeOverride:LoadLayouts()
-        end
+    function addonTable:GetBlizzEditmodeFrameSettingBool(frame, setting)
+        return false
     end
 
     function addonTable:OverrideBlizzEditmode(f, ...)
-        addonTable:RefreshBlizzEditmodeLayouts()
-        if not (LibEditModeOverride:GetActiveLayout() == DFLayoutName) then
-            print('Wrong EditMode layout detected - please use ' .. DFLayoutName .. ' and /reload .')
-            return;
-        end
-        LibEditModeOverride:ReanchorFrame(f, ...)
-        LibEditModeOverride:SaveOnly()
-
-        -- During login the application is refused and nothing is replayed, so
-        -- the anchor is saved and never put into effect. Whether the frame ends
-        -- up where we asked then depends on Blizzard's own PEW application
-        -- happening to run after our save - a race, and one we lose often
-        -- enough: TBC's pet frame went missing for five reporters in 0.43.0,
-        -- came back for one of them after a party change, and was gone again on
-        -- the next relog. That is what a race looks like from the outside.
-        --
-        -- So place it ourselves in that window. Moving a frame is not what
-        -- tainted the party frames - ApplyChanges was, because it re-runs
-        -- Blizzard's entire Edit Mode setup inside our call and every field it
-        -- assigns on the way through comes out owned by us. A SetPoint runs
-        -- none of that, and Blizzard's application later sets the same anchor
-        -- from the layout we just saved.
-        if not addonTable.BlizzEditmodeApplyAllowed and not Helper:IsCombatLocked() then
+        if f and not Helper:IsCombatLocked() then
             local ok, err = pcall(function(...)
                 f:ClearAllPoints()
                 f:SetPoint(...)
             end, ...)
             if not ok then
-                geterrorhandler()('DFUI Editmode direct anchor ' .. tostring(f and f.GetName and f:GetName()) ..
-                                      ': ' .. tostring(err))
+                geterrorhandler()('DFUI direct anchor ' .. tostring(f and f.GetName and f:GetName()) .. ': ' .. tostring(err))
             end
         end
-
-        addonTable:ScheduleBlizzEditmodeApply()
     end
 
     function addonTable:HookBlizzEditmodeAndFunc(fun, both)
+        if not EventRegistry or not EventRegistry.RegisterCallback then return end
         local lastUpdate = GetTime()
 
         EventRegistry:RegisterCallback("EditMode.Exit", function()
-            -- print('EditMode.Exit', GetTime())
             local newUpdate = GetTime()
-
             if newUpdate > lastUpdate then
-                lastUpdate = newUpdate;
+                lastUpdate = newUpdate
                 fun()
             end
         end)
         if both then
             EventRegistry:RegisterCallback("EditMode.Enter", function()
-                -- print('EditMode.Enter')
                 local newUpdate = GetTime()
-
                 if newUpdate > lastUpdate then
-                    lastUpdate = newUpdate;
+                    lastUpdate = newUpdate
                     fun()
                 end
             end)
         end
-        fun()
-    end
-
-    function addonTable:GetBlizzEditmodeFrameSetting(f, setting)
-        return LibEditModeOverride:GetFrameSetting(f, setting)
-    end
-
-    function addonTable:GetBlizzEditmodeFrameSettingBool(f, setting)
-        -- Read the layout as it is now, not as it was at login. Without this a
-        -- settings page shows our stale copy, so a checkbox can disagree with
-        -- the thing it controls after the player has been in Blizzard's Edit
-        -- Mode. Same reason the writers refresh.
-        addonTable:RefreshBlizzEditmodeLayouts()
-
-        local value = LibEditModeOverride:GetFrameSetting(f, setting)
-        if value == 1 then
-            return true;
-        else
-            return false;
-        end
-    end
-
-    function addonTable:SetBlizzEditmodeFrameSetting(f, setting, value, saveOnly)
-        addonTable:RefreshBlizzEditmodeLayouts()
-        LibEditModeOverride:SetFrameSetting(f, setting, value)
-        LibEditModeOverride:SaveOnly()
-
-        if not saveOnly then addonTable:ScheduleBlizzEditmodeApply() end
     end
 end
 
@@ -962,18 +676,14 @@ function Module:ShowEditmodeWarning(setting, value, str)
 end
 
 function Module:Era()
-    -- 1.15.9+: Era carries Blizzard Edit Mode. Every modern-UI code path
-    -- (ForceMoveBlizzEditModeGhosts, BagsBar/micromenu re-anchors, ...) calls
-    -- addonTable:OverrideBlizzEditmode, which only exists after this init -
-    -- without it the Actionbar module dies at enable time and nothing gets
-    -- styled. The init applies an EditMode layout (protected panel work), so
-    -- it must wait for combat to drop on a mid-combat load; Editmode enables
-    -- before Actionbar/Unitframe, so this regen gate fires before theirs and
-    -- the override exists by the time the deferred chains run.
     if DF.API.Version.IsModern then
-        addonTable.Helper:RunOutOfCombat('edit mode', function()
+        if InCombatLockdown() then
+            addonTable.Helper:RunOutOfCombat('edit mode', function()
+                self:InitEditmodeOverride()
+            end)
+        else
             self:InitEditmodeOverride()
-        end)
+        end
     end
 end
 

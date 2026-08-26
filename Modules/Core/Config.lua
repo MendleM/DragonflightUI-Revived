@@ -348,6 +348,16 @@ function Module:AddMainMenuButton()
         Module.EditModeButton = editBtn
 
         hooksecurefunc(GameMenuFrame, 'InitButtons', function(menu)
+            if menu.buttonPool and menu.buttonPool.EnumerateActive then
+                for btn in menu.buttonPool:EnumerateActive() do
+                    local txt = btn.GetText and btn:GetText()
+                    if txt and (txt == HUD_EDIT_MODE_MENU or txt == 'Bearbeitungsmodus' or txt == 'Edit Mode') then
+                        btn:Hide()
+                        btn.layoutIndex = nil
+                    end
+                end
+            end
+
             local configButton = menu:AddButton(L["MainMenuDragonflightUI"], function()
                 Module:ToggleConfigFrame()
             end)

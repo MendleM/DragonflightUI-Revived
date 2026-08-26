@@ -546,13 +546,6 @@ function SubModuleMixin:CreateVehicleLeaveButton()
         btn:ClearAllPoints()
         btn:SetPoint('CENTER', f, 'CENTER', 0, 0)
 
-        local lib = addonTable.LibEditModeOverride
-        if lib then
-            if addonTable.RefreshBlizzEditmodeLayouts then addonTable:RefreshBlizzEditmodeLayouts() end
-            lib:ReanchorFrame(btn, 'CENTER', f, 'CENTER', 0, 0)
-            lib:SaveOnly()
-        end
-
         -- era-1159: dress the real button in the retail round exit-arrow
         -- art (shipped by DFUI but previously used only for the edit-mode
         -- preview); the classic wooden square reads nothing like retail.

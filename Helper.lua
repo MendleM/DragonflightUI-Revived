@@ -19,6 +19,31 @@ DragonflightUIPerfLog = perfLog
 -- make globally available
 _G['DragonflightUI_Helper'] = Helper;
 
+function addonTable:OverrideBlizzEditmode(f, ...)
+    if f and not Helper:IsCombatLocked() then
+        local ok, err = pcall(function(...)
+            f:ClearAllPoints()
+            f:SetPoint(...)
+        end, ...)
+        if not ok then
+            geterrorhandler()('DFUI direct anchor ' .. tostring(f and f.GetName and f:GetName()) .. ': ' .. tostring(err))
+        end
+    end
+end
+
+function addonTable:RefreshBlizzEditmodeLayouts()
+end
+
+function addonTable:ScheduleBlizzEditmodeApply()
+end
+
+function addonTable:SetBlizzEditmodeFrameSetting(frame, setting, value, apply)
+end
+
+function addonTable:GetBlizzEditmodeFrameSettingBool(frame, setting)
+    return false
+end
+
 function Helper:Benchmark(label, func, level, moduleRef)
     if level == nil or type(level) ~= 'number' then level = 1; end
     -- level = level or 1;
