@@ -361,6 +361,11 @@ function Module.ChangeActionbar()
         if mab then
             mab:UnregisterAllEvents()
             mab:ClearAllPoints()
+            mab:SetSize(1, 1)
+            if mab.EndCaps then mab.EndCaps:Hide() end
+            if mab.BorderArt then mab.BorderArt:Hide() end
+            if mab.Background then mab.Background:Hide() end
+            if mab.ActionBarPageNumber then mab.ActionBarPageNumber:Hide() end
             mab:Show()
         end
 
@@ -380,21 +385,42 @@ function Module.ChangeActionbar()
 
         if MainMenuBar then MainMenuBar:SetSize(1, 1) end
 
-        if MainMenuExpBar then
-            MainMenuExpBar:Hide()
+        Module:HideBlizzardDefaultBars()
+    end
+end
+
+function Module:HideBlizzardDefaultBars()
+    if MainMenuExpBar then
+        MainMenuExpBar:Hide()
+        if not Module.ExpBarHooked then
+            Module.ExpBarHooked = true
             hooksecurefunc(MainMenuExpBar, 'Show', function()
                 MainMenuExpBar:Hide()
             end)
         end
-        if StatusTrackingBarManager then StatusTrackingBarManager:Hide() end
-        if ReputationWatchBar then
-            ReputationWatchBar:Hide()
+    end
+    if StatusTrackingBarManager then
+        StatusTrackingBarManager:Hide()
+        if not Module.StatusTrackingHooked then
+            Module.StatusTrackingHooked = true
+            hooksecurefunc(StatusTrackingBarManager, 'Show', function()
+                StatusTrackingBarManager:Hide()
+            end)
+        end
+    end
+    if ReputationWatchBar then
+        ReputationWatchBar:Hide()
+        if not Module.RepBarHooked then
+            Module.RepBarHooked = true
             hooksecurefunc(ReputationWatchBar, 'Show', function()
                 ReputationWatchBar:Hide()
             end)
         end
-        if MainMenuBarMaxLevelBar then
-            MainMenuBarMaxLevelBar:Hide()
+    end
+    if MainMenuBarMaxLevelBar then
+        MainMenuBarMaxLevelBar:Hide()
+        if not Module.MaxLevelBarHooked then
+            Module.MaxLevelBarHooked = true
             hooksecurefunc(MainMenuBarMaxLevelBar, 'Show', function()
                 MainMenuBarMaxLevelBar:Hide()
             end)
@@ -403,11 +429,13 @@ function Module.ChangeActionbar()
 end
 
 function Module.CreateNewXPBar()
+    if Module.xpbar then return end
     local newF = CreateFrame('Frame', 'DragonflightUIXPBar', UIParent, 'DragonflightUIXPBarTemplate')
     Module.xpbar = newF
 end
 
 function Module.CreateNewRepBar()
+    if Module.repbar then return end
     local newRep = CreateFrame('Frame', 'DragonflightUIRepBar', UIParent, 'DragonflightUIRepBarTemplate')
     Module.repbar = newRep
 end
@@ -451,39 +479,22 @@ function Module.HookPetBar()
 end
 
 function Module:ForceMoveBlizzEditModeGhosts()
-    if not addonTable.OverrideBlizzEditmode then return end
-    local t = {_G['MainActionBar'], _G['StanceBar'], _G['PetActionBar'], _G['PossessActionBar']}
+    if InCombatLockdown() then return end
 
-    local lib = addonTable.LibEditModeOverride
-    if lib then
-        if addonTable.RefreshBlizzEditmodeLayouts then addonTable:RefreshBlizzEditmodeLayouts() end
+    local mapping = {
+        {blizz = _G['MainActionBar'], holder = _G['DragonflightUIActionbarFrame1']},
+        {blizz = _G['StanceBar'], holder = _G['DragonflightUIStancebar']},
+        {blizz = _G['PetActionBar'], holder = _G['DragonflightUIPetbar']},
+        {blizz = _G['PossessActionBar'], holder = _G['DragonflightUIPossessbar'] or _G['DragonflightUIActionbarFrame1']}
+    }
 
-        for k, v in ipairs(t) do
-            if v then
-                v:SetClampedToScreen(false)
-                lib:ReanchorFrame(v, 'BOTTOM', UIParent, 'TOP', 0, 0 + 500)
-            end
-        end
-        lib:SaveOnly()
-
-        if not addonTable.BlizzEditmodeApplyAllowed and not InCombatLockdown() then
-            for k, v in ipairs(t) do
-                if v then
-                    v:ClearAllPoints()
-                    v:SetPoint('BOTTOM', UIParent, 'TOP', 0, 0 + 500)
-                end
-            end
-        end
-
-        for k, v in ipairs(t) do if v and v.SetScale then v:SetScale(1) end end
-
-        if addonTable.ScheduleBlizzEditmodeApply then addonTable:ScheduleBlizzEditmodeApply() end
-    else
-        for k, v in ipairs(t) do
-            if v then
-                v:SetClampedToScreen(false)
-                addonTable:OverrideBlizzEditmode(v, 'BOTTOM', UIParent, 'TOP', 0, 0 + 500)
-            end
+    for _, entry in ipairs(mapping) do
+        local blizzFrame, holder = entry.blizz, entry.holder
+        if blizzFrame and holder then
+            blizzFrame:SetClampedToScreen(false)
+            blizzFrame:ClearAllPoints()
+            blizzFrame:SetPoint('CENTER', holder, 'CENTER', 0, 0)
+            if blizzFrame.SetScale then blizzFrame:SetScale(1.0) end
         end
     end
 end
@@ -542,8 +553,11 @@ function Module.ChangeMicroMenu()
     microFrame:OnLoad()
     Module.MicroFrame = microFrame
 
-    if DF.API.Version.IsModern and MicroMenuContainer and addonTable.OverrideBlizzEditmode then
-        addonTable:OverrideBlizzEditmode(MicroMenuContainer, 'TOPLEFT', microFrame, 'TOPLEFT', 0, 0)
+    if DF.API.Version.IsModern and MicroMenuContainer then
+        pcall(function()
+            MicroMenuContainer:ClearAllPoints()
+            MicroMenuContainer:SetPoint('TOPLEFT', microFrame, 'TOPLEFT', 0, 0)
+        end)
     end
 end
 
@@ -588,6 +602,8 @@ function Module.UpdateBagState(state)
 
     local f = _G['DragonflightUIBagBar']
     if not f then return end
+    f:Show()
+    f:SetSize(200, 37)
 
     if DF.API.Version.IsTBC then state.customAnchorFrame = ''; end
 
@@ -606,17 +622,19 @@ function Module.UpdateBagState(state)
     if MainMenuBarBackpackButton then
         MainMenuBarBackpackButton:SetParent(f)
         MainMenuBarBackpackButton:SetScale(1.5)
+        pcall(function()
+            MainMenuBarBackpackButton:ClearAllPoints()
+            MainMenuBarBackpackButton:SetPoint('RIGHT', f, 'RIGHT', 0, 0)
+            MainMenuBarBackpackButton:Show()
+        end)
     end
 
     if _G['BagsBar'] then
         local b = _G['BagsBar']
-        local point, relativeTo, relativePoint, xOfs, yOfs = b:GetPoint(1)
-        if not (relativeTo == f) then addonTable:OverrideBlizzEditmode(b, 'RIGHT', f, 'RIGHT', 0, 0) end
-    else
-        if MainMenuBarBackpackButton then
-            MainMenuBarBackpackButton:ClearAllPoints()
-            MainMenuBarBackpackButton:SetPoint('RIGHT', f, 'RIGHT', 0, 0)
-        end
+        pcall(function()
+            b:ClearAllPoints()
+            b:SetPoint('RIGHT', f, 'RIGHT', 0, 0)
+        end)
     end
 
     for i = 0, 3 do

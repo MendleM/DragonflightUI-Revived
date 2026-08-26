@@ -140,25 +140,43 @@ end
 
 function Module.ChangeBackpack()
     local bagAtlas = 'Interface\\Addons\\DragonflightUI\\Textures\\bagslots2x'
+    local f = _G['DragonflightUIBagBar']
+    if f then
+        f:Show()
+        f:SetSize(200, 37)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetClampedToScreen(true)
+        f:SetMovable(true)
+    end
+
     -- MainMenuBarBackpackButton
-    do
+    if MainMenuBarBackpackButton then
         local texture = 'Interface\\Addons\\DragonflightUI\\Textures\\bigbag'
         local highlight = 'Interface\\Addons\\DragonflightUI\\Textures\\bigbagHighlight'
 
+        if f then
+            MainMenuBarBackpackButton:SetParent(f)
+            MainMenuBarBackpackButton:ClearAllPoints()
+            MainMenuBarBackpackButton:SetPoint('RIGHT', f, 'RIGHT', 0, 0)
+        end
         MainMenuBarBackpackButton:SetScale(1.5)
+        MainMenuBarBackpackButton:Show()
 
         SetItemButtonTexture(MainMenuBarBackpackButton, texture)
         MainMenuBarBackpackButton:SetHighlightTexture(highlight)
         MainMenuBarBackpackButton:SetPushedTexture(highlight)
         MainMenuBarBackpackButton:SetCheckedTexture(highlight)
 
-        MainMenuBarBackpackButtonNormalTexture:Hide()
-        MainMenuBarBackpackButtonNormalTexture:SetTexture()
+        if MainMenuBarBackpackButtonNormalTexture then
+            MainMenuBarBackpackButtonNormalTexture:Hide()
+            MainMenuBarBackpackButtonNormalTexture:SetTexture()
+        end
 
         if not MainMenuBarBackpackButton.Border then
             local cutout = 'Interface\\Addons\\DragonflightUI\\Textures\\bagslotCutout'
 
-            local border = MainMenuBarBackpackButton:CreateTexture('DragonflightUIBigBagBorder')
+            local border = MainMenuBarBackpackButton:CreateTexture('DragonflightUIBigBagBorder', 'OVERLAY')
             border:SetTexture(cutout)
             border:SetPoint('TOPLEFT', MainMenuBarBackpackButton, 'TOPLEFT', 0, 0)
             border:SetPoint('BOTTOMRIGHT', MainMenuBarBackpackButton, 'BOTTOMRIGHT', 0, 0)
@@ -296,7 +314,10 @@ function Module.ChangeBackpack()
     f:SetMovable(true)
 
     if _G['BagsBar'] then
-        addonTable:OverrideBlizzEditmode(_G['BagsBar'], 'RIGHT', f, 'RIGHT', 0, 0)
+        if not InCombatLockdown() then
+            _G['BagsBar']:ClearAllPoints()
+            _G['BagsBar']:SetPoint('RIGHT', f, 'RIGHT', 0, 0)
+        end
         Module.HookBagBarLayout()
     end
 end
