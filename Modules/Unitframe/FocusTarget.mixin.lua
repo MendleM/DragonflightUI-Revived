@@ -13,7 +13,17 @@ function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
     self:SetupOptions()
-    -- self:SetScript('OnEvent', self.OnEvent);
+
+    local f = _G['DragonflightUIFocusToTFrame']
+    if f then
+        f:SetSize(120, 49)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetClampedToScreen(true)
+        f:SetMovable(true)
+        f:EnableMouse(false)
+        f:Hide()
+    end
 end
 
 function SubModuleMixin:SetDefaults()

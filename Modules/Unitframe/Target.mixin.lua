@@ -25,6 +25,18 @@ function SubModuleMixin:Init()
     self:SetDefaults()
     self:SetupOptions()
 
+    local f = _G['DragonflightUITargetFrame']
+    if f then
+        f:SetSize(232, 100)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetClampedToScreen(true)
+        f:SetMovable(true)
+        f:SetFrameStrata('LOW')
+        f:EnableMouse(false)
+        f:Hide()
+    end
+
     self.famous = {['Norbert'] = true}
 
     self:SetScript('OnEvent', self.OnEvent);
@@ -704,9 +716,11 @@ function SubModuleMixin:Update()
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    f_orig:ClearAllPoints()
-    f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
-    f_orig:SetScale(state.scale)
+    if not InCombatLockdown() then
+        f_orig:ClearAllPoints()
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        f_orig:SetScale(state.scale)
+    end
 
     self:ReApplyTargetFrame()
     -- Module.ReApplyToT()

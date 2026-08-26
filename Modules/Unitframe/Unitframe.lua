@@ -60,6 +60,43 @@ local localSettings = {
     pet = {scale = 1.0, anchor = 'TOPLEFT', anchorParent = 'TOPLEFT', x = 100, y = -70}
 }
 
+function Module:PrePositionHolderFrames()
+    if not self.db or not self.db.profile then return end
+
+    local mapping = {
+        {name = 'DragonflightUIPlayerFrame', sub = 'player', defAnchor = 'TOPLEFT', defParent = 'TOPLEFT', defX = -19, defY = -4, sizeW = 232, sizeH = 100},
+        {name = 'DragonflightUITargetFrame', sub = 'target', defAnchor = 'TOPLEFT', defParent = 'TOPLEFT', defX = 250, defY = -4, sizeW = 232, sizeH = 100},
+        {name = 'DragonflightUIPetFrame', sub = 'pet', defAnchor = 'TOPRIGHT', defParent = 'BOTTOMRIGHT', defX = -3, defY = 28, sizeW = 120, sizeH = 49},
+        {name = 'DragonflightUIFocusFrame', sub = 'focus', defAnchor = 'TOPLEFT', defParent = 'TOPLEFT', defX = 250, defY = -170, sizeW = 232, sizeH = 100},
+        {name = 'DragonflightUITargetToTFrame', sub = 'tot', defAnchor = 'BOTTOMRIGHT', defParent = 'BOTTOMRIGHT', defX = -8, defY = -15, sizeW = 120, sizeH = 49},
+        {name = 'DragonflightUIFocusToTFrame', sub = 'focustot', defAnchor = 'BOTTOMRIGHT', defParent = 'BOTTOMRIGHT', defX = -8, defY = -15, sizeW = 120, sizeH = 49}
+    }
+
+    for _, entry in ipairs(mapping) do
+        local f = _G[entry.name]
+        local subData = self.db.profile[entry.sub]
+        if f and subData then
+            f:SetSize(entry.sizeW, entry.sizeH)
+            f:SetParent(UIParent)
+            f:SetScale(subData.scale or 1.0)
+            f:SetMovable(true)
+            f:EnableMouse(false)
+
+            local parent
+            if subData.customAnchorFrame and _G[subData.customAnchorFrame] then
+                parent = _G[subData.customAnchorFrame]
+            elseif subData.anchorFrame and _G[subData.anchorFrame] then
+                parent = _G[subData.anchorFrame]
+            else
+                parent = UIParent
+            end
+
+            f:ClearAllPoints()
+            f:SetPoint(subData.anchor or entry.defAnchor, parent, subData.anchorParent or entry.defParent, subData.x or entry.defX, subData.y or entry.defY)
+        end
+    end
+end
+
 function Module:OnInitialize()
     DF:Debug(self, 'Module ' .. mName .. ' OnInitialize()')
     self.db = DF.db:RegisterNamespace(mName, defaults)
@@ -69,14 +106,21 @@ function Module:OnInitialize()
     end)
 
     self:SetEnabledState(DF.ConfigModule:GetModuleEnabled(mName))
+    self:PrePositionHolderFrames()
 end
 
 function Module:OnEnable()
     DF:Debug(self, 'Module ' .. mName .. ' OnEnable()')
     self:SetWasEnabled(true)
+    self:PrePositionHolderFrames()
 
-    -- Unit frames are secure/protected; a combat reload must defer their
-    -- setup until lockdown drops (see Helper:RunOutOfCombat).
+    -- Setup submodules structures and apply visual styling immediately (textures, masks, colors)
+    self:EnableAddonSpecific()
+    Module.SubmodulesReady = true
+    Module:ApplySettings()
+
+    -- Unit frames secure parenting and points are protected; a combat reload must defer their
+    -- secure setup until lockdown drops (see Helper:RunOutOfCombat).
     Helper:RunOutOfCombat('unit frames', function() Module:EnableOutOfCombat() end)
 end
 
@@ -110,15 +154,18 @@ function Module:EnableOutOfCombat()
     Module:ApplySettings()
     Module:SaveLocalSettings()
 
-    hooksecurefunc('UIParent_UpdateTopFramePositions', function()
-        Module:SaveLocalSettings()
-    end)
+    if not self.HooksInstalled then
+        self.HooksInstalled = true
+        hooksecurefunc('UIParent_UpdateTopFramePositions', function()
+            Module:SaveLocalSettings()
+        end)
 
-    self:SecureHook(DF, 'RefreshConfig', function()
-        -- print('RefreshConfig', mName)      
-        Module:ApplySettings()
-        Module:RefreshOptionScreens()
-    end)
+        self:SecureHook(DF, 'RefreshConfig', function()
+            -- print('RefreshConfig', mName)      
+            Module:ApplySettings()
+            Module:RefreshOptionScreens()
+        end)
+    end
 
     Module:FixBlizzardBug()
 end
@@ -675,6 +722,9 @@ end
 Module:RegisterChatCommand('cheeese', 'TakePicture')
 
 function Module:SetupSubmodules()
+    if self.SubmodulesSetupDone then return end
+    self.SubmodulesSetupDone = true
+
     if DF.Caps.HasFocus then
         self.SubFocus:Setup()
         self.SubFocusTarget:Setup()

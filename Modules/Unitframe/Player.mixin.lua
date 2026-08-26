@@ -22,7 +22,15 @@ function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
     self:SetupOptions()
-    -- self:SetScript('OnEvent', self.OnEvent);  
+
+    local f = _G['DragonflightUIPlayerFrame']
+    if f then
+        f:SetSize(232, 100)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetMovable(true)
+        f:EnableMouse(false)
+    end
 end
 
 function SubModuleMixin:SetDefaults()
@@ -575,9 +583,11 @@ function SubModuleMixin:Update()
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    f_orig:SetParent(f)
-    f_orig:ClearAllPoints()
-    f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+    if not InCombatLockdown() then
+        f_orig:SetParent(f)
+        f_orig:ClearAllPoints()
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+    end
 
     self:ChangePlayerframe()
     self:SetPlayerBiggerHealthbar(state.biggerHealthbar)
@@ -1055,7 +1065,7 @@ end
 
 function SubModuleMixin:AddAlternatePowerBar()
     local localizedClass, englishClass, classIndex = UnitClass('player');
-    if not englishClass == 'DRUID' then return; end
+    if englishClass ~= 'DRUID' then return; end
 
     local bar = CreateFrame('StatusBar', 'DragonflightUIAlternatePowerBar', PlayerFrame, 'TextStatusBar');
     bar:SetSize(78, 12);

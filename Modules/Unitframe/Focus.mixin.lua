@@ -24,6 +24,17 @@ function SubModuleMixin:Init()
     self:SetDefaults()
     self:SetupOptions()
 
+    local f = _G['DragonflightUIFocusFrame']
+    if f then
+        f:SetSize(232, 100)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetClampedToScreen(true)
+        f:SetMovable(true)
+        f:EnableMouse(false)
+        f:Hide()
+    end
+
     self:SetScript('OnEvent', self.OnEvent);
 end
 
@@ -448,9 +459,11 @@ function SubModuleMixin:Update()
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    f_orig:ClearAllPoints()
-    f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
-    f_orig:SetScale(state.scale)
+    if not InCombatLockdown() then
+        f_orig:ClearAllPoints()
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        f_orig:SetScale(state.scale)
+    end
 
     self:ReApplyFocusFrame()
     -- self:ReApplyFocusToT()
