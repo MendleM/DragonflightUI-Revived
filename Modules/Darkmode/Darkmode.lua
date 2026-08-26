@@ -814,18 +814,20 @@ function Module:UpdateActionbar(state)
         -- SetItemButtonTextureVertexColor(MainMenuBarBackpackButton, state.actionbarR / 255, state.actionbarG / 255,
         --                                 state.actionbarB / 255)
 
-        MainMenuBarBackpackButton.Border:SetDesaturated(state.actionbarDesaturate)
-        MainMenuBarBackpackButton.Border:SetVertexColor(c:GetRGB())
+        if MainMenuBarBackpackButton and MainMenuBarBackpackButton.Border then
+            MainMenuBarBackpackButton.Border:SetDesaturated(state.actionbarDesaturate)
+            MainMenuBarBackpackButton.Border:SetVertexColor(c:GetRGB())
+        end
 
         for i = 0, 3 do
-            --
             local slot = _G['CharacterBag' .. i .. 'Slot']
-            slot.Border:SetDesaturated(state.actionbarDesaturate)
-            slot.Border:SetVertexColor(c:GetRGB())
+            if slot and slot.Border then
+                slot.Border:SetDesaturated(state.actionbarDesaturate)
+                slot.Border:SetVertexColor(c:GetRGB())
+            end
         end
 
         if KeyRingButton and KeyRingButton.Border then
-            --       
             KeyRingButton.Border:SetDesaturated(state.actionbarDesaturate)
             KeyRingButton.Border:SetVertexColor(c:GetRGB())
         end

@@ -15,6 +15,7 @@ function DragonflightUIEditModeMixin:InitEditMode()
     self.box.texture = self.box:CreateTexture(nil, 'OVERLAY')
     self.box.texture:SetAllPoints()
     self.box.texture:SetColorTexture(0, 0.8, 0, 0.42)
+    self.box:Hide()
 end
 
 function DragonflightUIEditModeMixin:ShowHighlight(show)
@@ -98,7 +99,7 @@ function DragonflightUIActionbarMixin:SetButtons(buttons, barNumber)
     if not barNumber then
         --
     elseif barNumber == 1 then
-        -- shouldSetParent = true;
+        shouldSetParent = true;
     elseif multibarFix then
         -- print('~~multibarFix', barNumber)
         if barNumber == 2 then
@@ -242,7 +243,8 @@ function DragonflightUIActionbarMixin:Update()
         self:SetSize(height, width)
     end
 
-    for i = buttons + 1, btnCount do
+    if not InCombatLockdown() then
+        for i = buttons + 1, btnCount do
         local btn = buttonTable[i]
         btn:ClearAllPoints()
         btn:SetPoint('CENTER', UIParent, 'BOTTOM', 0, -666)
@@ -372,6 +374,7 @@ function DragonflightUIActionbarMixin:Update()
 
             index = index + 1
         end
+    end
     end
     self:ShowHighlight(false)
 
