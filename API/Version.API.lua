@@ -58,7 +58,7 @@ Version.IsMoP = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
 --- (not version-mapped) so it stays correct as Blizzard rolls the backport
 --- to more flavors.
 ---@type boolean
-Version.IsModern = (EditModeManagerFrame ~= nil) or (StatusTrackingBarManager ~= nil) or true
+Version.IsModern = (EditModeManagerFrame ~= nil) or (StatusTrackingBarManager ~= nil)
 DF.IsModern = Version.IsModern
 
 --- Capabilities table for modern engine features (HAL)
@@ -70,7 +70,7 @@ DF.Caps = {
     HasContainerMixin = (ContainerFrameMixin ~= nil),
     HasFocus = not Version.IsClassic,
     HasAltPower = Version.IsCata or Version.IsMoP or (DF.InterfaceVersion >= 40000),
-    HasTotemBar = Version.IsWotlk or Version.IsCata or Version.IsMoP or (DF.InterfaceVersion >= 30000),
+    HasTotemBar = (_G['TotemFrame'] ~= nil) or (_G['MultiCastActionBarFrame'] ~= nil) or (GetTotemInfo ~= nil),
 }
 
 Version.Caps = DF.Caps
