@@ -649,7 +649,7 @@ function DragonflightUIActionbarMixin:UpdateDividerArt(state)
     -- Retail's three conditions. Past a few pixels of padding the line stops
     -- bridging the gap and just floats between the buttons, which is why
     -- Blizzard drops them once the player widens the spacing.
-    local hidden = state.hideDivider or (self.BorderArt and state.hideBorder) or (state.rows or 1) > 1 or
+    local hidden = (not self.BorderArt) or state.hideDivider or state.hideBorder or (state.rows or 1) > 1 or
                        (state.padding or 0) > DIVIDER_MAX_PADDING
     if hidden then
         hideAll()
