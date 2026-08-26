@@ -25,6 +25,7 @@ function SubModuleMixin:Init()
 
     local f = _G['DragonflightUIPlayerFrame']
     if f then
+        f:Show()
         f:SetSize(232, 100)
         f:SetParent(UIParent)
         f:SetScale(1.0)
@@ -579,6 +580,7 @@ function SubModuleMixin:Update()
         parent = _G[state.anchorFrame]
     end
 
+    f:Show()
     f:SetScale(state.scale)
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)

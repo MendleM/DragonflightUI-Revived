@@ -26,27 +26,21 @@ hooksecurefunc(DF, 'OnInitialize', function()
     -- print('DragonflightUI.Core.OnInitialize')
 
     for moduleName, v in pairs(DF.modules) do
-        --   
-        do
+        if v and type(v.OnInitialize) == 'function' then
             local event = DF_EVENT:format(moduleName, 'OnInitialize')
             hooksecurefunc(v, 'OnInitialize', function(self, ...)
-                -- e.g. 'Chat'
-                -- Event: 'DragonflightUI.Chat.OnInitialize'
-                -- arg1: AceModule table
                 EventRegistry:TriggerEvent(event, self);
                 initializedModules[moduleName] = true;
-                -- print(event);
             end)
+        else
+            initializedModules[moduleName] = true
         end
-        do
+
+        if v and type(v.OnEnable) == 'function' then
             local event = DF_EVENT:format(moduleName, 'OnEnable')
             hooksecurefunc(v, 'OnEnable', function(self, ...)
-                -- e.g. 'Chat'
-                -- Event: 'DragonflightUI.Chat.OnEnable'
-                -- arg1: AceModule table
                 EventRegistry:TriggerEvent(event, self);
                 enabledModules[moduleName] = true;
-                -- print(event);
             end)
         end
     end

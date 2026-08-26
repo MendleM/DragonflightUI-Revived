@@ -77,6 +77,7 @@ function Module:PrePositionHolderFrames()
         local f = _G[entry.name]
         local subData = self.db.profile[entry.sub]
         if f and subData then
+            f:Show()
             f:SetSize(entry.sizeW, entry.sizeH)
             f:SetParent(UIParent)
             f:SetScale(subData.scale or 1.0)
@@ -331,7 +332,7 @@ function Module:ApplySettingsInternal(sub, key)
     updateSub('party', self.SubParty, db.party)
     updateSub('player', self.SubPlayer, db.player)
     updateSub('playerSecondaryRes', self.SubPlayerSecondaryRes, db.playerSecondaryRes)
-    updateSub('playerTotemFrame', self.SubPlayerTotemFrame, db.playerTotemFrame)
+    if DF.Caps.HasTotemBar then updateSub('playerTotemFrame', self.SubPlayerTotemFrame, db.playerTotemFrame) end
     updateSub('pet', self.SubPet, db.pet)
     updateSub('target', self.SubTarget, db.target)
     updateSub('tot', self.SubTargetOfTarget, db.tot)

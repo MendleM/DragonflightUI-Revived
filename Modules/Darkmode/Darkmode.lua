@@ -461,24 +461,28 @@ function Module:UpdateUnitframe(state)
     local c = CreateColorFromRGBHexString(state.unitframeColor)
 
     -- player
-    if not f.DarkmodePlayerStatusHooked then
-        f.DarkmodePlayerStatusHooked = true
-        hooksecurefunc(unitModule.SubPlayer, 'UpdatePlayerStatus', function()
-            --  
-            self:UpdatePlayerFrame(state)
-        end)
+    if unitModule.SubPlayer then
+        if not f.DarkmodePlayerStatusHooked then
+            f.DarkmodePlayerStatusHooked = true
+            hooksecurefunc(unitModule.SubPlayer, 'UpdatePlayerStatus', function()
+                --  
+                self:UpdatePlayerFrame(state)
+            end)
+        end
+        self:UpdatePlayerFrame(state)
     end
-    self:UpdatePlayerFrame(state)
 
     -- target
-    if not f.DarkmodeTargetHooked then
-        f.DarkmodeTargetHooked = true
-        hooksecurefunc(unitModule.SubTarget, 'ChangeTargetFrame', function()
-            --  
-            self:UpdateTargetFrame(state)
-        end)
+    if unitModule.SubTarget then
+        if not f.DarkmodeTargetHooked then
+            f.DarkmodeTargetHooked = true
+            hooksecurefunc(unitModule.SubTarget, 'ChangeTargetFrame', function()
+                --  
+                self:UpdateTargetFrame(state)
+            end)
+        end
+        self:UpdateTargetFrame(state)
     end
-    self:UpdateTargetFrame(state)
 
     -- pet
     self:UpdatePetFrame(state)
@@ -567,7 +571,7 @@ function Module:UpdateTargetFrame(state)
     local f = unitModule.SubTarget
     local c = CreateColorFromRGBHexString(state.unitframeColor)
 
-    if not f.TargetFrameBackground then return end
+    if not f or not f.TargetFrameBackground then return end
 
     local TargetFrameBackground = f.TargetFrameBackground
     local targetPortExtra = f.PortraitExtra

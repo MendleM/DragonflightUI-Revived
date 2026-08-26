@@ -4,7 +4,7 @@ local L = addonTable.L;
 local Helper = addonTable.Helper;
 local LSM = LibStub('LibSharedMedia-3.0')
 local RangeCheck = LibStub("LibRangeCheck-3.0")
-local AuraDurations = LibStub:GetLibrary('AuraDurations-1.0')
+local AuraDurations = LibStub and LibStub('AuraDurations-1.0', true)
 
 local subModuleName = 'Target';
 local SubModuleMixin = {};
@@ -728,7 +728,9 @@ function SubModuleMixin:Update()
     TextStatusBar_UpdateTextString(TargetFrameHealthBar)
     self:UpdateComboFrameState(state)
     TargetFrameNameBackground:SetShown(not state.hideNameBackground)
-    AuraDurations.frame:SetState(state)
+    if AuraDurations and AuraDurations.frame then
+        AuraDurations.frame:SetState(state)
+    end
     UnitFramePortrait_Update(TargetFrame)
     if TargetFrame_CheckFaction then
         TargetFrame_CheckFaction(TargetFrame)
