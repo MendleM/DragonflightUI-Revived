@@ -24,7 +24,7 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
-        version = '0.44.0',
+        version = '0.44.0-rakStar-refactor',
         title = 'What 0.43.0 broke, and what it never fixed',
         date = '23 August 2026',
         intro = 'Three regressions from the last release, five long-standing bugs, and a checkbox that finally does something.',
