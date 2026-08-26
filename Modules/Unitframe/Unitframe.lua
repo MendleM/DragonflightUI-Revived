@@ -674,14 +674,22 @@ function Module:TakePicture()
 end
 Module:RegisterChatCommand('cheeese', 'TakePicture')
 
-function Module:Era()
-    -- self.SubFocus:Setup()
-    -- self.SubFocusTarget:Setup()
-    -- self.SubAltPower:Setup()
+function Module:SetupSubmodules()
+    if DF.Caps.HasFocus then
+        self.SubFocus:Setup()
+        self.SubFocusTarget:Setup()
+    end
+
+    if DF.Caps.HasAltPower then
+        self.SubAltPower:Setup()
+    end
 
     self.SubParty:Setup()
     self.SubPlayer:Setup()
     self.SubPlayerSecondaryRes:Setup()
+    if DF.Caps.HasTotemBar then
+        self.SubPlayerTotemFrame:Setup()
+    end
 
     self.SubPet:Setup()
     self.SubTarget:Setup()
@@ -693,100 +701,30 @@ function Module:Era()
     self:HookDrag()
     self:AddPortraitMasks()
     self:HookClassIcon()
+
+    if DF.API.Version.IsTBC then
+        self:AddRoleSelectDropdownOption()
+        local EditModeModule = DF:GetModule('Editmode')
+        EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+    end
+end
+
+function Module:Era()
+    self:SetupSubmodules()
 end
 
 function Module:TBC()
-    self.SubFocus:Setup()
-    self.SubFocusTarget:Setup()
-
-    -- self.SubAltPower:Setup()
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
-    self.SubPlayerTotemFrame:Setup()
-
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
-    self:AddRoleSelectDropdownOption()
-
-    local EditModeModule = DF:GetModule('Editmode');
-
-    EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+    self:SetupSubmodules()
 end
 
 function Module:Wrath()
-    self.SubFocus:Setup()
-    self.SubFocusTarget:Setup()
-
-    -- self.SubAltPower:Setup()
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
-    self.SubPlayerTotemFrame:Setup()
-
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
+    self:SetupSubmodules()
 end
 
 function Module:Cata()
-    self.SubFocus:Setup()
-    self.SubFocusTarget:Setup()
-
-    self.SubAltPower:Setup()
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
-    self.SubPlayerTotemFrame:Setup()
-
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
+    self:SetupSubmodules()
 end
 
 function Module:Mists()
-    self.SubFocus:Setup()
-    self.SubFocusTarget:Setup()
-
-    self.SubAltPower:Setup()
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
-    self.SubPlayerTotemFrame:Setup()
-
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
-
-    local EditModeModule = DF:GetModule('Editmode');
-    EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+    self:SetupSubmodules()
 end

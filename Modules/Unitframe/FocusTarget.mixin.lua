@@ -324,6 +324,8 @@ function SubModuleMixin:Update()
     local f_orig = FocusFrameToT
     local f = _G['DragonflightUIFocusToTFrame']
 
+    if not f or not f_orig or not self.PreviewFocusTarget then return end
+
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]

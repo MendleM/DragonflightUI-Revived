@@ -442,29 +442,39 @@ function SubModuleMixin:Update()
         parent = _G[state.anchorFrame]
     end
 
+    if not f or not f_orig or not self.PreviewFocus then return end
+
     f:SetScale(state.scale)
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    if f_orig then
-        f_orig:ClearAllPoints()
-        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
-        f_orig:SetScale(state.scale)
-    end
+    f_orig:ClearAllPoints()
+    f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+    f_orig:SetScale(state.scale)
 
     self:ReApplyFocusFrame()
     -- self:ReApplyFocusToT()
-    FocusFrameHealthBar.breakUpLargeNumbers = state.breakUpLargeNumbers
-    TextStatusBar_UpdateTextString(FocusFrameHealthBar)
-    FocusFrameNameBackground:SetShown(not state.hideNameBackground)
-    UnitFramePortrait_Update(FocusFrame)
+    if FocusFrameHealthBar then
+        FocusFrameHealthBar.breakUpLargeNumbers = state.breakUpLargeNumbers
+        TextStatusBar_UpdateTextString(FocusFrameHealthBar)
+    end
+    if FocusFrameNameBackground then
+        FocusFrameNameBackground:SetShown(not state.hideNameBackground)
+    end
+    if UnitFramePortrait_Update then
+        UnitFramePortrait_Update(FocusFrame)
+    end
     if TargetFrame_CheckFaction then
         TargetFrame_CheckFaction(FocusFrame)
-    else
+    elseif FocusFrame.CheckFaction then
         FocusFrame:CheckFaction()
     end
-    FocusFrame:UpdateStateHandler(state)
-    self.PreviewFocus:UpdateState(state);
+    if FocusFrame.UpdateStateHandler then
+        FocusFrame:UpdateStateHandler(state)
+    end
+    if self.PreviewFocus and self.PreviewFocus.UpdateState then
+        self.PreviewFocus:UpdateState(state)
+    end
 end
 
 function SubModuleMixin:ChangeFocusFrame()

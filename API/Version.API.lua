@@ -68,10 +68,9 @@ DF.Caps = {
     HasPooledParty = (_G['PartyMemberFrame1'] == nil and _G['PartyFrame'] ~= nil),
     HasModernStatusBars = (TextStatusBarMixin ~= nil),
     HasContainerMixin = (ContainerFrameMixin ~= nil),
-    HasFocus = (FocusFrame ~= nil) or (WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC),
-    HasAltPower = (_G['PlayerPowerBarAlt'] ~= nil) or (WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC) or
-        (WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC),
-    HasTotemBar = (_G['TotemFrame'] ~= nil),
+    HasFocus = not Version.IsClassic,
+    HasAltPower = Version.IsCata or Version.IsMoP or (DF.InterfaceVersion >= 40000),
+    HasTotemBar = Version.IsWotlk or Version.IsCata or Version.IsMoP or (DF.InterfaceVersion >= 30000),
 }
 
 Version.Caps = DF.Caps
