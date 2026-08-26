@@ -150,7 +150,6 @@ function DFProfessionMixin:OnLoad()
         self:ResetFilter()
     end)
 
-    self:SetupDrag()
     self:AddBlizzMoveSupport();
     self:SuppressBlizzardFrames()
     self:Hide()
@@ -162,55 +161,6 @@ function DFProfessionMixin:SuppressBlizzardFrames()
         frame:SetAlpha(0)
         if frame.EnableMouse then frame:EnableMouse(false) end
     end
-end
-
-local HEADER_HEIGHT = 32
-
-function DFProfessionMixin:SetupDrag()
-    self.frameDB = DF.db:RegisterNamespace('ProfessionFrame', {profile = {position = {}}})
-
-    self:SetMovable(true)
-    self:EnableMouse(true)
-    self:SetClampedToScreen(true)
-    self:RegisterForDrag('LeftButton')
-    self:SetScript('OnDragStart', function(frame)
-        if frame.BlizzMoveOwnsDrag then return end
-
-        local _, cursorY = GetCursorPosition()
-        local scale = frame:GetEffectiveScale()
-        local top = frame:GetTop()
-        if top and scale and scale > 0 and (top - (cursorY / scale)) <= HEADER_HEIGHT then
-            frame:StartMoving()
-            frame.DFIsMoving = true
-        end
-    end)
-    self:SetScript('OnDragStop', function(frame)
-        if not frame.DFIsMoving then return end
-
-        frame.DFIsMoving = nil
-        frame:StopMovingOrSizing()
-        frame:SavePosition()
-    end)
-end
-
-function DFProfessionMixin:SavePosition()
-    if not self.frameDB then return end
-
-    local point, _, relativePoint, x, y = self:GetPoint(1)
-    if not point then return end
-
-    self.frameDB.profile.position = {point = point, relativePoint = relativePoint, x = x, y = y}
-end
-
-function DFProfessionMixin:RestorePosition()
-    if self.BlizzMoveOwnsDrag then return false end
-
-    local pos = self.frameDB and self.frameDB.profile.position
-    if not pos or not pos.point then return false end
-
-    self:ClearAllPoints()
-    self:SetPoint(pos.point, UIParent, pos.relativePoint or pos.point, pos.x or 0, pos.y or 0)
-    return true
 end
 
 function DFProfessionMixin:OnShow()
@@ -225,20 +175,16 @@ function DFProfessionMixin:ShouldShow(should)
         self:SuppressBlizzardFrames()
 
         if self.TradeSkillOpen then
-            if not self:RestorePosition() then
-                self:ClearAllPoints()
-                self:SetPoint('TOPLEFT', TradeSkillFrame, 'TOPLEFT', 12, -12)
-            end
+            self:ClearAllPoints()
+            self:SetPoint('TOPLEFT', TradeSkillFrame, 'TOPLEFT', 12, -12)
 
             if TradeSkillFrame then TradeSkillFrame:SetFrameStrata('BACKGROUND') end
             self:SetFrameStrata('MEDIUM')
 
             self:UpdateUIPanelWindows(not self.minimized)
         elseif self.CraftOpen then
-            if not self:RestorePosition() then
-                self:ClearAllPoints()
-                self:SetPoint('TOPLEFT', CraftFrame, 'TOPLEFT', 12, -12)
-            end
+            self:ClearAllPoints()
+            self:SetPoint('TOPLEFT', CraftFrame, 'TOPLEFT', 12, -12)
 
             if CraftFrame then CraftFrame:SetFrameStrata('BACKGROUND') end
             self:SetFrameStrata('MEDIUM')
@@ -324,20 +270,28 @@ function DFProfessionMixin:Minimize(mini)
 end
 
 function DFProfessionMixin:UpdateUIPanelWindows(big)
+    local width = big and frameWidth or frameWidthSmall
+
     if TradeSkillFrame then
-        if big then
-            TradeSkillFrame:SetAttribute("UIPanelLayout-width", frameWidth);
-        else
-            TradeSkillFrame:SetAttribute("UIPanelLayout-width", frameWidthSmall);
+        TradeSkillFrame:SetAttribute("UIPanelLayout-area", "left")
+        TradeSkillFrame:SetAttribute("UIPanelLayout-pushable", 3)
+        TradeSkillFrame:SetAttribute("UIPanelLayout-width", width)
+        if UIPanelWindows and UIPanelWindows["TradeSkillFrame"] then
+            UIPanelWindows["TradeSkillFrame"].area = "left"
+            UIPanelWindows["TradeSkillFrame"].pushable = 3
+            UIPanelWindows["TradeSkillFrame"].width = width
         end
         UpdateUIPanelPositions(TradeSkillFrame)
     end
 
     if CraftFrame then
-        if big then
-            CraftFrame:SetAttribute("UIPanelLayout-width", frameWidth);
-        else
-            CraftFrame:SetAttribute("UIPanelLayout-width", frameWidthSmall);
+        CraftFrame:SetAttribute("UIPanelLayout-area", "left")
+        CraftFrame:SetAttribute("UIPanelLayout-pushable", 3)
+        CraftFrame:SetAttribute("UIPanelLayout-width", width)
+        if UIPanelWindows and UIPanelWindows["CraftFrame"] then
+            UIPanelWindows["CraftFrame"].area = "left"
+            UIPanelWindows["CraftFrame"].pushable = 3
+            UIPanelWindows["CraftFrame"].width = width
         end
         UpdateUIPanelPositions(CraftFrame)
     end
@@ -571,10 +525,6 @@ function DFProfessionMixin:AddBlizzMoveSupport()
 
         local data = {['DragonflightUI'] = {['DragonflightUIProfessionFrame'] = {}}}
         BlizzMoveAPI:RegisterAddOnFrames(data)
-
-        self.BlizzMoveOwnsDrag = true
-        self:SetScript('OnDragStart', nil)
-        self:SetScript('OnDragStop', nil)
     end)
 end
 

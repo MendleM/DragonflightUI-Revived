@@ -30,11 +30,6 @@ local defaults = {
             changeTalents = true,
             questLevel = true
         },
-        movable = {enabled = true},
-        -- one saved anchor per window; absent means "never moved". Kept out of
-        -- the 'movable' sub so the page's Defaults button resets the option
-        -- without silently throwing away every position the player set.
-        movableWindowPositions = {},
         widgetBelow = {
             scale = 1,
             anchorFrame = 'Minimap',
@@ -179,34 +174,6 @@ if not DF.Cata and not DF.API.Version.IsMoP then
     for k, v in pairs(moreOptions) do UIOptions.args[k] = v end
 end
 
-local movableOptions = {
-    name = L["UIMovableWindows"],
-    desc = L["UIMovableWindowsDesc"],
-    sub = 'movable',
-    get = getOption,
-    set = setOption,
-    type = 'group',
-    args = {
-        enabled = {
-            type = 'toggle',
-            name = L["UIMovableWindowsEnable"],
-            desc = L["UIMovableWindowsDesc"] .. getDefaultStr('enabled', 'movable'),
-            order = 1,
-            new = true
-        },
-        resetPosition = {
-            type = 'execute',
-            name = L["UIMovableWindowsReset"],
-            btnName = L["UIMovableWindowsResetButton"],
-            desc = L["UIMovableWindowsResetDesc"],
-            func = function()
-                if addonTable.MovableWindows then addonTable.MovableWindows:ResetPositions() end
-            end,
-            order = 2
-        }
-    }
-}
-
 local widgetBelowOptions = {
     name = L["WidgetBelowName"],
     desc = L["WidgetBelowNameDesc"],
@@ -314,9 +281,6 @@ function Module:RegisterSettings()
     end
 
     register('ui', {order = 0, name = UIOptions.name, descr = 'UIsss', isNew = false})
-    -- its own entry, and near the top: it is a feature of its own, not another
-    -- restyling toggle to be hunted for among twenty of them
-    register('movable', {order = 0.5, name = movableOptions.name, descr = 'desc', isNew = true})
     register('widgetBelow', {order = 19, name = widgetBelowOptions.name, descr = 'desc', isNew = false})
 end
 
@@ -325,13 +289,6 @@ function Module:RegisterOptionScreens()
         options = UIOptions,
         default = function()
             setDefaultSubValues(UIOptions.sub)
-        end
-    })
-
-    DF.ConfigModule:RegisterSettingsData('movable', 'misc', {
-        options = movableOptions,
-        default = function()
-            setDefaultSubValues('movable')
         end
     })
 
@@ -383,7 +340,6 @@ function Module:RefreshOptionScreens()
     end
 
     refreshCat('UI')
-    refreshCat('movable')
     refreshCat('widgetBelow')
 
     Module.PreviewWidgetBelow.DFEditModeSelection:RefreshOptionScreen();
@@ -493,11 +449,6 @@ function Module:ApplySettingsInternal(sub, key)
     end)
 
     Module:UpdateWidgetBelowState(db.widgetBelow)
-
-    -- Deliberately not a ConditionalOption: that helper only ever runs its
-    -- body once, and this option has to take effect in both directions
-    -- without a reload.
-    if addonTable.MovableWindows then addonTable.MovableWindows:Update() end
 end
 
 function Module:ChangeFrames()
