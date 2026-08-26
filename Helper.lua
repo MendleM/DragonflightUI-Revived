@@ -101,7 +101,7 @@ local function DrainOutOfCombatQueue()
 
     -- The enable chains slice themselves across frames, so let them land before
     -- re-applying settings on top.
-    C_Timer.After(1, Helper.ReapplyAfterCombat)
+    C_Timer.After(0.1, Helper.ReapplyAfterCombat)
 end
 
 -- Everything the client refused during combat, asked for once more: every
