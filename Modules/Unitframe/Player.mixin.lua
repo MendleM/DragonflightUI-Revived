@@ -22,7 +22,16 @@ function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
     self:SetupOptions()
-    -- self:SetScript('OnEvent', self.OnEvent);  
+
+    local f = _G['DragonflightUIPlayerFrame']
+    if f then
+        f:Show()
+        f:SetSize(232, 100)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetMovable(true)
+        f:EnableMouse(false)
+    end
 end
 
 function SubModuleMixin:SetDefaults()
@@ -260,19 +269,17 @@ function SubModuleMixin:SetupOptions()
         }
     }
 
-    if DF.Era then
-        local localizedClass, englishClass, classIndex = UnitClass('player');
-        if englishClass == 'DRUID' then
-            optionsPlayer.args['hideAlternatePowerBar'] = {
-                type = 'toggle',
-                name = L["PlayerFrameHideAlternatePowerBar"],
-                desc = L["PlayerFrameHideAlternatePowerBarDesc"] .. getDefaultStr('hideAlternatePowerBar', 'player'),
-                group = 'headerStyling',
-                order = 13,
-                new = false,
-                editmode = true
-            }
-        end
+    local localizedClass, englishClass, classIndex = UnitClass('player');
+    if englishClass == 'DRUID' then
+        optionsPlayer.args['hideAlternatePowerBar'] = {
+            type = 'toggle',
+            name = L["PlayerFrameHideAlternatePowerBar"],
+            desc = L["PlayerFrameHideAlternatePowerBarDesc"] .. getDefaultStr('hideAlternatePowerBar', 'player'),
+            group = 'headerStyling',
+            order = 13,
+            new = false,
+            editmode = true
+        }
     end
 
     if true then
@@ -458,7 +465,7 @@ function SubModuleMixin:Setup()
     self:CreateRestFlipbook()
     self:HookRestFunctions()
 
-    if DF.Era or DF.API.Version.IsTBC then self:AddAlternatePowerBar() end
+    if not DF.Caps.HasAltPower then self:AddAlternatePowerBar() end
 
     PlayerFrameHealthBar:HookScript('OnValueChanged', function()
         self:UpdatePlayerFrameHealthBar()
@@ -503,12 +510,10 @@ function SubModuleMixin:Setup()
     -- over the frame's spot while the frame is hidden. See Target.mixin.lua.
     f:EnableMouse(false)
 
-    if DF.API.Version.IsTBC then
-        --
+    if addonTable.OverrideBlizzEditmode then
         addonTable:OverrideBlizzEditmode(PlayerFrame, 'CENTER', f, 'CENTER', 0, 0)
-
-        PlayerFrame:SetHitRectInsets(30, 0, 0, 20)
     end
+    PlayerFrame:SetHitRectInsets(30, 0, 0, 20)
 
     -- state handler
     Mixin(f, DragonflightUIStateHandlerMixin)
@@ -553,10 +558,6 @@ function SubModuleMixin:OnEvent(event, ...)
     elseif event == 'ZONE_CHANGED' or event == 'ZONE_CHANGED_INDOORS' or event == 'ZONE_CHANGED_NEW_AREA' then
         self:ChangePlayerframe()
         self:SetPlayerBiggerHealthbar(self.ModuleRef.db.profile.player.biggerHealthbar)
-        -- elseif event == 'PLAYER_TARGET_CHANGED' then
-        -- fallback
-        -- self:ChangePlayerframe()
-        -- self:SetPlayerBiggerHealthbar(self.ModuleRef.db.profile.player.biggerHealthbar)
     end
 end
 
@@ -572,8 +573,6 @@ function SubModuleMixin:Update()
     local f_orig = PlayerFrame
     local f = _G['DragonflightUIPlayerFrame']
 
-    if DF.API.Version.IsTBC then state.customAnchorFrame = ''; end
-
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -581,19 +580,15 @@ function SubModuleMixin:Update()
         parent = _G[state.anchorFrame]
     end
 
+    f:Show()
     f:SetScale(state.scale)
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    f_orig:SetParent(f)
-    f_orig:ClearAllPoints()
-    f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
-
-    if DF.API.Version.IsTBC then
-    else
-        f:SetUserPlaced(true)
-        f_orig:SetMovable(true)
-        f_orig:SetUserPlaced(true)
+    if not InCombatLockdown() then
+        f_orig:SetParent(f)
+        f_orig:ClearAllPoints()
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
     end
 
     self:ChangePlayerframe()
@@ -899,10 +894,9 @@ function SubModuleMixin:ChangeStatusIcons()
     -- TargetFrameTextureFrameLeaderIcon:ClearAllPoints()
     -- TargetFrameTextureFrameLeaderIcon:SetPoint('BOTTOMLEFT', TargetFramePortrait, 'TOPRIGHT', -10 - 3, -10)
 
-    if DF.API.Version.IsTBC then
-        local t = PlayerPVPIcon;
-        t:ClearAllPoints()
-        t:SetPoint('LEFT', PlayerPortrait, 'LEFT', -22, -18)
+    if PlayerPVPIcon then
+        PlayerPVPIcon:ClearAllPoints()
+        PlayerPVPIcon:SetPoint('LEFT', PlayerPortrait, 'LEFT', -22, -18)
     end
 end
 
@@ -1073,7 +1067,7 @@ end
 
 function SubModuleMixin:AddAlternatePowerBar()
     local localizedClass, englishClass, classIndex = UnitClass('player');
-    if not englishClass == 'DRUID' then return; end
+    if englishClass ~= 'DRUID' then return; end
 
     local bar = CreateFrame('StatusBar', 'DragonflightUIAlternatePowerBar', PlayerFrame, 'TextStatusBar');
     bar:SetSize(78, 12);

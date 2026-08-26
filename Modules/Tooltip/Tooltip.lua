@@ -854,20 +854,18 @@ function Module:GameTooltipSetDefaultAnchor(self, parent)
             focused = GetMouseFocus()
         end
 
-        -- @TODO @HACK GetMouseFoci returns empty table on units instead of one with worldframe :(
-        if focused == WorldFrame or (DF.Era and not focused) or (DF.API.Version.IsTBC and not focused) or
-            (DF.API.Version.IsWotlk and not focused) or (DF.API.Version.IsMoP and not focused) then
-            -- units etc
+        -- Units and unparented world objects
+        if focused == WorldFrame or not focused then
             self:ClearAllPoints();
-            self:SetOwner(parent, state.mouseAnchor, state.mouseX, state.mouseY); -- TODO config           
+            self:SetOwner(parent, state.mouseAnchor, state.mouseX, state.mouseY);
             return;
         end
 
-        if DF.Era and parent == _G['LFGMinimapFrame'] then
+        if parent and parent == _G['LFGMinimapFrame'] then
             self:SetOwner(parent, 'ANCHOR_BOTTOMLEFT');
             return;
         end
-        if DF.Cata and parent == _G['PlayerPowerBarAlt'] then
+        if parent and parent == _G['PlayerPowerBarAlt'] then
             self:SetOwner(parent, 'ANCHOR_RIGHT');
             return;
         end

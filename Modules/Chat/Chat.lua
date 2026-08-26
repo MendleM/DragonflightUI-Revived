@@ -188,6 +188,28 @@ function Module:OnEnable()
     -- The registration below was written but never called, which is why the
     -- chat window could not be selected or moved in DFUI's edit mode.
     if ChatFrame1 then
+        ChatFrame1.ignoreFramePositionManager = true
+        ChatFrame1:SetUserPlaced(true)
+
+        if ChatFrame1.ApplySystemAnchor then
+            ChatFrame1.ApplySystemAnchor = function(self)
+                Module:ApplySettingsInternal()
+            end
+        end
+
+        local em = _G['EditModeManagerFrame']
+        if em and em.SetToLayoutAnchor and not em.DFChatHooked then
+            em.DFChatHooked = true
+            local orig_SetToLayoutAnchor = em.SetToLayoutAnchor
+            em.SetToLayoutAnchor = function(self, systemFrame, ...)
+                if systemFrame == ChatFrame1 then
+                    Module:ApplySettingsInternal()
+                    return
+                end
+                return orig_SetToLayoutAnchor(self, systemFrame, ...)
+            end
+        end
+
         local ok, err = pcall(function() Module:AddEditMode() end)
         if not ok then geterrorhandler()('DFUI Chat:AddEditMode: ' .. tostring(err)) end
     end
@@ -281,10 +303,12 @@ function Module:ApplySettingsInternal(sub, key)
     -- Blizzard left behind, and a chat frame held by two anchors ignores
     -- SetSize on that axis - which is how it ends up stretched and offset
     -- instead of moved.
+    ChatFrame1.ignoreFramePositionManager = true
     ChatFrame1:ClearAllPoints()
     ChatFrame1:SetPoint(db.anchor, parent, db.anchorParent, db.x, db.y)
     ChatFrame1:SetSize(db.sizeX, db.sizeY)
     ChatFrame1:SetUserPlaced(true)
+    ChatFrame1:Show()
 
     Module.FixDockedFrames()
 
@@ -368,6 +392,7 @@ function Module.FixDockedFrames()
     if not (dock and dock.primary and FCFDock_GetChatFrames) then return end
 
     for _, chatFrame in ipairs(FCFDock_GetChatFrames(dock)) do
+        chatFrame.ignoreFramePositionManager = true
         Module.SetDockClamping(chatFrame, chatFrame ~= dock.primary)
     end
 

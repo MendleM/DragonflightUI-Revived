@@ -22,7 +22,16 @@ function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
     self:SetupOptions()
-    -- self:SetScript('OnEvent', self.OnEvent);
+
+    local f = _G['DragonflightUIPetFrame']
+    if f then
+        f:SetSize(120, 49)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetClampedToScreen(true)
+        f:SetMovable(true)
+        f:EnableMouse(false)
+    end
 end
 
 function SubModuleMixin:SetDefaults()
@@ -305,19 +314,14 @@ function SubModuleMixin:Setup()
     -- over the frame's spot while the frame is hidden. See Target.mixin.lua.
     f:EnableMouse(false)
 
-    if DF.API.Version.IsTBC then
-        --
+    if addonTable.OverrideBlizzEditmode then
         addonTable:OverrideBlizzEditmode(PetFrame, 'CENTER', f, 'CENTER', 0, 0)
     end
 
     -- state
     PetFrame:SetParent(f)
-    if not DF.API.Version.IsTBC then
-        -- TODO TBC
-        Mixin(f, DragonflightUIStateHandlerMixin)
-        f:InitStateHandler()
-        -- f:SetUnit('pet')
-    end
+    Mixin(f, DragonflightUIStateHandlerMixin)
+    f:InitStateHandler()
 
     -- editmode
     local EditModeModule = DF:GetModule('Editmode');
@@ -371,8 +375,6 @@ function SubModuleMixin:Update()
     local f_orig = PetFrame
     local f = _G['DragonflightUIPetFrame']
 
-    if DF.API.Version.IsTBC then state.customAnchorFrame = ''; end
-
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -384,28 +386,17 @@ function SubModuleMixin:Update()
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    f_orig:ClearAllPoints()
-    f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
-    f_orig:SetScale(state.scale)
-
-    if DF.API.Version.IsTBC then
-        if state.scale < 1.0 then
-            state.scale = 1.0;
-        elseif state.scale > 2.0 then
-            state.scale = 2.0;
-        end
-        -- print(addonTable:GetBlizzEditmodeFrameSetting(f_orig, Enum.EditModeUnitFrameSetting.FrameSize))
-        local tbcScale = ((state.scale) - 1.0) * 20;
-        -- print('tbcScale', tbcScale)
-        tbcScale = math.floor(tbcScale + 0.5)
-        -- print('tbcScaleINT', tbcScale)
-        addonTable:SetBlizzEditmodeFrameSetting(f_orig, Enum.EditModeUnitFrameSetting.FrameSize, tbcScale, true)
-        -- print(addonTable:GetBlizzEditmodeFrameSetting(f_orig, Enum.EditModeUnitFrameSetting.FrameSize))
-
+    if not InCombatLockdown() then
+        f_orig:ClearAllPoints()
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        f_orig:SetScale(state.scale)
         f_orig:SetFrameLevel(10)
-    else
-        f:SetUserPlaced(true)
-        -- f_orig:SetUserPlaced(true)
+    end
+
+    if Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.FrameSize and addonTable.SetBlizzEditmodeFrameSetting then
+        local scale = math.min(math.max(state.scale, 1.0), 2.0)
+        local frameSize = math.floor(((scale - 1.0) * 20) + 0.5)
+        addonTable:SetBlizzEditmodeFrameSetting(f_orig, Enum.EditModeUnitFrameSetting.FrameSize, frameSize, true)
     end
 
     PetFrame.breakUpLargeNumbers = state.breakUpLargeNumbers

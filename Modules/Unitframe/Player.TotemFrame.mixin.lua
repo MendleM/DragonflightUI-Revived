@@ -184,6 +184,7 @@ function SubModuleMixin:Update()
     end
 
     local f = self.BaseFrame
+    if not f then return end
 
     -- f:SetScale(state.scale)
     f:ClearAllPoints()
@@ -207,9 +208,21 @@ function SubModuleMixin:CreateBase()
     -- baseFrame:Hide()
     self.BaseFrame = baseFrame;
 
-    _G['TotemFrame']:ClearAllPoints()
-    _G['TotemFrame']:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
-    _G['TotemFrame']:SetParent(baseFrame)
+    local totemFrame = _G['TotemFrame']
+    if totemFrame then
+        totemFrame.ignoreFramePositionManager = true
+        totemFrame:ClearAllPoints()
+        totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+        totemFrame:SetParent(baseFrame)
+
+        hooksecurefunc(totemFrame, 'SetPoint', function(self)
+            if self.DFSettingPoint then return end
+            self.DFSettingPoint = true
+            self:ClearAllPoints()
+            self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+            self.DFSettingPoint = nil
+        end)
+    end
 end
 
 local base = 'Interface\\Addons\\DragonflightUI\\Textures\\'

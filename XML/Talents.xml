@@ -1,4 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ http://wowprogramming.com/FrameXML/UI.xsd">
+	<Script file="Mixin/Talents/Talents_ClassicTree.mixin.lua" />
+	<Script file="Mixin/Talents/Talents_MoPMatrix.mixin.lua" />
+	<Script file="Mixin/Talents/Talents_Core.mixin.lua" />
 	<Script file="Mixin/Talents.mixin.lua" />
 	<Frame name="DFPlayerTalentFrameRoleIconTemplate" virtual="true">
 		<Size x="16" y="16" />

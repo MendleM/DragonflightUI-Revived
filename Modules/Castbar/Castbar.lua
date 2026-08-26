@@ -127,7 +127,7 @@ local frameTable = {
     {value = 'PlayerFrame', text = 'PlayerFrame', tooltip = 'descr', label = 'label'},
     {value = 'TargetFrame', text = 'TargetFrame', tooltip = 'descr', label = 'label'}
 }
-if DF.Wrath or DF.API.Version.IsTBC then
+if DF.Caps.HasFocus then
     table.insert(frameTable, {value = 'FocusFrame', text = 'FocusFrame', tooltip = 'descr', label = 'label'})
 end
 
@@ -654,7 +654,7 @@ function Module:RegisterSettings()
     register('mirrorTimer', {order = 1.5, name = self.SubMirrorTimer.Options.name, descr = 'Focusss', isNew = true})
     register('target', {order = 2, name = optionsTarget.name, descr = 'Target Cast Bar', isNew = false})
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus then
         register('focus', {order = 3, name = optionsFocus.name, descr = 'Focus Cast Bar', isNew = false})
     end
 end
@@ -674,7 +674,7 @@ function Module:RegisterOptionScreens()
         end
     })
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus then
         DF.ConfigModule:RegisterSettingsData('focus', 'castbar', {
             options = optionsFocus,
             default = function()
@@ -699,7 +699,7 @@ function Module:RefreshOptionScreens()
     Module.PlayerCastbar.DFEditModeSelection:RefreshOptionScreen();
     Module.TargetCastbar.DFEditModeSelection:RefreshOptionScreen();
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and Module.FocusCastbar then
         refreshCat('Focus')
         Module.FocusCastbar.DFEditModeSelection:RefreshOptionScreen();
     end
@@ -744,7 +744,7 @@ function Module:AddEditMode()
     Module.TargetCastbar.DFEditModeSelection:SetPoint('TOPLEFT', Module.TargetCastbar, 'TOPLEFT', -4, 4)
     Module.TargetCastbar.DFEditModeSelection:SetPoint('BOTTOMRIGHT', Module.TargetCastbar, 'BOTTOMRIGHT', 4, -16)
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and Module.FocusCastbar then
         EditModeModule:AddEditModeToFrame(Module.FocusCastbar)
         Module.FocusCastbar.DFEditModeSelection:SetGetLabelTextFunction(function()
             return optionsFocus.name
@@ -782,13 +782,13 @@ function Module:ApplySettingsInternal(sub, key)
         self.SubMirrorTimer:UpdateState(db.mirrorTimer)
         Module.TargetCastbar:UpdateState(db.target)
 
-        if DF.Wrath or DF.API.Version.IsTBC then Module.FocusCastbar:UpdateState(db.focus) end
+        if DF.Caps.HasFocus and Module.FocusCastbar then Module.FocusCastbar:UpdateState(db.focus) end
     elseif sub == 'player' then
         Module.PlayerCastbar:UpdateState(db.player)
     elseif sub == 'target' then
         Module.TargetCastbar:UpdateState(db.target)
     elseif sub == 'focus' then
-        Module.FocusCastbar:UpdateState(db.focus)
+        if Module.FocusCastbar then Module.FocusCastbar:UpdateState(db.focus) end
     elseif sub == 'mirrorTimer' then
         self.SubMirrorTimer:UpdateState(db.mirrorTimer)
     end
@@ -808,10 +808,12 @@ function Module.ChangeDefaultCastbar()
         PlayerCastingBarFrame:Hide()
     end
 
-    TargetFrameSpellBar:UnregisterAllEvents()
-    TargetFrameSpellBar:Hide()
+    if TargetFrameSpellBar then
+        TargetFrameSpellBar:UnregisterAllEvents()
+        TargetFrameSpellBar:Hide()
+    end
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and FocusFrameSpellBar then
         FocusFrameSpellBar:UnregisterAllEvents()
         FocusFrameSpellBar:Hide()
     end
@@ -900,21 +902,19 @@ function Module.AddNewCastbar()
     local target = CreateFrame('StatusBar', 'DragonflightUITargetCastbar', UIParent,
                                'DragonflightUITargetCastbarTemplate')
     target.DefaultParent = TargetFrame;
-    TargetFrameSpellBar.DFCastbar = target
+    if TargetFrameSpellBar then TargetFrameSpellBar.DFCastbar = target end
     Module.TargetCastbar = target
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus then
         local focus = CreateFrame('StatusBar', 'DragonflightUIFocusCastbar', UIParent,
                                   'DragonflightUIFocusCastbarTemplate')
         focus.DefaultParent = FocusFrame;
-        FocusFrameSpellBar.DFCastbar = focus
+        if FocusFrameSpellBar then FocusFrameSpellBar.DFCastbar = focus end
         Module.FocusCastbar = focus
     end
 
-    if DF.API.Version.IsTBC then
-    elseif Target_Spellbar_AdjustPosition then
+    if Target_Spellbar_AdjustPosition then
         hooksecurefunc('Target_Spellbar_AdjustPosition', function(self)
-            -- print('Target_Spellbar_AdjustPosition', self:GetName())
             if self.DFCastbar then self.DFCastbar:AdjustPosition() end
         end)
     elseif TargetFrameSpellBar and TargetFrameSpellBar.AdjustPosition then

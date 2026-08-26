@@ -423,16 +423,16 @@ function SubModuleMixin:AddBuffBorders()
         end)
     end
 
-    if DF.API.Version.IsTBC then
-        --
-        local t = {TargetFrame --[[, FocusFrame ]] }
+    if TargetFrame and TargetFrame.UpdateAuras then
+        hooksecurefunc(TargetFrame, 'UpdateAuras', function()
+            UpdateAuras(TargetFrame)
+        end)
+    end
 
-        for k, v in ipairs(t) do
-            --
-            hooksecurefunc(v, 'UpdateAuras', function()
-                UpdateAuras(v)
-            end)
-        end
+    if FocusFrame and FocusFrame.UpdateAuras then
+        hooksecurefunc(FocusFrame, 'UpdateAuras', function()
+            UpdateAuras(FocusFrame)
+        end)
     end
 end
 

@@ -5,23 +5,29 @@
 	<Include file="Party.mixin.lua" />
 	<Include file="Pet.mixin.lua" />
 	<Include file="Player.mixin.lua" />
+	<Include file="SecondaryRes/Res_DeathKnight.lua" />
+	<Include file="SecondaryRes/Res_Paladin.lua" />
+	<Include file="SecondaryRes/Res_Druid.lua" />
+	<Include file="SecondaryRes/Res_Warlock.lua" />
+	<Include file="SecondaryRes/Res_Monk.lua" />
+	<Include file="SecondaryRes/Res_Priest.lua" />
 	<Include file="PlayerSecondaryRes.mixin.lua" />
 	<Include file="Player.TotemFrame.mixin.lua" />
 	<Include file="Raid.mixin.lua" />
 	<Include file="Target.mixin.lua" />
 	<Include file="TargetOfTarget.mixin.lua" />
 	<Include file="Unitframe.lua" />
-	<Frame name="DragonflightUIPlayerFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
+	<Frame name="DragonflightUIPlayerFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 	</Frame>
-	<Frame name="DragonflightUIPetFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
+	<Frame name="DragonflightUIPetFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 	</Frame>
-	<Frame name="DragonflightUITargetFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
+	<Frame name="DragonflightUITargetFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 	</Frame>
-	<Frame name="DragonflightUITargetToTFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
+	<Frame name="DragonflightUITargetToTFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 	</Frame>
-	<Frame name="DragonflightUIFocusFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
+	<Frame name="DragonflightUIFocusFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 	</Frame>
-	<Frame name="DragonflightUIFocusToTFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
+	<Frame name="DragonflightUIFocusToTFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 	</Frame>
 	<!--
 		Declared here rather than CreateFrame'd in Party.mixin.lua, which is the

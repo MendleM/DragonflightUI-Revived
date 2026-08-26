@@ -163,6 +163,7 @@ function SubModuleMixin:UpdateState(state)
     self:Update();
 
     local f = self.PowerBarAltPreview
+    if not f then return end
 
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then

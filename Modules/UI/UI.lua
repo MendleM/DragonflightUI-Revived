@@ -154,7 +154,7 @@ local UIOptions = {
     }
 }
 
-if DF.Era or DF.API.Version.IsTBC or (DF.Wrath and not DF.Cata) then
+if not DF.Cata and not DF.API.Version.IsMoP then
     local moreOptions = {
         changeTalents = {
             type = 'toggle',
@@ -428,7 +428,7 @@ function Module:ApplySettingsInternal(sub, key)
         Module:UpdateTradeskills();
     end)
 
-    if DF.Era or DF.API.Version.IsTBC or (DF.Wrath and not DF.Cata) then
+    if not DF.Cata and not DF.API.Version.IsMoP then
         self:ConditionalOption('changeSpellBook', 'first', 'Change SpellBook', function()
             DragonflightUIMixin:ChangeSpellbookEra()
         end)
@@ -446,29 +446,31 @@ function Module:ApplySettingsInternal(sub, key)
     end)
 
     self:ConditionalOption('changeCharacterframe', 'first', 'Change Characterframe', function()
-        if DF.Cata then
-            -- DragonflightUIMixin:ChangeCharacterFrameCata()
+        if Version.IsCata or Version.IsMoP then
             Module:HookCharacterLevel()
-        elseif DF.Wrath then
+        elseif Version.IsWotlk then
             DragonflightUIMixin:ChangeCharacterFrameEra()
-        elseif DF.Era then
+        elseif Version.IsClassic then
             DragonflightUIMixin:ChangeCharacterFrameEra()
             Module:FuncOrWaitframe('Blizzard_EngravingUI', function()
-                EngravingFrame:SetPoint('TOPLEFT', CharacterFrame, 'TOPRIGHT', 9, -75)
-
-                RuneFrameControlButton:ClearAllPoints()
-                RuneFrameControlButton:SetPoint('TOPRIGHT', CharacterFrame, 'TOPRIGHT', -8, -26)
+                if EngravingFrame then
+                    EngravingFrame:SetPoint('TOPLEFT', CharacterFrame, 'TOPRIGHT', 9, -75)
+                end
+                if RuneFrameControlButton then
+                    RuneFrameControlButton:ClearAllPoints()
+                    RuneFrameControlButton:SetPoint('TOPRIGHT', CharacterFrame, 'TOPRIGHT', -8, -26)
+                end
             end)
-        elseif DF.API.Version.IsTBC then
+        elseif Version.IsTBC then
             DragonflightUIMixin:ChangeCharacterFrameEra()
-            DragonflightUIMixin:ChangeTBCPVPFrame()
+            if DragonflightUIMixin.ChangeTBCPVPFrame then DragonflightUIMixin:ChangeTBCPVPFrame() end
         end
     end)
 
     self:ConditionalOption('changeInspect', 'first', 'Change InspectFrame', function()
         local loaded, value = DF:LoadAddOn('Blizzard_InspectUI')
         Module:FuncOrWaitframe('Blizzard_InspectUI', function()
-            if DF.Era or DF.API.Version.IsTBC then
+            if not DF.Cata and not DF.API.Version.IsMoP then
                 DragonflightUIMixin:ChangeInspectFrameEra()
             else
                 DragonflightUIMixin:ChangeInspectFrame()
@@ -484,13 +486,15 @@ function Module:ApplySettingsInternal(sub, key)
         end)
     end)
 
-    if (DF.Era or DF.API.Version.IsTBC or (DF.Wrath and not DF.Cata and false)) then
-        self:ConditionalOption('changeTalents', 'first', 'Change Talentframe', function()
-            Module:FuncOrWaitframe('Blizzard_TalentUI', function()
+    self:ConditionalOption('changeTalents', 'first', 'Change Talentframe', function()
+        Module:FuncOrWaitframe('Blizzard_TalentUI', function()
+            if not DF.Cata and not DF.API.Version.IsMoP then
                 DragonflightUIMixin:ChangeTalentsEra()
-            end)
+            else
+                DragonflightUIMixin:ChangeTalents()
+            end
         end)
-    end
+    end)
 
     self:ConditionalOption('questLevel', 'first', 'Show Questlevel', function()
         DragonflightUIMixin:AddQuestLevel()

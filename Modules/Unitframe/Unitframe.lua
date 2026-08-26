@@ -60,6 +60,45 @@ local localSettings = {
     pet = {scale = 1.0, anchor = 'TOPLEFT', anchorParent = 'TOPLEFT', x = 100, y = -70}
 }
 
+function Module:PrePositionHolderFrames()
+    if not self.db or not self.db.profile then return end
+
+    local mapping = {
+        {name = 'DragonflightUIPlayerFrame', sub = 'player', defAnchor = 'TOPLEFT', defParent = 'TOPLEFT', defX = -19, defY = -4, sizeW = 232, sizeH = 100},
+        {name = 'DragonflightUITargetFrame', sub = 'target', defAnchor = 'TOPLEFT', defParent = 'TOPLEFT', defX = 250, defY = -4, sizeW = 232, sizeH = 100},
+        {name = 'DragonflightUIPetFrame', sub = 'pet', defAnchor = 'TOPRIGHT', defParent = 'BOTTOMRIGHT', defX = -3, defY = 28, sizeW = 120, sizeH = 49},
+        {name = 'DragonflightUIFocusFrame', sub = 'focus', defAnchor = 'TOPLEFT', defParent = 'TOPLEFT', defX = 250, defY = -170, sizeW = 232, sizeH = 100},
+        {name = 'DragonflightUITargetToTFrame', sub = 'tot', defAnchor = 'BOTTOMRIGHT', defParent = 'BOTTOMRIGHT', defX = -8, defY = -15, sizeW = 120, sizeH = 49},
+        {name = 'DragonflightUIFocusToTFrame', sub = 'focustot', defAnchor = 'BOTTOMRIGHT', defParent = 'BOTTOMRIGHT', defX = -8, defY = -15, sizeW = 120, sizeH = 49},
+        {name = 'DragonflightUIPartyMoveFrame', sub = 'party', defAnchor = 'TOPLEFT', defParent = 'TOPRIGHT', defX = 0, defY = 0, sizeW = 120, sizeH = 242}
+    }
+
+    for _, entry in ipairs(mapping) do
+        local f = _G[entry.name]
+        local subData = self.db.profile[entry.sub]
+        if f and subData then
+            f:Show()
+            f:SetSize(entry.sizeW, entry.sizeH)
+            f:SetParent(UIParent)
+            f:SetScale(subData.scale or 1.0)
+            f:SetMovable(true)
+            f:EnableMouse(false)
+
+            local parent
+            if subData.customAnchorFrame and _G[subData.customAnchorFrame] then
+                parent = _G[subData.customAnchorFrame]
+            elseif subData.anchorFrame and _G[subData.anchorFrame] then
+                parent = _G[subData.anchorFrame]
+            else
+                parent = UIParent
+            end
+
+            f:ClearAllPoints()
+            f:SetPoint(subData.anchor or entry.defAnchor, parent, subData.anchorParent or entry.defParent, subData.x or entry.defX, subData.y or entry.defY)
+        end
+    end
+end
+
 function Module:OnInitialize()
     DF:Debug(self, 'Module ' .. mName .. ' OnInitialize()')
     self.db = DF.db:RegisterNamespace(mName, defaults)
@@ -69,14 +108,21 @@ function Module:OnInitialize()
     end)
 
     self:SetEnabledState(DF.ConfigModule:GetModuleEnabled(mName))
+    self:PrePositionHolderFrames()
 end
 
 function Module:OnEnable()
     DF:Debug(self, 'Module ' .. mName .. ' OnEnable()')
     self:SetWasEnabled(true)
+    self:PrePositionHolderFrames()
 
-    -- Unit frames are secure/protected; a combat reload must defer their
-    -- setup until lockdown drops (see Helper:RunOutOfCombat).
+    -- Setup submodules structures and apply visual styling immediately (textures, masks, colors)
+    self:EnableAddonSpecific()
+    Module.SubmodulesReady = true
+    Module:ApplySettings()
+
+    -- Unit frames secure parenting and points are protected; a combat reload must defer their
+    -- secure setup until lockdown drops (see Helper:RunOutOfCombat).
     Helper:RunOutOfCombat('unit frames', function() Module:EnableOutOfCombat() end)
 end
 
@@ -110,15 +156,18 @@ function Module:EnableOutOfCombat()
     Module:ApplySettings()
     Module:SaveLocalSettings()
 
-    hooksecurefunc('UIParent_UpdateTopFramePositions', function()
-        Module:SaveLocalSettings()
-    end)
+    if not self.HooksInstalled then
+        self.HooksInstalled = true
+        hooksecurefunc('UIParent_UpdateTopFramePositions', function()
+            Module:SaveLocalSettings()
+        end)
 
-    self:SecureHook(DF, 'RefreshConfig', function()
-        -- print('RefreshConfig', mName)      
-        Module:ApplySettings()
-        Module:RefreshOptionScreens()
-    end)
+        self:SecureHook(DF, 'RefreshConfig', function()
+            -- print('RefreshConfig', mName)      
+            Module:ApplySettings()
+            Module:RefreshOptionScreens()
+        end)
+    end
 
     Module:FixBlizzardBug()
 end
@@ -146,18 +195,16 @@ function Module:RegisterSettings()
     register('targetoftarget',
              {order = 0, name = self.SubTargetOfTarget.Options.name, descr = 'Targetss', isNew = false})
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus then
         register('focus', {order = 0, name = self.SubFocus.Options.name, descr = 'Focusss', isNew = false})
         register('focusTarget', {order = 0, name = self.SubFocusTarget.Options.name, descr = 'Focusss', isNew = false})
     end
-    if DF.Cata then
+    if DF.Caps.HasAltPower then
         register('altpower', {order = 0, name = self.SubAltPower.Options.name, descr = 'Focusss', isNew = false})
     end
 end
 
 function Module:RefreshOptionScreens()
-    -- print('Module:RefreshOptionScreens()')
-
     local configFrame = DF.ConfigModule.ConfigFrame
 
     local refreshCat = function(name)
@@ -172,7 +219,7 @@ function Module:RefreshOptionScreens()
     refreshCat('Target')
     refreshCat('TargetOfTarget')
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and _G['DragonflightUIFocusFrame'] then
         refreshCat('Focus')
         refreshCat('focusTarget')
 
@@ -285,17 +332,17 @@ function Module:ApplySettingsInternal(sub, key)
     updateSub('party', self.SubParty, db.party)
     updateSub('player', self.SubPlayer, db.player)
     updateSub('playerSecondaryRes', self.SubPlayerSecondaryRes, db.playerSecondaryRes)
-    updateSub('playerTotemFrame', self.SubPlayerTotemFrame, db.playerTotemFrame)
+    if DF.Caps.HasTotemBar then updateSub('playerTotemFrame', self.SubPlayerTotemFrame, db.playerTotemFrame) end
     updateSub('pet', self.SubPet, db.pet)
     updateSub('target', self.SubTarget, db.target)
     updateSub('tot', self.SubTargetOfTarget, db.tot)
     updateSub('raid', self.SubRaid, db.raid)
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus then
         updateSub('focus', self.SubFocus, db.focus)
         updateSub('focusTarget', self.SubFocusTarget, db.focusTarget)
     end
-    if DF.Cata then updateSub('altpower', self.SubAltPower, db.altpower) end
+    if DF.Caps.HasAltPower then updateSub('altpower', self.SubAltPower, db.altpower) end
 end
 
 function Module:FixBlizzardBug()
@@ -432,18 +479,11 @@ function Module:AddPortraitMasks()
 
     addMask(PetFrame, PetPortrait)
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and FocusFrame then
         addMask(FocusFrame, FocusFramePortrait)
-        addMask(self.SubFocus.PreviewFocus, self.SubFocus.PreviewFocus.TargetFramePortrait)
-        addMask(FocusFrameToT, FocusFrameToTPortrait)
-        addMask(self.SubFocusTarget.PreviewFocusTarget, self.SubFocusTarget.PreviewFocusTarget.TargetFramePortrait)
-    end
-
-    for i = 1, 4 do
-        local pf = _G['PartyMemberFrame' .. i]
-        local port = _G['PartyMemberFrame' .. i .. 'Portrait']
-
-        addMask(pf, port)
+        if self.SubFocus.PreviewFocus then addMask(self.SubFocus.PreviewFocus, self.SubFocus.PreviewFocus.TargetFramePortrait) end
+        if FocusFrameToT then addMask(FocusFrameToT, FocusFrameToTPortrait) end
+        if self.SubFocusTarget.PreviewFocusTarget then addMask(self.SubFocusTarget.PreviewFocusTarget, self.SubFocusTarget.PreviewFocusTarget.TargetFramePortrait) end
     end
 
     -- fix portraits
@@ -457,8 +497,6 @@ end
 function Module:HookEnergyBar()
     hooksecurefunc("UnitFrameManaBar_UpdateType", function(manaBar, dontcall)
         if manaBar.DFUpdateFunc and type(manaBar.DFUpdateFunc) == 'function' and not dontcall then
-            --
-            -- print('~UnitFrameManaBar_UpdateType:', manaBar:GetName())
             manaBar.DFUpdateFunc()
         end
     end)
@@ -489,7 +527,6 @@ function Module:ChangeFonts()
     changeFont(PlayerFrameHealthBarText, std)
     changeFont(PlayerFrameHealthBarTextLeft, std)
     changeFont(PlayerFrameHealthBarTextRight, std)
-
     changeFont(PlayerFrameManaBarText, std)
     changeFont(PlayerFrameManaBarTextLeft, std)
     changeFont(PlayerFrameManaBarTextRight, std)
@@ -497,40 +534,23 @@ function Module:ChangeFonts()
     changeFont(PetFrameHealthBarText, std)
     changeFont(PetFrameHealthBarTextLeft, std)
     changeFont(PetFrameHealthBarTextRight, std)
-
     changeFont(PetFrameManaBarText, std)
     changeFont(PetFrameManaBarTextLeft, std)
     changeFont(PetFrameManaBarTextRight, std)
 
-    changeFont(TargetFrameTextureFrame.HealthBarText, std)
-    changeFont(TargetFrameTextureFrame.HealthBarTextLeft, std)
-    changeFont(TargetFrameTextureFrame.HealthBarTextRight, std)
-
-    changeFont(TargetFrameTextureFrame.ManaBarText, std)
-    changeFont(TargetFrameTextureFrame.ManaBarTextLeft, std)
-    changeFont(TargetFrameTextureFrame.ManaBarTextRight, std)
-
-    for i = 1, 4 do
-        local healthbar = _G['PartyMemberFrame' .. i .. 'HealthBar']
-        if healthbar then
-            changeFont(healthbar.DFHealthBarText, std)
-            changeFont(healthbar.DFHealthBarTextLeft, std)
-            changeFont(healthbar.DFHealthBarTextRight, std)
-        end
-
-        local manabar = _G['PartyMemberFrame' .. i .. 'ManaBar']
-        if manabar then
-            changeFont(manabar.DFManaBarText, std)
-            changeFont(manabar.DFManaBarTextLeft, std)
-            changeFont(manabar.DFManaBarTextRight, std)
-        end
+    if TargetFrameTextureFrame then
+        changeFont(TargetFrameTextureFrame.HealthBarText, std)
+        changeFont(TargetFrameTextureFrame.HealthBarTextLeft, std)
+        changeFont(TargetFrameTextureFrame.HealthBarTextRight, std)
+        changeFont(TargetFrameTextureFrame.ManaBarText, std)
+        changeFont(TargetFrameTextureFrame.ManaBarTextLeft, std)
+        changeFont(TargetFrameTextureFrame.ManaBarTextRight, std)
     end
 
-    if DF.Wrath or DF.API.Version.IsTBC then
+    if DF.Caps.HasFocus and FocusFrameTextureFrame then
         changeFont(FocusFrameTextureFrame.HealthBarText, std)
         changeFont(FocusFrameTextureFrame.HealthBarTextLeft, std)
         changeFont(FocusFrameTextureFrame.HealthBarTextRight, std)
-
         changeFont(FocusFrameTextureFrame.ManaBarText, std)
         changeFont(FocusFrameTextureFrame.ManaBarTextLeft, std)
         changeFont(FocusFrameTextureFrame.ManaBarTextRight, std)
@@ -703,14 +723,25 @@ function Module:TakePicture()
 end
 Module:RegisterChatCommand('cheeese', 'TakePicture')
 
-function Module:Era()
-    -- self.SubFocus:Setup()
-    -- self.SubFocusTarget:Setup()
-    -- self.SubAltPower:Setup()
+function Module:SetupSubmodules()
+    if self.SubmodulesSetupDone then return end
+    self.SubmodulesSetupDone = true
+
+    if DF.Caps.HasFocus then
+        self.SubFocus:Setup()
+        self.SubFocusTarget:Setup()
+    end
+
+    if DF.Caps.HasAltPower then
+        self.SubAltPower:Setup()
+    end
 
     self.SubParty:Setup()
     self.SubPlayer:Setup()
     self.SubPlayerSecondaryRes:Setup()
+    if DF.Caps.HasTotemBar then
+        self.SubPlayerTotemFrame:Setup()
+    end
 
     self.SubPet:Setup()
     self.SubTarget:Setup()
@@ -722,100 +753,35 @@ function Module:Era()
     self:HookDrag()
     self:AddPortraitMasks()
     self:HookClassIcon()
+
+    if Menu and Menu.ModifyMenu then
+        self:AddRoleSelectDropdownOption()
+    end
+
+    if DF.Caps.HasEditMode and DF.Caps.HasFocus then
+        local EditModeModule = DF:GetModule('Editmode')
+        if EditModeModule and EditModeModule.ShowEditmodeWarning then
+            EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+        end
+    end
+end
+
+function Module:Era()
+    self:SetupSubmodules()
 end
 
 function Module:TBC()
-    self.SubFocus:Setup()
-    self.SubFocusTarget:Setup()
-
-    -- self.SubAltPower:Setup()
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
-    self.SubPlayerTotemFrame:Setup()
-
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
-    self:AddRoleSelectDropdownOption()
-
-    local EditModeModule = DF:GetModule('Editmode');
-
-    EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+    self:SetupSubmodules()
 end
 
 function Module:Wrath()
-    self.SubFocus:Setup()
-    self.SubFocusTarget:Setup()
-
-    -- self.SubAltPower:Setup()
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
-    self.SubPlayerTotemFrame:Setup()
-
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
+    self:SetupSubmodules()
 end
 
 function Module:Cata()
-    self.SubFocus:Setup()
-    self.SubFocusTarget:Setup()
-
-    self.SubAltPower:Setup()
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
-    self.SubPlayerTotemFrame:Setup()
-
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
+    self:SetupSubmodules()
 end
 
 function Module:Mists()
-    self.SubFocus:Setup()
-    self.SubFocusTarget:Setup()
-
-    self.SubAltPower:Setup()
-    self.SubParty:Setup()
-    self.SubPlayer:Setup()
-    self.SubPlayerSecondaryRes:Setup()
-    self.SubPlayerTotemFrame:Setup()
-
-    self.SubPet:Setup()
-    self.SubTarget:Setup()
-    self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
-
-    self:HookEnergyBar()
-    self:ChangeFonts()
-    self:HookDrag()
-    self:AddPortraitMasks()
-    self:HookClassIcon()
-
-    local EditModeModule = DF:GetModule('Editmode');
-    EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+    self:SetupSubmodules()
 end

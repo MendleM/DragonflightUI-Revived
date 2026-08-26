@@ -13,7 +13,16 @@ function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
     self:SetupOptions()
-    -- self:SetScript('OnEvent', self.OnEvent);
+
+    local f = _G['DragonflightUITargetToTFrame']
+    if f then
+        f:SetSize(120, 49)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetClampedToScreen(true)
+        f:SetMovable(true)
+        f:EnableMouse(false)
+    end
 end
 
 function SubModuleMixin:SetDefaults()
@@ -331,8 +340,6 @@ function SubModuleMixin:Update()
     local f_orig = TargetFrameToT
     local f = _G['DragonflightUITargetToTFrame']
 
-    if DF.API.Version.IsTBC then state.customAnchorFrame = ''; end
-
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -347,13 +354,6 @@ function SubModuleMixin:Update()
     f_orig:ClearAllPoints()
     f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
     f_orig:SetScale(state.scale)
-
-    if DF.API.Version.IsTBC then
-    else
-        f:SetUserPlaced(true)
-        f_orig:SetMovable(true)
-        f_orig:SetUserPlaced(true)
-    end
 
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 

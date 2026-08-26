@@ -24,6 +24,17 @@ function SubModuleMixin:Init()
     self:SetDefaults()
     self:SetupOptions()
 
+    local f = _G['DragonflightUIFocusFrame']
+    if f then
+        f:SetSize(232, 100)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetClampedToScreen(true)
+        f:SetMovable(true)
+        f:EnableMouse(false)
+        f:Hide()
+    end
+
     self:SetScript('OnEvent', self.OnEvent);
 end
 
@@ -357,10 +368,11 @@ function SubModuleMixin:Setup()
 
     f:Hide()
 
-    if DF.API.Version.IsTBC then
-        --
+    if addonTable.OverrideBlizzEditmode and FocusFrame then
         addonTable:OverrideBlizzEditmode(FocusFrame, 'CENTER', f, 'CENTER', 0, 0)
-        addonTable:SetBlizzEditmodeFrameSetting(FocusFrame, Enum.EditModeUnitFrameSetting.UseLargerFrame, 1)
+        if Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.UseLargerFrame and addonTable.SetBlizzEditmodeFrameSetting then
+            addonTable:SetBlizzEditmodeFrameSetting(FocusFrame, Enum.EditModeUnitFrameSetting.UseLargerFrame, 1)
+        end
     end
 
     -- state handler
@@ -434,8 +446,6 @@ function SubModuleMixin:Update()
     local f_orig = FocusFrame
     local f = _G['DragonflightUIFocusFrame']
 
-    if DF.API.Version.IsTBC then state.customAnchorFrame = ''; end
-
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -443,35 +453,41 @@ function SubModuleMixin:Update()
         parent = _G[state.anchorFrame]
     end
 
+    if not f or not f_orig or not self.PreviewFocus then return end
+
     f:SetScale(state.scale)
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    -- f_orig:SetParent(f)
-    f_orig:ClearAllPoints()
-    f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
-    f_orig:SetScale(state.scale)
-
-    if DF.API.Version.IsTBC then
-    else
-        f:SetUserPlaced(true)
-        f_orig:SetMovable(true)
-        f_orig:SetUserPlaced(true)
+    if not InCombatLockdown() then
+        f_orig:ClearAllPoints()
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        f_orig:SetScale(state.scale)
     end
 
     self:ReApplyFocusFrame()
     -- self:ReApplyFocusToT()
-    FocusFrameHealthBar.breakUpLargeNumbers = state.breakUpLargeNumbers
-    TextStatusBar_UpdateTextString(FocusFrameHealthBar)
-    FocusFrameNameBackground:SetShown(not state.hideNameBackground)
-    UnitFramePortrait_Update(FocusFrame)
+    if FocusFrameHealthBar then
+        FocusFrameHealthBar.breakUpLargeNumbers = state.breakUpLargeNumbers
+        TextStatusBar_UpdateTextString(FocusFrameHealthBar)
+    end
+    if FocusFrameNameBackground then
+        FocusFrameNameBackground:SetShown(not state.hideNameBackground)
+    end
+    if UnitFramePortrait_Update then
+        UnitFramePortrait_Update(FocusFrame)
+    end
     if TargetFrame_CheckFaction then
         TargetFrame_CheckFaction(FocusFrame)
-    else
+    elseif FocusFrame.CheckFaction then
         FocusFrame:CheckFaction()
     end
-    FocusFrame:UpdateStateHandler(state)
-    self.PreviewFocus:UpdateState(state);
+    if FocusFrame.UpdateStateHandler then
+        FocusFrame:UpdateStateHandler(state)
+    end
+    if self.PreviewFocus and self.PreviewFocus.UpdateState then
+        self.PreviewFocus:UpdateState(state)
+    end
 end
 
 function SubModuleMixin:ChangeFocusFrame()

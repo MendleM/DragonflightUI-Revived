@@ -13,7 +13,17 @@ function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
     self:SetupOptions()
-    -- self:SetScript('OnEvent', self.OnEvent);
+
+    local f = _G['DragonflightUIFocusToTFrame']
+    if f then
+        f:SetSize(120, 49)
+        f:SetParent(UIParent)
+        f:SetScale(1.0)
+        f:SetClampedToScreen(true)
+        f:SetMovable(true)
+        f:EnableMouse(false)
+        f:Hide()
+    end
 end
 
 function SubModuleMixin:SetDefaults()
@@ -324,6 +334,8 @@ function SubModuleMixin:Update()
     local f_orig = FocusFrameToT
     local f = _G['DragonflightUIFocusToTFrame']
 
+    if not f or not f_orig or not self.PreviewFocusTarget then return end
+
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -374,13 +386,6 @@ function SubModuleMixin:Update()
     -- alone so Blizzard's own writes here, SMALL_FOCUS_UPSCALE and friends from
     -- SetSmallSize, do not multiply into it either.
     f_orig:SetScale(1)
-
-    if DF.API.Version.IsTBC then
-    else
-        f:SetUserPlaced(true)
-        f_orig:SetMovable(true)
-        f_orig:SetUserPlaced(true)
-    end
 
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 

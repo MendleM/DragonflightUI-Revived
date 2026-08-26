@@ -263,25 +263,7 @@ function DragonFlightUIQuickKeybindMixin:HookCustomStance()
 end
 
 function DragonFlightUIQuickKeybindMixin:HookExtraButtons()
-    -- print('DragonFlightUIQuickKeybindMixin:HookExtraButtons()')
-    -- "DragonflightUIMultiactionBar" .. n .. "Button" .. i
-
-    local ActionBarButtonNames = {
-        "DragonflightUIMultiactionBar6Button", "DragonflightUIMultiactionBar7Button",
-        "DragonflightUIMultiactionBar8Button"
-    }
-
-    for b, actionBar in ipairs(ActionBarButtonNames) do
-        for i = 1, 12 do
-            local btn = _G[actionBar .. i]
-
-            btn:HookScript('OnEnter', function(selfButton)
-                if DragonflightUIQuickKeybindFrame:IsInQuickKeybindMode() then
-                    DragonflightUIQuickKeybindButtonOverlay:SetButton(selfButton)
-                end
-            end)
-        end
-    end
+    self:HookExtraButtonsTBC()
 end
 
 function DragonFlightUIQuickKeybindMixin:HookExtraButtonsTBC()
@@ -291,14 +273,16 @@ function DragonFlightUIQuickKeybindMixin:HookExtraButtonsTBC()
         for i = 1, 12 do
             local btn = _G[actionBar .. i]
 
-            btn.command = 'MULTIACTIONBAR' .. (b + 5 - 1) .. 'BUTTON' .. i
-            btn.commandHuman = 'Action Bar ' .. (b + 5) .. ' Button ' .. i
+            if btn then
+                btn.command = 'MULTIACTIONBAR' .. (b + 5 - 1) .. 'BUTTON' .. i
+                btn.commandHuman = 'Action Bar ' .. (b + 5) .. ' Button ' .. i
 
-            btn:HookScript('OnEnter', function(selfButton)
-                if DragonflightUIQuickKeybindFrame:IsInQuickKeybindMode() then
-                    DragonflightUIQuickKeybindButtonOverlay:SetButton(selfButton)
-                end
-            end)
+                btn:HookScript('OnEnter', function(selfButton)
+                    if DragonflightUIQuickKeybindFrame:IsInQuickKeybindMode() then
+                        DragonflightUIQuickKeybindButtonOverlay:SetButton(selfButton)
+                    end
+                end)
+            end
         end
     end
 end

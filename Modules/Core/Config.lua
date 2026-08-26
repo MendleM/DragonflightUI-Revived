@@ -313,7 +313,17 @@ function Module:ApplySettingsInternal(sub, key)
     if modules['Darkmode'] then
         Helper:Benchmark(string.format(strFormat, 'Darkmode'), function()
             DF:EnableModule('Darkmode')
+            local darkmod = DF:GetModule('Darkmode', true)
+            if darkmod then darkmod:ApplySettings() end
         end)
+    else
+        local darkmod = DF:GetModule('Darkmode', true)
+        if darkmod then
+            Helper:Benchmark(string.format('DisableModule(%s)', 'Darkmode'), function()
+                DF:DisableModule('Darkmode')
+                darkmod:ApplySettings()
+            end)
+        end
     end
 
     Module.DontRefresh = true;
@@ -348,6 +358,16 @@ function Module:AddMainMenuButton()
         Module.EditModeButton = editBtn
 
         hooksecurefunc(GameMenuFrame, 'InitButtons', function(menu)
+            if menu.buttonPool and menu.buttonPool.EnumerateActive then
+                for btn in menu.buttonPool:EnumerateActive() do
+                    local txt = btn.GetText and btn:GetText()
+                    if txt and (txt == HUD_EDIT_MODE_MENU or txt == 'Bearbeitungsmodus' or txt == 'Edit Mode') then
+                        btn:Hide()
+                        btn.layoutIndex = nil
+                    end
+                end
+            end
+
             local configButton = menu:AddButton(L["MainMenuDragonflightUI"], function()
                 Module:ToggleConfigFrame()
             end)

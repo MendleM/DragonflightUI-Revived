@@ -65,28 +65,20 @@ function DragonflightUIMicroMenuMixin:OnLoad()
         self:SetSize(width, height)
     end
 
-    if DF.API.Version.IsTBC then
-    else
+    if UpdateMicroButtons then
         hooksecurefunc('UpdateMicroButtons', function()
-            -- print('#UpdateMicroButtons')
             self:UpdateLayout(true)
         end)
+    end
 
-        if UpdateMicroButtonsParent then
-            hooksecurefunc('UpdateMicroButtonsParent', function(parent)
-                -- print('#UpdateMicroButtonsParent')
-                self:OnUpdateMicroButtonsParent(parent)
-            end)
-        end
+    if UpdateMicroButtonsParent then
+        hooksecurefunc('UpdateMicroButtonsParent', function(parent)
+            self:OnUpdateMicroButtonsParent(parent)
+        end)
+    end
 
-        -- inside calls UpdateMicroButtons
-        -- hooksecurefunc('MoveMicroButtons', function()
-        --     -- print('#MoveMicroButtons')
-        --     self:UpdateLayout(true)
-        -- end)
-
+    if ActionBarController_UpdateAll then
         hooksecurefunc('ActionBarController_UpdateAll', function(force)
-            -- print('#ActionBarController_UpdateAll')
             self:OnActionBarController_UpdateAll()
         end)
     end
@@ -200,8 +192,6 @@ function DragonflightUIMicroMenuMixin:Update()
     local state = self.State
     if not state then return end
 
-    if DF.API.Version.IsTBC then state.customAnchorFrame = ''; end
-
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
@@ -216,66 +206,19 @@ function DragonflightUIMicroMenuMixin:Update()
 
     local container = _G['MicroMenuContainer']
 
-    -- The buttons are not ours to scale by proxy.
-    --
-    -- MicroMenuContainer is parent="UIParent" and MicroMenu hangs off it
-    -- (Blizzard_MicroMenu/Classic/MicroMenuContainer.xml), so nothing the
-    -- buttons live in inherits the scale set above - our slider was resizing a
-    -- holder they are anchored to but not parented under. This was gated on
-    -- IsTBC, which is exactly why scaling worked there and nowhere else, and why
-    -- the only thing that appeared to resize the micro menu on other flavours
-    -- was Blizzard's Edit Mode, which owns the container through
-    -- Enum.EditModeMicroMenuSetting.Size.
-    --
-    -- Keyed on where the container actually sits rather than on the flavour: if
-    -- it is inside our frame it has the scale already, and setting it again
-    -- would square it.
     if container and not IsInside(container, self) then container:SetScale(state.scale) end
 
-    if DF.API.Version.IsTBC and container then
-        local point, relativeTo, relativePoint, xOfs, yOfs = container:GetPoint(1)
-
+    if container then
+        local point, relativeTo = container:GetPoint(1)
         if not (relativeTo == self) then
             addonTable:OverrideBlizzEditmode(container, 'TOPLEFT', self, 'TOPLEFT', 0, 0)
         end
-    end
 
-    -- Our frame is the draggable/clamped one, but it was a fixed 100x100
-    -- box that has nothing to do with the buttons: the extra width and
-    -- height showed up as dead space, and screen clamping stopped at the
-    -- box edge rather than the visible menu. Track the container's size.
-    if container then
         local w, h = container:GetSize()
         if w and w > 1 and h and h > 1 then self:SetSize(w, h) end
-
-        -- if not self.FirstMoved then
-        --     self.FirstMoved = true;
-        --     self:UpdateTBCPosition()
-        -- end
-    else
     end
 
     if self.UpdateStateHandler then self:UpdateStateHandler(state) end
-end
-
-function DragonflightUIMicroMenuMixin:UpdateTBCPosition()
-    local state = self.State
-    if not state then return end
-    if not DF.API.Version.IsTBC then return end
-
-    if DF.API.Version.IsTBC then state.customAnchorFrame = ''; end
-
-    local parent;
-    if DF.Settings.ValidateFrame(state.customAnchorFrame) then
-        parent = _G[state.customAnchorFrame]
-    else
-        parent = _G[state.anchorFrame]
-    end
-
-    local f = _G['MicroMenuContainer']
-    addonTable:OverrideBlizzEditmode(f, 'TOPLEFT', self, 'TOPLEFT', 0, 0)
-    -- f:SetScale(state.scale)
-    -- addonTable:OverrideBlizzEditmode(f, state.anchor, parent, state.anchorParent, state.x, state.y)
 end
 
 function DragonflightUIMicroMenuMixin:ChangeButtons()
