@@ -1,12 +1,12 @@
 ## Interface: 50504
 ## Title: DragonflightUI [|cff8080ffMoP Classic|r]
-## Notes: Brings the modern retail UI to classic.|n|cffbbbbbbMaintained by MendleM|r|n|cffbbbbbbOriginally by Karl-Heinz Schneider|r
-## Notes-esES: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r
-## Notes-esMX: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r
-## Author: MendleM, Karl-Heinz Schneider
+## Notes: Brings the modern retail UI to classic.|n|cffbbbbbbMaintained by MendleM / rakStar91|r|n|cffbbbbbbOriginally by Karl-Heinz Schneider|r
+## Notes-esES: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM / rakStar91|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r
+## Notes-esMX: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM / rakStar91|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r
+## Author: MendleM, rakStar91, Karl-Heinz Schneider
 ## X-Website: https://github.com/MendleM/DragonflightUI-Revived
 ## X-Curse-Project-ID: 819757
-## Version: 0.44.0-rakStar-refactor
+## Version: 0.44.0
 ## IconTexture: Interface\Icons\INV_Misc_Head_Dragon_01
 ## X-Date: @project-date-integer@
 ## Category: UI Overhaul

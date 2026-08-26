@@ -174,7 +174,7 @@ local function CreateWindow()
     product:SetPoint('TOPLEFT', f, 'TOPLEFT', PAD, -34)
     product:SetTextColor(0.55, 0.55, 0.58)
     product:SetText('DragonflightUI ' .. DF:GetVersion() ..
-                        '  |cff4a4a4d|||r  Maintained by MendleM, originally by Karl-Heinz Schneider')
+                        '  |cff4a4a4d|||r  Maintained by MendleM / rakStar91, originally by Karl-Heinz Schneider')
 
     local close = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate')
     close:SetSize(170, 28)
