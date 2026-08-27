@@ -42,6 +42,7 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 - **MoP:** the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.
 - **Keyring (Cata & MoP):** suppressed phantom keyring button on Cataclysm and MoP while preserving full display and styling on Classic Era, TBC, and Wrath.
 - **Reputation Bar:** unchecking "Show as experience bar" (Als Erfahrungsleiste anzeigen) now properly hides the reputation text immediately without requiring a /reload.
+- **FPS Frame (Issue #16):** prevented duplicate FPS/latency frame creation during initialization, resolving ghost/duplicate FPS overlays when moving the frame in Edit Mode.
 - **MoP Bag Counter:** fixed free bag slots counter placement and text sizing inside the backpack button.
 
 ### Professions

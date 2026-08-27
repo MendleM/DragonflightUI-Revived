@@ -574,6 +574,8 @@ function Module.RefreshBagBarToggle()
 end
 
 function Module.ChangeFramerate()
+    if Module.FPSFrame then return end
+
     local fps = CreateFrame('Frame', 'DragonflightUIFPSTextFrame', UIParent, 'DragonflightUIFPSTemplate')
     fps:SetSize(65, 26)
     if CharacterMicroButton then
