@@ -2,7 +2,7 @@ local addonName, addonTable = ...;
 local Helper = addonTable.Helper;
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
-local LibTradeSkillRecipes = LibStub("LibTradeSkillRecipes-1")
+local LibTradeSkillRecipes = LibStub("LibTradeSkillRecipes-1", true)
 
 local base = 'Interface\\Addons\\DragonflightUI\\Textures\\UI\\'
 local MAX_TRADE_SKILL_REAGENTS = 8
@@ -675,7 +675,12 @@ function DFProfessionMixin:UpdateHeader()
         self.RankFrame.DFStatusTexture = base .. prof.profData.bar
     end
 
-    self.RankFrame:UpdateRankFrame(prof.skill, 0, prof.maxSkill)
+    if self.SelectedProfession == 'beast' then
+        self.RankFrame:Hide()
+    else
+        self.RankFrame:Show()
+        self.RankFrame:UpdateRankFrame(prof.skill, 0, prof.maxSkill)
+    end
 end
 
 function DFProfessionMixin:GetRecipeQuality(index)
@@ -724,7 +729,7 @@ function DFProfessionMixin:IsRecipeSpell(index)
 end
 
 function DFProfessionMixin:GetRecipeExpansion(index)
-    if not index or index == 0 then return -1 end
+    if not index or index == 0 or not LibTradeSkillRecipes then return -1 end
 
     if self.TradeSkillOpen then
         local numSkills = GetNumTradeSkills()
@@ -927,6 +932,7 @@ function DFProfessionMixin:UpdateRecipe(id)
             self.CreateAllButton:Disable();
         end
         self.CreateButton:Show();
+        if CraftCreateButton then CraftCreateButton:Hide() end
 
         self.InputBox:SetNumber(GetTradeskillRepeatCount() or 1);
 
@@ -1133,6 +1139,7 @@ function DFProfessionMixin:UpdateRecipe(id)
             CraftCreateButton:ClearAllPoints()
             CraftCreateButton:SetPoint('BOTTOMRIGHT', self, 'BOTTOMRIGHT', -9, 7)
             CraftCreateButton:SetFrameLevel(8)
+            CraftCreateButton:Show()
         end
 
         if (GetCraftDescription(id)) then

@@ -2,7 +2,7 @@ local addonName, addonTable = ...;
 local Helper = addonTable.Helper;
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
-local LibTradeSkillRecipes = LibStub("LibTradeSkillRecipes-1")
+local LibTradeSkillRecipes = LibStub("LibTradeSkillRecipes-1", true)
 
 local base = 'Interface\\Addons\\DragonflightUI\\Textures\\UI\\'
 
@@ -160,6 +160,11 @@ function DFProfessionMixin:SuppressBlizzardFrames()
     if frame and frame.SetAlpha then
         frame:SetAlpha(0)
         if frame.EnableMouse then frame:EnableMouse(false) end
+    end
+    local cFrame = _G['CraftFrame']
+    if cFrame and cFrame.SetAlpha then
+        cFrame:SetAlpha(0)
+        if cFrame.EnableMouse then cFrame:EnableMouse(false) end
     end
 end
 
@@ -381,7 +386,7 @@ function DFProfessionMixin:SetupFrameStyle()
         rankFrameBG:SetSize(451, 29)
         rankFrameBG:SetPoint('TOPLEFT', rankFrame, 'TOPLEFT', 0, 0)
 
-        local rankFrameBar = CreateFrame('Statusbar', 'DragonflightUIProfessionRankFrameBar', self)
+        local rankFrameBar = CreateFrame('Statusbar', 'DragonflightUIProfessionRankFrameBar', rankFrame)
         rankFrameBar:SetSize(441, 18)
         rankFrameBar:SetPoint('TOPLEFT', rankFrame, 'TOPLEFT', 5, -3)
         rankFrameBar:SetMinMaxValues(0, 100);
@@ -508,9 +513,14 @@ function DFProfessionMixin:UpdateTrainingPoints()
         if self.SelectedProfession == 'beast' then
             self.TrainingFrame:Show()
             local totalPoints, spent = GetPetTrainingPoints();
+            totalPoints = totalPoints or 0
+            spent = spent or 0
             self.TrainingFrameLabel:Show();
             self.TrainingFrameText:Show();
             self.TrainingFrameText:SetText(totalPoints - spent);
+            local newW = (self.TrainingFrameLabel:GetUnboundedStringWidth() or 40) +
+                             (self.TrainingFrameText:GetUnboundedStringWidth() or 20) + 16
+            self.TrainingFrame:SetWidth(newW)
         else
             self.TrainingFrame:Hide()
         end
@@ -830,7 +840,27 @@ function DFProfessionMixin:UpdateProfessionData()
                     local icon = GetSpellBookItemTexture(spellIndex, BOOKTYPE_SPELL)
                     skillTable['runeforging'] = {
                         nameLoc = spellName,
-                        icon = icon,
+                        icon = icon or (professionDataTable[skillID] and professionDataTable[skillID].icon),
+                        skillID = skillID,
+                        skill = 1,
+                        maxSkill = 1,
+                        profData = professionDataTable[skillID]
+                    }
+                elseif skillID == profs.beast then
+                    local icon = GetSpellBookItemTexture(spellIndex, BOOKTYPE_SPELL)
+                    skillTable['beast'] = {
+                        nameLoc = spellName,
+                        icon = icon or (professionDataTable[skillID] and professionDataTable[skillID].icon),
+                        skillID = skillID,
+                        skill = 1,
+                        maxSkill = 1,
+                        profData = professionDataTable[skillID]
+                    }
+                elseif skillID == profs.poison then
+                    local icon = GetSpellBookItemTexture(spellIndex, BOOKTYPE_SPELL)
+                    skillTable['poison'] = {
+                        nameLoc = spellName,
+                        icon = icon or (professionDataTable[skillID] and professionDataTable[skillID].icon),
                         skillID = skillID,
                         skill = 1,
                         maxSkill = 1,
@@ -914,6 +944,67 @@ function DFProfessionMixin:UpdateProfessionData()
                         }
                     end
                 end
+            end
+        end
+
+        for i = 1, GetNumSpellTabs() do
+            local name, texture, offset, numSpells = GetSpellTabInfo(i)
+            for j = 1, numSpells do
+                local spellIndex = offset + j
+                local spellName, spellSubName = GetSpellBookItemName(spellIndex, BOOKTYPE_SPELL)
+                if spellName then
+                    local skillID = DragonflightUILocalizationData:GetSkillIDFromProfessionName(spellName)
+
+                    if skillID == profs.runeforging then
+                        local icon = GetSpellBookItemTexture(spellIndex, BOOKTYPE_SPELL)
+                        skillTable['runeforging'] = {
+                            nameLoc = spellName,
+                            icon = icon or (professionDataTable[skillID] and professionDataTable[skillID].icon),
+                            skillID = skillID,
+                            skill = 1,
+                            maxSkill = 1,
+                            profData = professionDataTable[skillID]
+                        }
+                    elseif skillID == profs.beast then
+                        local icon = GetSpellBookItemTexture(spellIndex, BOOKTYPE_SPELL)
+                        skillTable['beast'] = {
+                            nameLoc = spellName,
+                            icon = icon or (professionDataTable[skillID] and professionDataTable[skillID].icon),
+                            skillID = skillID,
+                            skill = 1,
+                            maxSkill = 1,
+                            profData = professionDataTable[skillID]
+                        }
+                    elseif skillID == profs.poison then
+                        local icon = GetSpellBookItemTexture(spellIndex, BOOKTYPE_SPELL)
+                        skillTable['poison'] = {
+                            nameLoc = spellName,
+                            icon = icon or (professionDataTable[skillID] and professionDataTable[skillID].icon),
+                            skillID = skillID,
+                            skill = 1,
+                            maxSkill = 1,
+                            profData = professionDataTable[skillID]
+                        }
+                    end
+                end
+            end
+        end
+    end
+
+    if self.CraftOpen then
+        local craftLine = GetCraftDisplaySkillLine()
+        if not craftLine or craftLine == DragonflightUILocalizationData.DF_PROFESSIONS_BEAST then
+            if not skillTable['beast'] then
+                local beastLoc = DragonflightUILocalizationData.DF_PROFESSIONS_BEAST
+                local profData = professionDataTable[profs.beast] or professionDataTable[667]
+                skillTable['beast'] = {
+                    nameLoc = beastLoc,
+                    icon = profData and profData.icon or 132162,
+                    skillID = profs.beast or 667,
+                    skill = 1,
+                    maxSkill = 1,
+                    profData = profData
+                }
             end
         end
     end
