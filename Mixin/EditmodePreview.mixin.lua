@@ -70,7 +70,9 @@ function DragonflightUIEditModePreviewTargetMixin:SetUnit(unit)
 
     self.ManaBar:SetMinMaxValues(0, 100)
     self.ManaBar:SetValue(unit.energyAmount)
-    self.ManaBar:SetPowerType(unit.powerType)
+    if self.ManaBar.SetPowerType then
+        self.ManaBar:SetPowerType(unit.powerType)
+    end
 
     if self.RaidTargetIcon then self.RaidTargetIcon:UpdateTargetIcon(unit.targetIcon) end
 
@@ -570,7 +572,6 @@ function DragonflightUIEditModePreviewPartyFrameMixin:OnLoad()
     self.PartyFrames = {}
 
     for k = 1, 4 do
-        -- 
         local fakeParty = CreateFrame('Frame', 'DragonflightUIEditModeParty' .. k .. 'Preview', self,
                                       'DFEditModePreviewPartyTemplate')
         fakeParty:OnLoad()
@@ -581,6 +582,20 @@ function DragonflightUIEditModePreviewPartyFrameMixin:OnLoad()
         end
 
         self.PartyFrames[k] = fakeParty;
+    end
+
+    self.RaidPartyFrames = {}
+    for k = 1, 5 do
+        local fakeRaid = CreateFrame('Frame', 'DragonflightUIEditModePartyRaid' .. k .. 'Preview', self,
+                                     'DFEditModePreviewRaidTemplate')
+        fakeRaid:OnLoad()
+        if k == 1 then
+            fakeRaid:SetPoint('TOPLEFT', self, 'TOPLEFT', 0, 0)
+        else
+            fakeRaid:SetPoint('TOPLEFT', self.RaidPartyFrames[k - 1], 'BOTTOMLEFT', 0, 0)
+        end
+        fakeRaid:Hide()
+        self.RaidPartyFrames[k] = fakeRaid
     end
 
     self:SetScript('OnEvent', self.OnEvent)
@@ -597,22 +612,7 @@ function DragonflightUIEditModePreviewPartyFrameMixin:OnUpdate(elapsed)
 
     if GetTime() - self.LastUpdate >= updateInterval then
         self.LastUpdate = GetTime()
-        -- print('self:OnUpdate')
-        -- if self.UpdateBlizzard then self:UpdateBlizzard() end
     end
-end
-
-function DragonflightUIEditModePreviewPartyFrameMixin:UpdateBlizzard()
-    -- local PartyMoveFrame = self.DFEditModeSelection.ModuleRef.PartyMoveFrame;
-
-    -- local state = self.state;
-    -- local parent = _G[state.anchorFrame]
-
-    -- local point, relativeTo, relativePoint, xOfs, yOfs = self:GetPoint(1)
-    -- PartyMoveFrame:ClearAllPoints();
-    -- -- self.PartyMoveFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
-    -- PartyMoveFrame:SetPoint(point, relativeTo, relativePoint, xOfs, yOfs)
-    -- PartyMoveFrame:SetScale(state.scale)
 end
 
 function DragonflightUIEditModePreviewPartyFrameMixin:UpdateState(state)
@@ -622,65 +622,110 @@ end
 
 function DragonflightUIEditModePreviewPartyFrameMixin:Update()
     local state = self.state;
+    if not state then return end
     self:ClearAllPoints()
 
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
         parent = _G[state.customAnchorFrame]
-    else
+    elseif DF.Settings.ValidateFrame(state.anchorFrame) then
         parent = _G[state.anchorFrame]
-    end
-
-    self:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
-    self:SetScale(state.scale)
-
-    local sizeX, sizeY = 120, 53
-    if _G['PartyMemberFrame' .. 1] then
-        sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
-    end
-
-    if state.orientation == 'vertical' then
-        self:SetSize(sizeX, sizeY * 4 + 3 * state.padding)
     else
-        self:SetSize(sizeX * 4 + 3 * state.padding, sizeY)
+        parent = UIParent
+    end
+    parent = parent or UIParent
+
+    self:SetPoint(state.anchor or 'TOPLEFT', parent, state.anchorParent or 'TOPLEFT', state.x or 16, state.y or -160)
+    self:SetScale(state.scale or 1.0)
+
+    local useRaidStyle = false
+    local UnitframeModule = DF:GetModule('Unitframe')
+    if UnitframeModule and UnitframeModule.SubParty and UnitframeModule.SubParty.GetRaidStylePartyFrames then
+        useRaidStyle = UnitframeModule.SubParty.GetRaidStylePartyFrames()
+    elseif C_CVar and C_CVar.GetCVar then
+        useRaidStyle = C_CVar.GetCVar('useCompactPartyFrames') == '1'
     end
 
-    for i = 2, 4 do
-        local pf = self.PartyFrames[i]
+    if useRaidStyle then
+        local rWidth = 72
+        local rHeight = 36
+        local rGap = 1
+
+        if DefaultCompactUnitFrameSetupOptions then
+            rWidth = DefaultCompactUnitFrameSetupOptions.width or rWidth
+            rHeight = DefaultCompactUnitFrameSetupOptions.height or rHeight
+        end
 
         if state.orientation == 'vertical' then
-            pf:ClearAllPoints()
-            pf:SetPoint('TOPLEFT', self.PartyFrames[i - 1], 'BOTTOMLEFT', 0, -state.padding)
+            self:SetSize(rWidth, rHeight * 5 + 4 * rGap)
         else
-            pf:ClearAllPoints()
-            pf:SetPoint('TOPLEFT', self.PartyFrames[i - 1], 'TOPRIGHT', state.padding, 0)
+            self:SetSize(rWidth * 5 + 4 * rGap, rHeight)
+        end
+
+        for i = 1, 5 do
+            local rf = self.RaidPartyFrames and self.RaidPartyFrames[i]
+            if rf then
+                rf:SetSize(rWidth, rHeight)
+                rf:ClearAllPoints()
+                if i == 1 then
+                    rf:SetPoint('TOPLEFT', self, 'TOPLEFT', 0, 0)
+                else
+                    if state.orientation == 'vertical' then
+                        rf:SetPoint('TOPLEFT', self.RaidPartyFrames[i - 1], 'BOTTOMLEFT', 0, -rGap)
+                    else
+                        rf:SetPoint('TOPLEFT', self.RaidPartyFrames[i - 1], 'TOPRIGHT', rGap, 0)
+                    end
+                end
+                rf:Show()
+            end
+        end
+
+        if self.PartyFrames then
+            for _, pf in ipairs(self.PartyFrames) do
+                pf:Hide()
+            end
+        end
+    else
+        local sizeX, sizeY = 120, 53
+        if _G['PartyMemberFrame' .. 1] then
+            sizeX, sizeY = _G['PartyMemberFrame' .. 1]:GetSize()
+        end
+
+        local padding = state.padding or 10
+        if state.orientation == 'vertical' then
+            self:SetSize(sizeX, sizeY * 4 + 3 * padding)
+        else
+            self:SetSize(sizeX * 4 + 3 * padding, sizeY)
+        end
+
+        for i = 1, 4 do
+            local pf = self.PartyFrames and self.PartyFrames[i]
+            if pf then
+                pf:ClearAllPoints()
+                if i == 1 then
+                    pf:SetPoint('TOPLEFT', self, 'TOPLEFT', 0, 0)
+                else
+                    if state.orientation == 'vertical' then
+                        pf:SetPoint('TOPLEFT', self.PartyFrames[i - 1], 'BOTTOMLEFT', 0, -padding)
+                    else
+                        pf:SetPoint('TOPLEFT', self.PartyFrames[i - 1], 'TOPRIGHT', padding, 0)
+                    end
+                end
+                pf:UpdateState(state)
+                pf:Show()
+            end
+        end
+
+        if self.RaidPartyFrames then
+            for _, rf in ipairs(self.RaidPartyFrames) do
+                rf:Hide()
+            end
         end
     end
-
-    for k, v in ipairs(self.PartyFrames) do
-        --
-        v:UpdateState(state)
-    end
-
-    self:UpdateVisibility()
 end
 
 function DragonflightUIEditModePreviewPartyFrameMixin:UpdateVisibility()
-    if GetDisplayedAllyFrames and (GetDisplayedAllyFrames() ~= "party") then
-        for k, v in ipairs(self.PartyFrames) do
-            --           
-            v:Show()
-        end
-        return;
-    end
-    for k, v in ipairs(self.PartyFrames) do
-        --
-        if UnitExists('party' .. k) then
-            v:Hide()
-        else
-            v:Show()
-        end
-    end
+    self:Update()
 end
 
 function DragonflightUIEditModePreviewPartyFrameMixin:OnEvent(event, arg1, ...)
@@ -1256,17 +1301,23 @@ local NATIVE_UNIT_FRAME_WIDTH = 72;
 -- 	width = NATIVE_UNIT_FRAME_WIDTH,
 -- 	displayBorder = true,
 -- }
-
 function DragonflightUIEditModePreviewRaidMixin:SetupFrame()
     local base = 'Interface\\Addons\\DragonflightUI\\Textures\\uiunitframe'
     local frame = self;
 
-    local options = DefaultCompactUnitFrameSetupOptions;
-    local componentScale = min(options.height / NATIVE_UNIT_FRAME_HEIGHT, options.width / NATIVE_UNIT_FRAME_WIDTH);
+    local options = DefaultCompactUnitFrameSetupOptions or {
+        height = NATIVE_UNIT_FRAME_HEIGHT,
+        width = NATIVE_UNIT_FRAME_WIDTH,
+        displayPowerBar = true,
+        displayBorder = true
+    };
+    local optWidth = options.width or NATIVE_UNIT_FRAME_WIDTH;
+    local optHeight = options.height or NATIVE_UNIT_FRAME_HEIGHT;
+    local componentScale = min(optHeight / NATIVE_UNIT_FRAME_HEIGHT, optWidth / NATIVE_UNIT_FRAME_WIDTH);
 
     frame:SetAlpha(1);
 
-    frame:SetSize(options.width, options.height);
+    frame:SetSize(optWidth, optHeight);
     local powerBarHeight = 8;
     local powerBarUsedHeight = options.displayPowerBar and powerBarHeight or 0;
 
@@ -1303,75 +1354,42 @@ function DragonflightUIEditModePreviewRaidMixin:SetupFrame()
 
     frame.powerBar.background = frame.powerBar:CreateTexture(nil, 'BACKGROUND')
     frame.powerBar.background:SetAllPoints()
+    frame.powerBar.background:SetTexture("Interface\\RaidFrame\\Raid-Bar-Resource-Background");
+    frame.powerBar.background:SetTexCoord(0, 1, 0, 0.53125);
 
-    if (frame.powerBar) then
-        if (options.displayPowerBar) then
-            if (options.displayBorder) then
-                frame.powerBar:SetPoint("TOPLEFT", frame.healthBar, "BOTTOMLEFT", 0, -2);
-            else
-                frame.powerBar:SetPoint("TOPLEFT", frame.healthBar, "BOTTOMLEFT", 0, 0);
-            end
-            frame.powerBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1);
-            frame.powerBar:SetStatusBarTexture("Interface\\RaidFrame\\Raid-Bar-Resource-Fill");
-            frame.powerBar.background:SetTexture("Interface\\RaidFrame\\Raid-Bar-Resource-Background");
-            frame.powerBar:Show();
-        else
-            frame.powerBar:Hide();
-        end
-    end
+    frame.powerBar:SetPoint("TOPLEFT", frame.healthBar, "BOTTOMLEFT", 0, -1);
+    frame.powerBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1);
+    frame.powerBar:SetStatusBarTexture("Interface\\RaidFrame\\Raid-Bar-Resource-Fill");
+    frame.powerBar:SetStatusBarColor(0, 0, 1, 1)
+    frame.powerBar:SetFrameLevel(7)
 
     function frame.powerBar:SetPowerType(powerType)
-        local r, g, b;
-        local info = PowerBarColor[powerType];
-        if (info) then
-            r, g, b = info.r, info.g, info.b;
+        local info = PowerBarColor and (PowerBarColor[powerType] or PowerBarColor["MANA"])
+        if info then
+            frame.powerBar:SetStatusBarColor(info.r, info.g, info.b)
         else
-            if (not altR) then
-                -- couldn't find a power token entry...default to indexing by power type or just mana if we don't have that either
-                info = PowerBarColor[powerType] or PowerBarColor["MANA"];
-                r, g, b = info.r, info.g, info.b;
-            else
-                r, g, b = altR, altG, altB;
-            end
+            frame.powerBar:SetStatusBarColor(0, 0, 1, 1)
         end
-        frame.powerBar:SetStatusBarColor(r, g, b);
     end
 
-    frame.iconFrame = CreateFrame('FRAME', 'DragonflightUIIconFrame', frame)
-    -- frame.iconFrame:SetAllPoints()
-    frame.iconFrame:SetPoint('TOPLEFT', frame, 'TOPLEFT', 0, 0)
-    frame.iconFrame:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', 0, 0)
-    frame.iconFrame:SetHeight(12)
+    frame.iconFrame = CreateFrame('Frame', nil, self)
+    frame.iconFrame:SetAllPoints()
+    frame.iconFrame:SetFrameLevel(8)
 
-    -- frame.iconFrame:SetSize(55, 55)
-    frame.iconFrame:SetFrameLevel(10)
+    frame.roleIcon = frame.iconFrame:CreateTexture(nil)
+    frame.roleIcon:SetSize(12, 12)
+    frame.roleIcon:SetPoint('TOPLEFT', frame, 'TOPLEFT', 4, -4)
+    frame.roleIcon:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\roleicons')
+    frame.roleIcon:SetTexCoord(0.015625, 0.265625, 0.03125, 0.53125)
 
-    frame.roleIcon = frame.iconFrame:CreateTexture('DragonflightUIRoleIcon', 'ARTWORK')
-    frame.roleIcon:ClearAllPoints();
-    frame.roleIcon:SetPoint("TOPLEFT", frame, 'TOPLEFT', 3, -2);
-    frame.roleIcon:SetSize(12, 12);
-    -- frame.roleIcon:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\roleicons')
-
-    -- function frame.roleIcon:UpdateRoleIcon(role)
-    --     frame.roleIcon:Show()
-    --     if role == 'TANK' then
-    --         frame.roleIcon:SetTexCoord(0.578125, 0.828125, 0.03125, 0.53125)
-    --     elseif role == 'HEALER' then
-    --         frame.roleIcon:SetTexCoord(0.296875, 0.546875, 0.03125, 0.53125)
-    --     elseif role == 'DAMAGER' then
-    --         frame.roleIcon:SetTexCoord(0.015625, 0.265625, 0.03125, 0.53125)
-    --     else
-    --         frame.roleIcon:Hide()
-    --     end
-    -- end
     function frame.roleIcon:UpdateRoleIcon(role)
         frame.roleIcon:Show()
-        if (role == "TANK" or role == "HEALER" or role == "DAMAGER") then
-            frame.roleIcon:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES");
-            frame.roleIcon:SetTexCoord(GetTexCoordsForRoleSmallCircle(role));
-        elseif (role == 'MAINTANK' or role == 'MAINASSIST') then
-            frame.roleIcon:SetTexture("Interface\\GroupFrame\\UI-Group-" .. role .. "Icon");
-            frame.roleIcon:SetTexCoord(0, 1, 0, 1);
+        if role == 'TANK' then
+            frame.roleIcon:SetTexCoord(0.578125, 0.828125, 0.03125, 0.53125)
+        elseif role == 'HEALER' then
+            frame.roleIcon:SetTexCoord(0.296875, 0.546875, 0.03125, 0.53125)
+        elseif role == 'DAMAGER' then
+            frame.roleIcon:SetTexCoord(0.015625, 0.265625, 0.03125, 0.53125)
         else
             frame.roleIcon:Hide()
         end
@@ -1394,9 +1412,10 @@ function DragonflightUIEditModePreviewRaidMixin:SetupFrame()
 
     local NATIVE_FONT_SIZE = 12;
     local fontName, fontSize, fontFlags = frame.statusText:GetFont();
-    frame.statusText:SetFont('GameFontDisable', NATIVE_FONT_SIZE * componentScale, fontFlags);
-    frame.statusText:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 3, options.height / 3 - 2);
-    frame.statusText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, options.height / 3 - 2);
+    fontName = fontName or STANDARD_TEXT_FONT or 'Fonts\\FRIZQT__.ttf';
+    frame.statusText:SetFont(fontName, NATIVE_FONT_SIZE * componentScale, (fontFlags and fontFlags ~= '') and fontFlags or 'OUTLINE');
+    frame.statusText:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 3, optHeight / 3 - 2);
+    frame.statusText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, optHeight / 3 - 2);
     frame.statusText:SetHeight(12 * componentScale);
     frame.statusText:SetText('100%')
 
