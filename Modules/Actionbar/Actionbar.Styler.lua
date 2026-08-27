@@ -181,6 +181,26 @@ function Module.ChangeBackpack()
             MainMenuBarBackpackButtonNormalTexture:SetTexture()
         end
 
+        if DF.MoP and MainMenuBarBackpackButtonCount then
+            MainMenuBarBackpackButtonCount:ClearAllPoints()
+            MainMenuBarBackpackButtonCount:SetPoint('BOTTOMRIGHT', MainMenuBarBackpackButton, 'BOTTOMRIGHT', -6, 6)
+
+            local fontFile, fontHeight, flags = MainMenuBarBackpackButtonCount:GetFont()
+            if fontFile then
+                MainMenuBarBackpackButtonCount:SetFont(fontFile, 12, flags)
+            end
+
+            if not Module.MoPBackpackCountHooked then
+                Module.MoPBackpackCountHooked = true
+                hooksecurefunc(MainMenuBarBackpackButtonCount, 'SetPoint', function(self)
+                    if self.DF_SettingPoint then return end
+                    self.DF_SettingPoint = true
+                    self:ClearAllPoints()
+                    self:SetPoint('BOTTOMRIGHT', MainMenuBarBackpackButton, 'BOTTOMRIGHT', -6, 6)
+                    self.DF_SettingPoint = false
+                end)
+            end
+        end
         if not MainMenuBarBackpackButton.Border then
             local cutout = 'Interface\\Addons\\DragonflightUI\\Textures\\bagslotCutout'
 
@@ -255,7 +275,8 @@ function Module.ChangeBackpack()
     end
 
     -- keyring
-    if not DF.Cata then
+    local hasKeyring = not (DF.Cata or DF.MoP) and KeyRingButton
+    if hasKeyring then
         KeyRingButton:SetSize(30, 30)
         KeyRingButton:SetScale(1)
         Module.AnchorBagSlots()
@@ -312,6 +333,8 @@ function Module.ChangeBackpack()
 
             KeyRingButton.Border = border
         end
+    elseif KeyRingButton then
+        KeyRingButton:Hide()
     end
 
     local f = _G['DragonflightUIBagBar']
@@ -346,9 +369,12 @@ function Module.AnchorBagSlots()
         end
     end
 
-    if not DF.Cata and KeyRingButton and _G['CharacterBag3Slot'] then
+    local hasKeyring = not (DF.Cata or DF.MoP) and KeyRingButton
+    if hasKeyring and _G['CharacterBag3Slot'] then
         KeyRingButton:ClearAllPoints()
         KeyRingButton:SetPoint('RIGHT', _G['CharacterBag3Slot'], 'LEFT', 0, 0)
+    elseif KeyRingButton then
+        KeyRingButton:Hide()
     end
 end
 
@@ -521,17 +547,23 @@ function Module.BagBarExpandToggled(expanded)
         f:GetHighlightTexture():SetRotation(rotation)
     end
 
+    local hasKeyring = not (DF.Cata or DF.MoP) and KeyRingButton
+
     for i = 0, 3 do
         local bag = _G['CharacterBag' .. i .. 'Slot']
         if bag then
             if (expanded) then
                 bag:Show()
-                if not DF.Cata and KeyRingButton then KeyRingButton:Show() end
+                if hasKeyring then KeyRingButton:Show() end
             else
                 bag:Hide()
-                if not DF.Cata and KeyRingButton then KeyRingButton:Hide() end
+                if hasKeyring then KeyRingButton:Hide() end
             end
         end
+    end
+
+    if not hasKeyring and KeyRingButton then
+        KeyRingButton:Hide()
     end
 end
 

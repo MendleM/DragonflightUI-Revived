@@ -804,7 +804,7 @@ function Module:UpdateActionbar(state)
             end
         end
 
-        if KeyRingButton and KeyRingButton.Border then
+        if not (DF.Cata or DF.MoP) and KeyRingButton and KeyRingButton.Border then
             KeyRingButton.Border:SetDesaturated(state.actionbarDesaturate)
             KeyRingButton.Border:SetVertexColor(c:GetRGB())
         end
