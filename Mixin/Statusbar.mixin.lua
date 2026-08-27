@@ -193,6 +193,8 @@ function DragonflightUIXPBarMixin:Update()
     if showXP then
         self:UpdateText()
     else
+        self.Text:SetText('')
+        self.TextPercent:SetText('')
     end
 
     if state.alwaysShowXP then
@@ -234,7 +236,7 @@ function DragonflightUIXPBarMixin:Update()
 
         self:Collapse(not showXP)
 
-        self:UpdateStateHandler(state)
+        self:UpdateStateHandler(state, showXP)
     end
 end
 
@@ -466,6 +468,8 @@ function DragonflightUIRepBarMixin:Update()
     else
         if not state then return end
 
+        local showRep = not not self.WatchedName
+
         if state.alwaysShowRep then
             self.Text:SetDrawLayer('OVERLAY')
         else
@@ -488,9 +492,9 @@ function DragonflightUIRepBarMixin:Update()
         self:SetWidth(state.width)
         self:SetHeight(state.height)
 
-        self:Collapse(not self.WatchedName)
+        self:Collapse(not showRep)
 
-        self:UpdateStateHandler(state)
+        self:UpdateStateHandler(state, showRep)
 
         self.NeedsUpdate = false;
     end
@@ -527,6 +531,10 @@ function DragonflightUIRepBarMixin:UpdateBar()
             self.Bar:SetStatusBarTexture('Interface\\Addons\\DragonflightUI\\Textures\\Reputation\\RepGreen')
         end
     else
+        self.valid = false
+        self.Text:SetText('')
+        self.Bar:SetMinMaxValues(0, 1)
+        self.Bar:SetValue(0)
     end
 end
 
@@ -537,8 +545,10 @@ function DragonflightUIRepBarMixin:Collapse(collapse)
     if collapse and not state.EditModeActive then
         self:Hide()
         self:SetHeight(0.00000001)
+        self.Text:Hide()
     else
         self:Show()
         self:SetHeight(state.height)
+        self.Text:Show()
     end
 end

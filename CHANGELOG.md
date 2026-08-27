@@ -41,6 +41,7 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 - **Flyout Direction:** choosing *Up* works properly.
 - **MoP:** the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.
 - **Keyring (Cata & MoP):** suppressed phantom keyring button on Cataclysm and MoP while preserving full display and styling on Classic Era, TBC, and Wrath.
+- **Reputation Bar:** unchecking "Show as experience bar" (Als Erfahrungsleiste anzeigen) now properly hides the reputation text immediately without requiring a /reload.
 - **MoP Bag Counter:** fixed free bag slots counter placement and text sizing inside the backpack button.
 
 ### Professions

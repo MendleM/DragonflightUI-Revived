@@ -75,6 +75,7 @@ DF.ChangelogData = {
                     'Flyout Direction: choosing Up works properly.',
                     'MoP: the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.',
                     'Keyring (Cata & MoP): suppressed phantom keyring button on Cataclysm and MoP while maintaining full visibility on Classic Era, TBC, and Wrath.',
+                    'Reputation Bar: unchecking "Show as experience bar" now properly hides the reputation text immediately without leaving floating text on screen until /reload.',
                     'MoP Bag Counter: fixed free bag slots counter positioning and text size inside the backpack button.'
                 }
             }, {
