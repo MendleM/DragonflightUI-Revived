@@ -530,6 +530,7 @@ function Module:ChangeFonts()
     changeFont(PlayerFrameManaBarText, std)
     changeFont(PlayerFrameManaBarTextLeft, std)
     changeFont(PlayerFrameManaBarTextRight, std)
+    changeFont(PlayerName, std)
 
     changeFont(PetFrameHealthBarText, std)
     changeFont(PetFrameHealthBarTextLeft, std)
@@ -537,6 +538,7 @@ function Module:ChangeFonts()
     changeFont(PetFrameManaBarText, std)
     changeFont(PetFrameManaBarTextLeft, std)
     changeFont(PetFrameManaBarTextRight, std)
+    changeFont(PetName, std)
 
     if TargetFrameTextureFrame then
         changeFont(TargetFrameTextureFrame.HealthBarText, std)
@@ -545,6 +547,7 @@ function Module:ChangeFonts()
         changeFont(TargetFrameTextureFrame.ManaBarText, std)
         changeFont(TargetFrameTextureFrame.ManaBarTextLeft, std)
         changeFont(TargetFrameTextureFrame.ManaBarTextRight, std)
+        changeFont(TargetFrameTextureFrame.name, std)
     end
 
     if DF.Caps.HasFocus and FocusFrameTextureFrame then
@@ -554,6 +557,17 @@ function Module:ChangeFonts()
         changeFont(FocusFrameTextureFrame.ManaBarText, std)
         changeFont(FocusFrameTextureFrame.ManaBarTextLeft, std)
         changeFont(FocusFrameTextureFrame.ManaBarTextRight, std)
+        changeFont(FocusFrameTextureFrame.name, std)
+    end
+
+    for i = 1, 4 do
+        changeFont(_G['PartyMemberFrame' .. i .. 'Name'], std)
+        changeFont(_G['PartyMemberFrame' .. i .. 'HealthBarText'], std)
+        changeFont(_G['PartyMemberFrame' .. i .. 'HealthBarTextLeft'], std)
+        changeFont(_G['PartyMemberFrame' .. i .. 'HealthBarTextRight'], std)
+        changeFont(_G['PartyMemberFrame' .. i .. 'ManaBarText'], std)
+        changeFont(_G['PartyMemberFrame' .. i .. 'ManaBarTextLeft'], std)
+        changeFont(_G['PartyMemberFrame' .. i .. 'ManaBarTextRight'], std)
     end
 end
 
