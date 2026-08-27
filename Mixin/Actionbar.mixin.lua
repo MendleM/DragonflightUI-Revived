@@ -144,6 +144,7 @@ function DragonflightUIActionbarMixin:SetButtons(buttons, barNumber)
             --
             -- btn:SetAttribute('action', multi * 12 + i)
             btn:SetParent(self)
+            btn:SetFrameLevel(self:GetFrameLevel() + 5)
         else
             self:SetHideFrame(btn, i + 1)
         end
@@ -272,6 +273,7 @@ function DragonflightUIActionbarMixin:Update()
             -- print('btn', i, btn:GetName())
             btn:ClearAllPoints()
             btn:Show()
+            btn:SetFrameLevel(self:GetFrameLevel() + 5)
             if btn.decoDF then btn.decoDF:SetShown(not state.hideArt) end
 
             if btn.DFIgnoreParentScale then
@@ -1914,26 +1916,29 @@ function DragonflightUIActionbarMixin:StyleButton(btn, keepNormalHighlight)
         btn.NewActionTexture = nil
     end
 
-    local icon = _G[btnName .. 'Icon']
-    -- icon:ClearAllPoints()
-    icon:SetSize(45, 45)
-    -- icon:SetPoint('CENTER')
-    -- icon:SetAlpha(0)
-    btn.Icon = icon
+    local icon = _G[btnName .. 'Icon'] or btn.icon or btn.Icon
+    if icon then
+        icon:ClearAllPoints()
+        icon:SetPoint('CENTER', btn, 'CENTER', 0, 0)
+        icon:SetSize(45, 45)
+        btn.Icon = icon
+    end
 
     local mask;
     if btn.IconMask then
         -- tbc etc
         mask = btn.IconMask
     else
-        mask = btn:CreateMaskTexture('DragonflightUIIconMask')
+        mask = btn:CreateMaskTexture(btnName .. 'DFIconMask')
     end
-    mask:SetAllPoints(icon)
-    mask:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\maskNew')
-    mask:SetSize(45, 45)
-    btn.Mask = mask
+    if icon then
+        mask:SetAllPoints(icon)
+        mask:SetTexture('Interface\\Addons\\DragonflightUI\\Textures\\maskNew')
+        mask:SetSize(45, 45)
+        btn.Mask = mask
 
-    icon:AddMaskTexture(mask)
+        icon:AddMaskTexture(mask)
+    end
 
     local cd = _G[btnName .. 'Cooldown']
     cd:SetSwipeTexture('Interface\\Addons\\DragonflightUI\\Textures\\maskNewAlpha')
@@ -2553,11 +2558,9 @@ end
 
 function DragonflightUIPetbarMixin:StylePetButton()
 
-    if DF.API.Version.IsModern and _G['PetActionBar'] then
-        -- era-1159: was IsTBC-only; Era 1.15.9 has the same modern
-        -- PetActionBar whose background art otherwise bleeds through and
-        -- makes the pet bar read as a plain action bar.
+    if _G['PetActionBar'] then
         local pab = _G['PetActionBar']
+        pab:EnableMouse(false)
         pab:Hide()
         if pab.BackgroundArt1 then
             pab.BackgroundArt1:SetTexture('')
@@ -2567,6 +2570,10 @@ function DragonflightUIPetbarMixin:StylePetButton()
             pab.BackgroundArt2:SetTexture('')
             pab.BackgroundArt2:Hide()
         end
+    end
+
+    if PetActionBarFrame then
+        PetActionBarFrame:EnableMouse(false)
     end
 
     local count = #(self.buttonTable)
@@ -2595,7 +2602,14 @@ function DragonflightUIPetbarMixin:StylePetButton()
             normalTwo:SetAlpha(0)
         end
 
-        local newNormal = btn:CreateTexture('DragonflightUINormalTexture2Replacement', 'OVERLAY')
+        local icon = _G[btnName .. 'Icon'] or btn.icon or btn.Icon
+        if icon then
+            icon:ClearAllPoints()
+            icon:SetPoint('CENTER', btn, 'CENTER', 0, 0)
+            icon:SetSize(45, 45)
+        end
+
+        local newNormal = btn.DFNormalTexture or btn:CreateTexture(btnName .. 'DFNormalTexture2Replacement', 'OVERLAY')
         newNormal:ClearAllPoints()
         newNormal:SetSize(46, 45)
         newNormal:SetPoint('TOPLEFT')
@@ -2657,7 +2671,7 @@ function DragonflightUIPetbarMixin:StylePetButton()
         checked:SetVertexColor(color.r, color.g, color.b, color.a)
 
         if true then
-            local fakeChecked = btn:CreateTexture(btn:GetName() .. 'DFFakeChecked', 'OVERLAY')
+            local fakeChecked = btn.DFFakeChecked or btn:CreateTexture(btnName .. 'DFFakeChecked', 'OVERLAY')
             btn.DFFakeChecked = fakeChecked
             fakeChecked:ClearAllPoints()
             fakeChecked:SetSize(46, 45)
@@ -2668,10 +2682,13 @@ function DragonflightUIPetbarMixin:StylePetButton()
             fakeChecked:Hide()
             fakeChecked:SetVertexColor(color.r, color.g, color.b, color.a)
 
-            hooksecurefunc(btn, 'SetChecked', function(_, isChecked)
-                -- print('SetChecked', btn:GetName(), isChecked)
-                fakeChecked:SetShown(isChecked)
-            end)
+            if not btn.DFHookedSetChecked then
+                btn.DFHookedSetChecked = true
+                hooksecurefunc(btn, 'SetChecked', function(_, isChecked)
+                    -- print('SetChecked', btn:GetName(), isChecked)
+                    fakeChecked:SetShown(isChecked)
+                end)
+            end
         end
 
         if true then

@@ -380,10 +380,39 @@ function Module.ChangeActionbar()
         MainMenuBar:SetSize(1, 1)
     end
 
+    Module.DisableBlizzardBarGridUpdates()
     Module:HideBlizzardDefaultBars()
 
     if DF.API.Version.IsModern then
         Module:ForceMoveBlizzEditModeGhosts()
+    end
+end
+
+function Module.DisableBlizzardBarGridUpdates()
+    local multiBars = {
+        _G['MainActionBar'],
+        _G['MultiBarBottomLeft'],
+        _G['MultiBarBottomRight'],
+        _G['MultiBarLeft'],
+        _G['MultiBarRight'],
+        _G['MultiBar5'],
+        _G['MultiBar6'],
+        _G['MultiBar7'],
+        _G['PetActionBar'],
+        _G['PetActionBarFrame'],
+        _G['StanceBar'],
+        _G['PossessActionBar'],
+    }
+    for _, bBar in ipairs(multiBars) do
+        if bBar then
+            bBar:EnableMouse(false)
+            if bBar.UpdateShownButtons then
+                bBar.UpdateShownButtons = function() end
+            end
+            if bBar.SetShowGrid then
+                bBar.SetShowGrid = function() end
+            end
+        end
     end
 end
 
@@ -452,28 +481,15 @@ function Module.HookPetBar()
         PetActionBarFrame:ClearAllPoints()
         PetActionBarFrame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
         PetActionBarFrame.ignoreFramePositionManager = true
+        PetActionBarFrame:EnableMouse(false)
+    end
+
+    if PetActionBar then
+        PetActionBar:EnableMouse(false)
     end
 
     if SlidingActionBarTexture0 then SlidingActionBarTexture0:SetTexture('') end
     if SlidingActionBarTexture1 then SlidingActionBarTexture1:SetTexture('') end
-
-    for i = 1, 10 do
-        local pBtn = _G['PetActionButton' .. i]
-        if pBtn then
-            pBtn:SetSize(30, 30)
-            local normalTexture2 = _G['PetActionButton' .. i .. 'NormalTexture2'];
-            if normalTexture2 then normalTexture2:SetSize(50, 50) end
-        end
-    end
-
-    local spacing = 7
-    for i = 2, 10 do
-        local btn = _G['PetActionButton' .. i]
-        local prev = _G['PetActionButton' .. (i - 1)]
-        if btn and prev then
-            btn:SetPoint('LEFT', prev, 'RIGHT', spacing, 0)
-        end
-    end
 end
 
 function Module:ForceMoveBlizzEditModeGhosts()
@@ -493,6 +509,7 @@ function Module:ForceMoveBlizzEditModeGhosts()
             blizzFrame:ClearAllPoints()
             blizzFrame:SetPoint('CENTER', holder, 'CENTER', 0, 0)
             if blizzFrame.SetScale then blizzFrame:SetScale(1.0) end
+            blizzFrame:EnableMouse(false)
         end
     end
 end
