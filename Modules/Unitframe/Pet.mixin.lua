@@ -314,9 +314,31 @@ function SubModuleMixin:Setup()
     -- over the frame's spot while the frame is hidden. See Target.mixin.lua.
     f:EnableMouse(false)
 
+    PetFrame.ignoreFramePositionManager = true
+
     if addonTable.OverrideBlizzEditmode then
         addonTable:OverrideBlizzEditmode(PetFrame, 'CENTER', f, 'CENTER', 0, 0)
     end
+
+    if PetFrame_SetPoint then
+        PetFrame_SetPoint = function(self)
+            local holder = _G['DragonflightUIPetFrame']
+            if holder and not InCombatLockdown() then
+                self:ClearAllPoints()
+                self:SetPoint('CENTER', holder, 'CENTER', 0, 0)
+            end
+        end
+    end
+
+    hooksecurefunc(PetFrame, 'SetPoint', function(self, point, relativeTo)
+        local holder = _G['DragonflightUIPetFrame']
+        if not self.DF_SettingPoint and holder and relativeTo ~= holder and not InCombatLockdown() then
+            self.DF_SettingPoint = true
+            self:ClearAllPoints()
+            self:SetPoint('CENTER', holder, 'CENTER', 0, 0)
+            self.DF_SettingPoint = false
+        end
+    end)
 
     -- state
     PetFrame:SetParent(f)
@@ -358,9 +380,22 @@ function SubModuleMixin:Setup()
             self.FakePreview:Hide()
         end
     });
+
+    self:RegisterEvent('PLAYER_ENTERING_WORLD')
+    self:RegisterEvent('UNIT_PET')
+    self:RegisterEvent('PET_UI_UPDATE')
 end
 
 function SubModuleMixin:OnEvent(event, ...)
+    if event == 'UNIT_PET' or event == 'PET_UI_UPDATE' or event == 'PLAYER_ENTERING_WORLD' then
+        if not InCombatLockdown() then
+            local holder = _G['DragonflightUIPetFrame']
+            if holder then
+                PetFrame:ClearAllPoints()
+                PetFrame:SetPoint('CENTER', holder, 'CENTER', 0, 0)
+            end
+        end
+    end
 end
 
 function SubModuleMixin:UpdateState(state)
@@ -438,7 +473,11 @@ function SubModuleMixin:ChangePetFrame()
     local base = 'Interface\\Addons\\DragonflightUI\\Textures\\uiunitframe'
     local tex2xBase = 'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe2x\\'
 
-    PetFrame:SetPoint('TOPLEFT', PlayerFrame, 'TOPLEFT', 100, -70)
+    local f = _G['DragonflightUIPetFrame']
+    if f and not InCombatLockdown() then
+        PetFrame:ClearAllPoints()
+        PetFrame:SetPoint('CENTER', f, 'CENTER', 0, 0)
+    end
     PetFrameTexture:SetTexture('')
     PetFrameTexture:Hide()
 
