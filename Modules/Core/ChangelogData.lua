@@ -73,7 +73,15 @@ DF.ChangelogData = {
                     'Eliminated legacy Blizzard gryphon textures and duplicate visual elements on TBC.',
                     'Fixed Action Bar 1 scaling and in-combat alignment for backpack and bag bars.',
                     'Flyout Direction: choosing Up works properly.',
-                    'MoP: the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.'
+                    'MoP: the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.',
+                    'Keyring (Cata & MoP): suppressed phantom keyring button on Cataclysm and MoP while maintaining full visibility on Classic Era, TBC, and Wrath.',
+                    'MoP Bag Counter: fixed free bag slots counter positioning and text size inside the backpack button.'
+                }
+            }, {
+                title = 'Professions',
+                items = {
+                    'Beast Training: restored Beast Training (Wildtierausbildung) and CraftFrame support for Hunter pets in Classic Era, Season of Discovery, and TBC with spellbook tab scanning, training points counter, and legacy craft frame suppression.',
+                    'MoP & Cataclysm Crash Fix: included LibTradeSkillRecipes in MoP and Cata TOC files and hardened mixins to prevent startup errors and restore the Dragonflight UI profession window.'
                 }
             }, {
                 title = 'Dark Mode',

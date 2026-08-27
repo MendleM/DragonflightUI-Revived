@@ -40,6 +40,12 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 - **Scaling & Alignment:** corrected Action Bar 1 scaling and in-combat alignment for backpack and bag bar slots.
 - **Flyout Direction:** choosing *Up* works properly.
 - **MoP:** the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.
+- **Keyring (Cata & MoP):** suppressed phantom keyring button on Cataclysm and MoP while preserving full display and styling on Classic Era, TBC, and Wrath.
+- **MoP Bag Counter:** fixed free bag slots counter placement and text sizing inside the backpack button.
+
+### Professions
+- **Beast Training:** restored Beast Training (Wildtierausbildung) and CraftFrame support for Hunter pets in Classic Era, Season of Discovery, and TBC with spellbook tab scanning, training points counter, and legacy craft frame suppression.
+- **MoP & Cataclysm Crash Fix:** included `LibTradeSkillRecipes` in MoP and Cata TOC files and hardened mixins to prevent startup errors and restore the Dragonflight UI profession window.
 
 ### Dark Mode
 - **Live Toggle:** Dark Mode can now be toggled on and off live with immediate color and saturation restoration without requiring `/reload`.
