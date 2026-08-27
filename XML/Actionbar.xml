@@ -6,7 +6,7 @@
 	</Frame>
 	<Frame name="DragonflightUIStancebarFrameTemplate" mixin="DragonflightUIStancebarMixin" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" virtual="true">
 	</Frame>
-	<Frame name="DragonflightUIPetbarFrameTemplate" mixin="DragonflightUIPetbarMixin" virtual="true">
+	<Frame name="DragonflightUIPetbarFrameTemplate" mixin="DragonflightUIPetbarMixin" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" virtual="true">
 	</Frame>
 	<Frame name="DragonflightUIXPBarTemplate" mixin="DragonflightUIXPBarMixin" virtual="true">
 		<Scripts>
