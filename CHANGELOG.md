@@ -26,16 +26,26 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 ### Unit Frames & Totems
 - **Shaman Totem Bar:** dynamic `HasTotemBar` detection and anchored positioning to prevent active totem icons from snapping below player frame.
 - **Combat Reload Visuals:** early holder pre-positioning and immediate visual skinning prevent visual snapping when reloading during combat.
+- **Pet Frame Anchoring:** locked `PetFrame` to `DragonflightUIPetFrame` and suppressed Blizzard's position manager to prevent the unit frame from jumping to default coordinates when summoning a pet.
 - **TBC:** the pet frame is back. It was saved to the layout and then never actually placed.
 - **Focus Target & Faction Icons:** focus target frame restored on TBC and MoP; target faction icon alignment fixed on Era.
 - **Target of Target:** eliminated reload errors during combat when target-of-target is not yet built.
 
 ### Action Bars
+- **Pet Bar Sizing & Centering (Issue #13):** standardized default button scale to 0.8 (36px), removed legacy fixed 30px sizing loop, and centered icon art to prevent undersized pet action buttons.
+- **SpellBook & Pet Action Taint:** neutralized Blizzard's default `UpdateShownButtons` and `SetShowGrid` on background bars to eliminate `ADDON BLOCKED` errors when opening the spellbook, leveling up, or casting pet abilities.
+- **Pet Bar Clickability:** disabled mouse interception on replaced Blizzard container frames and updated secure frame templates so pet action buttons are immediately clickable upon login.
 - **Bar Dividers:** fixed rendering condition so dividers only appear on Action Bar 1 when background border art is active, removing stray lines from Action Bars 2–8.
 - **Art Cleanup:** eliminated legacy Blizzard gryphons and duplicate visual layers on TBC.
 - **Scaling & Alignment:** corrected Action Bar 1 scaling and in-combat alignment for backpack and bag bar slots.
 - **Flyout Direction:** choosing *Up* works properly.
 - **MoP:** the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.
+- **Keyring (Cata & MoP):** suppressed phantom keyring button on Cataclysm and MoP while preserving full display and styling on Classic Era, TBC, and Wrath.
+- **MoP Bag Counter:** fixed free bag slots counter placement and text sizing inside the backpack button.
+
+### Professions
+- **Beast Training:** restored Beast Training (Wildtierausbildung) and CraftFrame support for Hunter pets in Classic Era, Season of Discovery, and TBC with spellbook tab scanning, training points counter, and legacy craft frame suppression.
+- **MoP & Cataclysm Crash Fix:** included `LibTradeSkillRecipes` in MoP and Cata TOC files and hardened mixins to prevent startup errors and restore the Dragonflight UI profession window.
 
 ### Dark Mode
 - **Live Toggle:** Dark Mode can now be toggled on and off live with immediate color and saturation restoration without requiring `/reload`.
