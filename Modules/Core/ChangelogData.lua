@@ -58,6 +58,7 @@ DF.ChangelogData = {
                 items = {
                     'Shaman TotemFrame: added dynamic HasTotemBar capability detection and hooked positioning to keep active totems attached to DragonflightUI.',
                     'Added early holder pre-positioning and immediate visual skinning in combat reloads.',
+                    'Pet frame anchoring: fixed position jumping on pet summon by locking PetFrame to DragonflightUIPetFrame.',
                     'Focus target is visible on TBC and MoP.',
                     'Era: faction icon sits on target frame properly.',
                     'No more error when reloading during combat from target-of-target not being built yet.'
@@ -65,6 +66,9 @@ DF.ChangelogData = {
             }, {
                 title = 'Action bars',
                 items = {
+                    'Pet bar sizing: standardized default button scale to 0.8 (36px) and centered icons at 45x45 base, resolving undersized buttons (Issue #13).',
+                    'Action bar & Pet bar taint: neutralized Blizzard SetShown/UpdateShownButtons on background bars to eliminate ADDON BLOCKED errors on spellbook open and pet casts.',
+                    'Pet bar clickability: disabled mouse interception on Blizzard container frames and fixed secure templates so pet buttons are clickable on login.',
                     'Bar dividers: restricted dividers strictly to Action Bar 1 with active border art, preventing stray divider lines across Action Bars 2-8.',
                     'Eliminated legacy Blizzard gryphon textures and duplicate visual elements on TBC.',
                     'Fixed Action Bar 1 scaling and in-combat alignment for backpack and bag bars.',
