@@ -31,16 +31,208 @@ function addonTable:OverrideBlizzEditmode(f, ...)
     end
 end
 
-function addonTable:RefreshBlizzEditmodeLayouts()
+function addonTable:FixBlizzEditModeManagerLayouts()
+    if not (EditModeManagerFrame and EditModeManagerFrame.layoutInfo) then return end
+    local info = EditModeManagerFrame.layoutInfo
+    if not info.layouts then return end
+
+    if info.activeLayout and info.activeLayout > #info.layouts then
+        if EditModePresetLayoutManager and EditModePresetLayoutManager.GetCopyOfPresetLayouts then
+            local ok, presets = pcall(EditModePresetLayoutManager.GetCopyOfPresetLayouts, EditModePresetLayoutManager)
+            if ok and presets and #presets > 0 then
+                local merged = {}
+                for _, p in ipairs(presets) do table.insert(merged, p) end
+                for _, c in ipairs(info.layouts) do table.insert(merged, c) end
+                info.layouts = merged
+            end
+        end
+    end
+    if info.activeLayout and not info.layouts[info.activeLayout] and info.layouts[1] then
+        info.layouts[info.activeLayout] = info.layouts[1]
+    end
 end
 
-function addonTable:ScheduleBlizzEditmodeApply()
+function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
+    local val = (enabled and 1) or 0
+
+    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSetting) then
+        return
+    end
+
+    local targetSystem = Enum.EditModeSystem.UnitFrame
+    local targetSystemIndex = Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Party
+    local targetSetting = Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames
+
+    if not targetSystem or not targetSetting then return end
+
+    if PartyFrame then
+        PartyFrame.system = PartyFrame.system or targetSystem
+        PartyFrame.systemIndex = PartyFrame.systemIndex or targetSystemIndex
+    end
+
+    if addonTable.FixBlizzEditModeManagerLayouts then
+        addonTable:FixBlizzEditModeManagerLayouts()
+    end
+
+    local function EnsureSettingInLayout(layout)
+        if not layout then return end
+        layout.systems = layout.systems or {}
+        local foundSys = false
+        for _, sys in ipairs(layout.systems) do
+            if sys.system == targetSystem and (not targetSystemIndex or sys.systemIndex == targetSystemIndex) then
+                foundSys = true
+                sys.settings = sys.settings or {}
+                local foundSetting = false
+                for _, s in ipairs(sys.settings) do
+                    if s.setting == targetSetting then
+                        s.value = val
+                        foundSetting = true
+                    end
+                end
+                if not foundSetting then
+                    table.insert(sys.settings, {setting = targetSetting, value = val})
+                end
+            end
+        end
+        if not foundSys then
+            table.insert(layout.systems, {
+                system = targetSystem,
+                systemIndex = targetSystemIndex or 3,
+                settings = {
+                    {setting = targetSetting, value = val}
+                },
+                isInDefaultPosition = true,
+            })
+        end
+    end
+
+    if EditModeManagerFrame and EditModeManagerFrame.layoutInfo and EditModeManagerFrame.layoutInfo.layouts then
+        for _, layout in ipairs(EditModeManagerFrame.layoutInfo.layouts) do
+            EnsureSettingInLayout(layout)
+        end
+    end
+
+    if EditModeManagerFrame and EditModeManagerFrame.OnEditModeSystemSettingChange and PartyFrame then
+        pcall(EditModeManagerFrame.OnEditModeSystemSettingChange, EditModeManagerFrame, PartyFrame, targetSetting, val)
+    end
+
+    if C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts then
+        local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
+        if ok and layoutInfo and layoutInfo.layouts then
+            for _, layout in ipairs(layoutInfo.layouts) do
+                EnsureSettingInLayout(layout)
+            end
+            pcall(C_EditMode.SaveLayouts, layoutInfo)
+        end
+    end
 end
 
 function addonTable:SetBlizzEditmodeFrameSetting(frame, setting, value, apply)
+    if not (frame and setting) then return end
+
+    if frame == PartyFrame and Enum and Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames then
+        if addonTable.SubModuleMixins and addonTable.SubModuleMixins['Party'] and addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames then
+            addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value == 1)
+            return
+        end
+    end
+
+    if EditModeManagerFrame and EditModeManagerFrame.OnEditModeSystemSettingChange then
+        pcall(EditModeManagerFrame.OnEditModeSystemSettingChange, EditModeManagerFrame, frame, setting, value)
+    end
+
+    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then
+        return
+    end
+
+    local targetSystem = frame.system or (Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame)
+    local targetSystemIndex = frame.systemIndex
+
+    local layoutInfo = C_EditMode.GetLayouts()
+    if not layoutInfo or not layoutInfo.layouts then return end
+
+    for _, l in ipairs(layoutInfo.layouts) do
+        if l.systems then
+            for _, sys in ipairs(l.systems) do
+                if (not targetSystem or sys.system == targetSystem) and (not targetSystemIndex or sys.systemIndex == targetSystemIndex) then
+                    if sys.settings then
+                        local found = false
+                        for _, s in ipairs(sys.settings) do
+                            if s.setting == setting then
+                                s.value = value
+                                found = true
+                            end
+                        end
+                        if not found then
+                            table.insert(sys.settings, {setting = setting, value = value})
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    pcall(C_EditMode.SaveLayouts, layoutInfo)
+
+    if EditModeManagerFrame then
+        if EditModeManagerFrame.UpdateLayoutInfo then
+            pcall(EditModeManagerFrame.UpdateLayoutInfo, EditModeManagerFrame)
+        end
+        addonTable:FixBlizzEditModeManagerLayouts()
+    end
+
+    if UIParent_UpdateRaidAndPartyFrames then
+        pcall(UIParent_UpdateRaidAndPartyFrames)
+    end
+    if CompactRaidFrameManager_UpdateShown then
+        pcall(CompactRaidFrameManager_UpdateShown, CompactRaidFrameManager)
+    end
+    if CompactRaidFrameContainer_UpdateDisplayedUnits then
+        pcall(CompactRaidFrameContainer_UpdateDisplayedUnits, CompactRaidFrameContainer)
+    end
+    if PartyFrame and PartyFrame.UpdatePartyFrames then
+        pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
+    end
+
+    local fakeParty = _G['DragonflightUIEditModePartyFramePreview']
+    if fakeParty and fakeParty.Update then
+        pcall(fakeParty.Update, fakeParty)
+    end
 end
 
 function addonTable:GetBlizzEditmodeFrameSettingBool(frame, setting)
+    if frame == PartyFrame and Enum and Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames then
+        if addonTable.SubModuleMixins and addonTable.SubModuleMixins['Party'] and addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames then
+            return addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames()
+        end
+    end
+
+    if not (C_EditMode and C_EditMode.GetLayouts) then return false end
+    local layoutInfo = C_EditMode.GetLayouts()
+    if not layoutInfo or not layoutInfo.layouts then return false end
+
+    local targetSystem = frame and frame.system or (Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame)
+    local targetSystemIndex = frame and frame.systemIndex
+
+    local activeLayout = layoutInfo.activeLayout and layoutInfo.layouts[layoutInfo.activeLayout]
+    local searchLayouts = activeLayout and {activeLayout} or layoutInfo.layouts
+
+    for _, layout in ipairs(searchLayouts) do
+        if layout.systems then
+            for _, sys in ipairs(layout.systems) do
+                if (not targetSystem or sys.system == targetSystem) and (not targetSystemIndex or sys.systemIndex == targetSystemIndex) then
+                    if sys.settings then
+                        for _, s in ipairs(sys.settings) do
+                            if s.setting == setting then
+                                return s.value == 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     return false
 end
 

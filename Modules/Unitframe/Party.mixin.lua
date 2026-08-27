@@ -51,6 +51,21 @@ local STATUS_TEXT_KEYS = {'TextString', 'LeftText', 'RightText', 'DFTextString',
 -- switches between numeric, percentage and both, and reveals them on mouseover
 -- through lockShow. LeftText and RightText matter: the "both" display mode
 -- writes the percentage and the value into them rather than into TextString.
+local function GetDFUIUnitframeFont()
+    local newFont = 'Fonts\\FRIZQT__.ttf'
+    local locale = GetLocale()
+    if locale == "ruRU" then
+        newFont = "Fonts\\FRIZQT___CYR.TTF"
+    elseif locale == "koKR" then
+        newFont = "Fonts\\2002.TTF"
+    elseif locale == "zhCN" then
+        newFont = "Fonts\\ARKai_T.TTF"
+    elseif locale == "zhTW" then
+        newFont = "Fonts\\blei00d.TTF"
+    end
+    return newFont
+end
+
 local function EnsureBarStatusText(bar)
     if not (bar and bar.CreateFontString) or bar.TextString then return end
 
@@ -74,15 +89,12 @@ local function FitBarStatusText(bar)
     if not bar or not bar.GetHeight then return end
 
     local size = ((bar:GetHeight() or 10) >= 12) and 10 or 9
+    local fontFile = GetDFUIUnitframeFont()
 
     for _, key in ipairs(STATUS_TEXT_KEYS) do
         local text = bar[key]
         if text and text.SetFont then
-            -- GetFont returns nil when the string draws from a font OBJECT
-            -- rather than a file, so fall back rather than passing nil on
-            local file, _, flags = text:GetFont()
-            file = file or STANDARD_TEXT_FONT or 'Fonts\\FRIZQT__.ttf'
-            text:SetFont(file, size, (flags and flags ~= '') and flags or 'OUTLINE')
+            text:SetFont(fontFile, size, 'OUTLINE')
         end
     end
 end
@@ -101,17 +113,18 @@ function SubModuleMixin:SetDefaults()
         breakUpLargeNumbers = true,
         scale = 1.0,
         override = false,
-        anchorFrame = 'CompactRaidFrameManager',
+        anchorFrame = 'UIParent',
         customAnchorFrame = '',
         anchor = 'TOPLEFT',
-        anchorParent = 'TOPRIGHT',
-        x = 0,
-        y = 0,
+        anchorParent = 'TOPLEFT',
+        x = 16,
+        y = -160,
         customHealthBarTexture = 'Default',
         customPowerBarTexture = 'Default',
         padding = 10,
         orientation = 'vertical',
         disableBuffTooltip = 'INCOMBAT',
+        useCompactPartyFrames = false,
         -- Visibility
         alphaNormal = 1.0,
         alphaCombat = 1.0,
@@ -134,48 +147,105 @@ end
 
 -- Use Raid-Style Party Frames.
 --
--- This used to read and write the useCompactPartyFrames CVar, which is what it
--- was on the old clients. On 1.15.9 that CVar is dead - the string does not
--- appear anywhere in the client - and the answer moved into the Edit Mode
--- layout. Both frames ask the same question:
---
---   CompactPartyFrameMixin:ShouldShow()
---     return ShouldShowPartyFrames() and EditModeManagerFrame:UseRaidStylePartyFrames()
---   PartyFrameMixin:ShouldShow()
---     return ShouldShowPartyFrames() and not EditModeManagerFrame:UseRaidStylePartyFrames()
---
--- and UseRaidStylePartyFrames reads the layout setting, not a CVar. So the
--- toggle was writing somewhere nothing reads, which is exactly the "doesn't do
--- anything when toggled on and off" report.
---
--- Older flavours still have the CVar, so keep it for them and pick by what the
--- client actually offers rather than by flavour.
-local function HasModernRaidStyleSetting()
-    return (EditModeManagerFrame and EditModeManagerFrame.UseRaidStylePartyFrames and Enum and
-               Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames) and true or false
+-- As per AGENTS.MD architecture rules:
+-- DragonflightUI is decoupled from Blizzard Edit Mode layout mutations (C_EditMode.SaveLayouts).
+-- DragonflightUI's database (Module.db.profile.party.useCompactPartyFrames) is the Single Source of Truth.
+-- Blizzard's EditModeManagerFrame:UseRaidStylePartyFrames() is overridden to directly return the DragonflightUI setting.
+
+function SubModuleMixin.GetRaidStylePartyFrames(self)
+    local Module = (self and type(self) == 'table' and self.ModuleRef) or DF:GetModule('Unitframe')
+    if Module and Module.db and Module.db.profile and Module.db.profile.party and Module.db.profile.party.useCompactPartyFrames ~= nil then
+        return Module.db.profile.party.useCompactPartyFrames == true
+    end
+    if C_CVar and C_CVar.GetCVar and C_CVar.GetCVar('useCompactPartyFrames') ~= nil then
+        return C_CVar.GetCVar('useCompactPartyFrames') == '1'
+    end
+    return false
 end
 
-function SubModuleMixin.GetRaidStylePartyFrames()
-    if HasModernRaidStyleSetting() then
-        local ok, value = pcall(EditModeManagerFrame.UseRaidStylePartyFrames, EditModeManagerFrame)
-        if ok then return value and true or false end
+function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
+    local enabled
+    local selfRef
+    if type(selfOrEnabled) == 'table' then
+        selfRef = selfOrEnabled
+        enabled = maybeEnabled
+    else
+        enabled = selfOrEnabled
+    end
+    local val = enabled and true or false
+
+    local Module = (selfRef and type(selfRef) == 'table' and selfRef.ModuleRef) or DF:GetModule('Unitframe')
+    if Module and Module.db and Module.db.profile and Module.db.profile.party then
+        Module.db.profile.party.useCompactPartyFrames = val
     end
 
-    return C_CVar and C_CVar.GetCVar('useCompactPartyFrames') == '1'
-end
-
-function SubModuleMixin.SetRaidStylePartyFrames(enabled)
-    if HasModernRaidStyleSetting() and PartyFrame and addonTable.SetBlizzEditmodeFrameSetting then
-        -- Goes through the layout, so it survives a reload and reaches both
-        -- frames. SetBlizzEditmodeFrameSetting schedules the application that
-        -- makes them swap.
-        addonTable:SetBlizzEditmodeFrameSetting(PartyFrame, Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames,
-                                                enabled and 1 or 0)
-        return
+    -- Keep CVar in sync if client supports it
+    if C_CVar and C_CVar.GetCVar and C_CVar.GetCVar('useCompactPartyFrames') ~= nil then
+        pcall(SetCVar, 'useCompactPartyFrames', val and '1' or '0')
+    elseif SetCVar then
+        pcall(SetCVar, 'useCompactPartyFrames', val and '1' or '0')
     end
 
-    if SetCVar then SetCVar('useCompactPartyFrames', enabled and '1' or '0') end
+    if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
+        addonTable:SyncRaidStylePartyFrameToBlizzard(val)
+    end
+
+    -- Update preview in Edit Mode
+    local fakeParty = _G['DragonflightUIEditModePartyFramePreview']
+    if fakeParty and fakeParty.Update then
+        pcall(fakeParty.Update, fakeParty)
+    end
+
+    -- Safely trigger Blizzard updates out of combat on a clean tick
+    Helper:RunOutOfCombat('RaidStylePartyFrames', function()
+        C_Timer.After(0, function()
+            if InCombatLockdown() then return end
+            if PartyFrame and PartyFrame.UpdateSystem and Enum and Enum.EditModeUnitFrameSetting then
+                pcall(PartyFrame.UpdateSystem, PartyFrame, Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames)
+            end
+            if PartyFrame and PartyFrame.UpdatePartyFrames then
+                pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
+            end
+            if CompactPartyFrame and CompactPartyFrame.UpdateVisibility then
+                pcall(CompactPartyFrame.UpdateVisibility, CompactPartyFrame)
+            end
+            if CompactPartyFrame and CompactPartyFrame.UpdateLayout then
+                pcall(CompactPartyFrame.UpdateLayout, CompactPartyFrame)
+            end
+            if UIParent_UpdateRaidAndPartyFrames then
+                pcall(UIParent_UpdateRaidAndPartyFrames)
+            end
+            if CompactRaidFrameManager_UpdateShown then
+                pcall(CompactRaidFrameManager_UpdateShown, CompactRaidFrameManager)
+            end
+            if CompactRaidFrameContainer_UpdateDisplayedUnits then
+                pcall(CompactRaidFrameContainer_UpdateDisplayedUnits, CompactRaidFrameContainer)
+            end
+        end)
+    end)
 end
+
+local function InstallEditModeOverride()
+    local function QuerySetting()
+        return SubModuleMixin.GetRaidStylePartyFrames()
+    end
+
+    if EditModeManagerFrame then
+        EditModeManagerFrame.UseRaidStylePartyFrames = QuerySetting
+    end
+    if EditModeManagerFrameMixin and EditModeManagerFrameMixin.UseRaidStylePartyFrames then
+        EditModeManagerFrameMixin.UseRaidStylePartyFrames = QuerySetting
+    end
+end
+InstallEditModeOverride()
+
+local editModeWatcher = CreateFrame('Frame')
+editModeWatcher:RegisterEvent('ADDON_LOADED')
+editModeWatcher:SetScript('OnEvent', function(_, _, addon)
+    if addon == 'Blizzard_EditMode' or EditModeManagerFrame ~= nil then
+        InstallEditModeOverride()
+    end
+end)
 
 function SubModuleMixin:SetupOptions()
     local Module = self.ModuleRef;
@@ -508,35 +578,9 @@ function SubModuleMixin:SetupModern()
             -- back afterwards, never during.
             hooksecurefunc(PartyFrame, 'SetPoint', function(frame, _, relativeTo)
                 if relativeTo == self.PartyMoveFrame then return end
-                if self.PartyAnchorPending then return end
-
-                self.PartyAnchorPending = true
-                -- Check a few times over the next second and a half, not just
-                -- once on the next frame.
-                --
-                -- Once was enough to bring the members back, but the user
-                -- reported it taking "a few seconds" - which is the single
-                -- check running while Blizzard's own pass is still settling,
-                -- finding the counts agree, and doing nothing. The frames then
-                -- waited for some later event to notice. Retrying briefly turns
-                -- that into an immediate repair, and each attempt stops as soon
-                -- as the count is healthy so the common case costs one compare.
-                for _, delay in ipairs({0, 0.1, 0.3, 0.7, 1.5}) do
-                    C_Timer.After(delay, function()
-                        if InCombatLockdown() then return end
-                        if not (PartyFrame and PartyFrame.UpdatePartyFrames and PartyFrame.PartyMemberFramePool) then
-                            return
-                        end
-
-                        local expected = GetNumSubgroupMembers and GetNumSubgroupMembers() or 0
-                        if expected == 0 then return end
-
-                        local shown = 0
-                        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
-                            if pf:IsShown() then shown = shown + 1 end
-                        end
-
-                        if shown < expected then pcall(PartyFrame.UpdatePartyFrames, PartyFrame) end
+                if not InCombatLockdown() then
+                    C_Timer.After(0, function()
+                        ReanchorPartyFrame()
                     end)
                 end
             end)
@@ -607,6 +651,8 @@ function SubModuleMixin:SetupModern()
                     -- every roster event for no reason.
                     local expected = GetNumSubgroupMembers and GetNumSubgroupMembers() or 0
                     if expected == 0 then return end
+
+                    if SubModuleMixin.GetRaidStylePartyFrames() then return end
 
                     local shown = 0
                     for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
@@ -824,6 +870,12 @@ function SubModuleMixin:SetupModern()
             auras:SetPoint('TOPLEFT', pf, 'TOPLEFT', 48, -43)
         end
 
+        -- Name font (matching PlayerFrame / PlayerName)
+        local nameText = pf.Name or pf.name or _G[pf:GetName() and (pf:GetName() .. 'Name')]
+        if nameText and nameText.SetFont then
+            nameText:SetFont(GetDFUIUnitframeFont(), 11, 'OUTLINE')
+        end
+
         -- Role icon (Era 1.15.x has LFG roles), same treatment as the
         -- classic reskin: top-right corner of the member frame.
         if UnitGroupRolesAssigned then
@@ -1038,6 +1090,10 @@ function SubModuleMixin:Setup()
 
     -- Modern pooled party setup (Era 1.15.9+, TBC 2.5.6+, MoP 5.5.4+)
     self:SetupModern()
+
+    if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
+        addonTable:SyncRaidStylePartyFrameToBlizzard(self.GetRaidStylePartyFrames(self))
+    end
 end
 
 function SubModuleMixin:OnEvent(event, ...)
@@ -1072,6 +1128,14 @@ function SubModuleMixin:Update()
         self.PartyMoveFrame:SetSize(sizeX, sizeY * 4 + 3 * state.padding)
     else
         self.PartyMoveFrame:SetSize(sizeX * 4 + 3 * state.padding, sizeY)
+    end
+
+    if not InCombatLockdown() and PartyFrame and self.PartyMoveFrame then
+        if PartyFrame:GetParent() ~= self.PartyMoveFrame then
+            PartyFrame:SetParent(self.PartyMoveFrame)
+        end
+        PartyFrame:ClearAllPoints()
+        PartyFrame:SetPoint('TOPLEFT', self.PartyMoveFrame, 'TOPLEFT', 0, 0)
     end
 
     if self.RestyleModernParty then self.RestyleModernParty() end

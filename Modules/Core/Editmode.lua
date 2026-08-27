@@ -599,19 +599,6 @@ function Module:InitEditmodeOverride()
     addonTable.BlizzEditmodeReapplyTimer = nil
     addonTable.BlizzEditmodeApplyAllowed = true
 
-    function addonTable:RefreshBlizzEditmodeLayouts()
-    end
-
-    function addonTable:ScheduleBlizzEditmodeApply()
-    end
-
-    function addonTable:SetBlizzEditmodeFrameSetting(frame, setting, value, apply)
-    end
-
-    function addonTable:GetBlizzEditmodeFrameSettingBool(frame, setting)
-        return false
-    end
-
     function addonTable:OverrideBlizzEditmode(f, ...)
         if f and not Helper:IsCombatLocked() then
             local ok, err = pcall(function(...)

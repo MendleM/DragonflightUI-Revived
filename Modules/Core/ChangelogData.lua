@@ -54,8 +54,11 @@ DF.ChangelogData = {
                     'All versions: decoupled ChatFrame1 from Blizzard EditModeManager and legacy position manager so position is preserved through window resizing and scaling.'
                 }
             }, {
-                title = 'Unit frames & Totems',
+                title = 'Unit frames & Party / Raid',
                 items = {
+                    'Party & Raid Frame Toggle (Issue #14): Fixed "Use Raid-Style Party Frames" to switch immediately and live between portrait frames and compact raid frames without requiring a /reload.',
+                    'Party Frame Positioning & Typography: Unified member names and health/mana text to FRIZQT outline font, and anchored modern PartyFrame directly to DragonflightUIPartyMoveFrame.',
+                    'Edit Mode Party Preview: Dynamic preview switching between 4 portrait frames and 5 compact raid boxes based on active setting.',
                     'Shaman TotemFrame: added dynamic HasTotemBar capability detection and hooked positioning to keep active totems attached to DragonflightUI.',
                     'Added early holder pre-positioning and immediate visual skinning in combat reloads.',
                     'Pet frame anchoring: fixed position jumping on pet summon by locking PetFrame to DragonflightUIPetFrame.',
