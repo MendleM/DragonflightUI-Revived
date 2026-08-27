@@ -23,7 +23,10 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 ### Chat
 - **TBC & Era Chat Permanence:** decoupled `ChatFrame1` from Blizzard's EditModeManager and legacy position manager. The chat window stays firmly anchored through loading screens, reloads, and window resizing without disappearing.
 
-### Unit Frames & Totems
+### Unit Frames & Party / Raid
+- **Party & Raid Frame Toggle (Issue #14):** Fixed "Use Raid-Style Party Frames" (Gruppen wie Schlachtzug anzeigen) to switch immediately and live between portrait party frames and compact raid frames without requiring a `/reload`. Decoupled setting persistence to DragonflightUI database as the single source of truth and hooked `EditModeManagerFrame:UseRaidStylePartyFrames()`.
+- **Party Frame Positioning & Fonts:** Unified party member names and health/mana status text typography to FRIZQT outline font, and anchored the pooled modern `PartyFrame` container directly to `DragonflightUIPartyMoveFrame`.
+- **Edit Mode Party Preview:** Dynamic preview switching between 4 portrait party member frames and 5 compact raid member boxes based on the active raid-style party frame setting.
 - **Shaman Totem Bar:** dynamic `HasTotemBar` detection and anchored positioning to prevent active totem icons from snapping below player frame.
 - **Combat Reload Visuals:** early holder pre-positioning and immediate visual skinning prevent visual snapping when reloading during combat.
 - **Pet Frame Anchoring:** locked `PetFrame` to `DragonflightUIPetFrame` and suppressed Blizzard's position manager to prevent the unit frame from jumping to default coordinates when summoning a pet.
