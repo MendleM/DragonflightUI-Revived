@@ -3074,6 +3074,15 @@ function DragonflightUIFPSMixin:OnLoad()
         --
         self:Update()
     end)
+
+    if FramerateText and not self.HookedFramerateText then
+        self.HookedFramerateText = true
+        hooksecurefunc(FramerateText, 'SetFormattedText', function(f)
+            if self.state and self.state.hideDefaultFPS then
+                f:SetText('')
+            end
+        end)
+    end
 end
 
 function DragonflightUIFPSMixin:SetupFrame()
@@ -3143,6 +3152,7 @@ end
 
 function DragonflightUIFPSMixin:Update()
     local state = self.state;
+    if not state then return end
 
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then
@@ -3158,11 +3168,23 @@ function DragonflightUIFPSMixin:Update()
 
     -- self:UpdateStateHandler(state)
 
-    FramerateLabel:ClearAllPoints()
-    if state.hideDefaultFPS then
-        FramerateLabel:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, 117 - 500)
-    else
-        FramerateLabel:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, 117)
+    if FramerateLabel then
+        if state.hideDefaultFPS then
+            FramerateLabel:SetAlpha(0)
+            if FramerateText then
+                FramerateText:SetAlpha(0)
+                FramerateText:SetText('')
+            end
+            FramerateLabel:ClearAllPoints()
+            FramerateLabel:SetPoint('TOPLEFT', UIParent, 'BOTTOMLEFT', -10000, -10000)
+        else
+            FramerateLabel:SetAlpha(1)
+            if FramerateText then
+                FramerateText:SetAlpha(1)
+            end
+            FramerateLabel:ClearAllPoints()
+            FramerateLabel:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, 117)
+        end
     end
 
     if state.showPing then
@@ -3181,7 +3203,7 @@ function DragonflightUIFPSMixin:Update()
         self.FPSText:Hide()
     end
 
-    self:SetShown(FramerateLabel:IsShown())
+    self:SetShown(FramerateLabel and FramerateLabel:IsShown() or false)
 
     if state.alwaysShowFPS then self:Show() end
 
