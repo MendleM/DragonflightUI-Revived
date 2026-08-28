@@ -771,6 +771,13 @@ function Module:SetupSubmodules()
     if Menu and Menu.ModifyMenu then
         self:AddRoleSelectDropdownOption()
     end
+
+    if DF.Caps.HasEditMode and DF.Caps.HasFocus then
+        local EditModeModule = DF:GetModule('Editmode')
+        if EditModeModule and EditModeModule.ShowEditmodeWarning then
+            EditModeModule:ShowEditmodeWarning(3, 0, 'Target and Focus')
+        end
+    end
 end
 
 function Module:Era()
