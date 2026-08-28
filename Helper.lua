@@ -31,6 +31,50 @@ function addonTable:OverrideBlizzEditmode(f, ...)
     end
 end
 
+local safeFallbackLayout = {
+    layoutType = 0,
+    layoutName = 'Default',
+    systems = {},
+}
+
+local function ProtectBlizzardEditModeManager()
+    local function SafeGetActiveLayoutInfo(self, orig)
+        local info = orig and orig(self)
+        if info and info.systems then return info end
+        if self and self.layoutInfo and self.layoutInfo.layouts then
+            local active = self.layoutInfo.activeLayout
+            local layout = (active and self.layoutInfo.layouts[active]) or self.layoutInfo.layouts[1]
+            if layout and layout.systems then return layout end
+        end
+        return safeFallbackLayout
+    end
+
+    if EditModeManagerFrameMixin and EditModeManagerFrameMixin.GetActiveLayoutInfo and not EditModeManagerFrameMixin.DFUISafeguarded then
+        local orig = EditModeManagerFrameMixin.GetActiveLayoutInfo
+        EditModeManagerFrameMixin.GetActiveLayoutInfo = function(self)
+            return SafeGetActiveLayoutInfo(self, orig)
+        end
+        EditModeManagerFrameMixin.DFUISafeguarded = true
+    end
+
+    if EditModeManagerFrame and EditModeManagerFrame.GetActiveLayoutInfo and not EditModeManagerFrame.DFUISafeguarded then
+        local orig = EditModeManagerFrame.GetActiveLayoutInfo
+        EditModeManagerFrame.GetActiveLayoutInfo = function(self)
+            return SafeGetActiveLayoutInfo(self, orig)
+        end
+        EditModeManagerFrame.DFUISafeguarded = true
+    end
+end
+ProtectBlizzardEditModeManager()
+
+local editModeBugWatcher = CreateFrame('Frame')
+editModeBugWatcher:RegisterEvent('ADDON_LOADED')
+editModeBugWatcher:SetScript('OnEvent', function(_, _, addon)
+    if addon == 'Blizzard_EditMode' or EditModeManagerFrame ~= nil then
+        ProtectBlizzardEditModeManager()
+    end
+end)
+
 function addonTable:FixBlizzEditModeManagerLayouts()
     if not (EditModeManagerFrame and EditModeManagerFrame.layoutInfo) then return end
     local info = EditModeManagerFrame.layoutInfo
