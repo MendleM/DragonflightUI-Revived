@@ -771,7 +771,7 @@ function DragonflightUIActionbarMixin:AddPagingStateDriver()
                 elseif HasTempShapeshiftActionBar() then
                     page = GetTempShapeshiftBarIndex();    
                 elseif HasBonusActionBar() then
-                    page = GetBonusBarIndex();
+                    page = GetBonusBarIndex() + 6;
                 else
                     page = nil;
                 end
@@ -852,7 +852,7 @@ function DragonflightUIActionbarMixin:UpdatePagingStateDriver(state)
     elseif mode == 'SMART' then
         local driverTable = {}
         -- 
-        tinsert(driverTable, "[overridebar][possessbar][shapeshift]possess")
+        tinsert(driverTable, "[overridebar][possessbar]possess")
         -- 
         for i = 2, 6 do
             --
