@@ -34,111 +34,21 @@ end
 function addonTable:FixBlizzEditModeManagerLayouts()
     if not (EditModeManagerFrame and EditModeManagerFrame.layoutInfo) then return end
     local info = EditModeManagerFrame.layoutInfo
-    info.layouts = info.layouts or {}
+    if not info.layouts then return end
 
-    if EditModePresetLayoutManager and EditModePresetLayoutManager.GetCopyOfPresetLayouts then
-        local ok, presets = pcall(EditModePresetLayoutManager.GetCopyOfPresetLayouts, EditModePresetLayoutManager)
-        if ok and presets and #presets > 0 then
-            local merged = {}
-            for _, p in ipairs(presets) do table.insert(merged, p) end
-            for _, c in ipairs(info.layouts) do table.insert(merged, c) end
-            info.layouts = merged
+    if info.activeLayout and info.activeLayout > #info.layouts then
+        if EditModePresetLayoutManager and EditModePresetLayoutManager.GetCopyOfPresetLayouts then
+            local ok, presets = pcall(EditModePresetLayoutManager.GetCopyOfPresetLayouts, EditModePresetLayoutManager)
+            if ok and presets and #presets > 0 then
+                local merged = {}
+                for _, p in ipairs(presets) do table.insert(merged, p) end
+                for _, c in ipairs(info.layouts) do table.insert(merged, c) end
+                info.layouts = merged
+            end
         end
     end
-
-    if #info.layouts == 0 then
-        table.insert(info.layouts, {
-            layoutType = 0,
-            layoutName = 'Default',
-            systems = {},
-        })
-    end
-
-    info.activeLayout = info.activeLayout or 1
-    if not info.layouts[info.activeLayout] then
+    if info.activeLayout and not info.layouts[info.activeLayout] and info.layouts[1] then
         info.layouts[info.activeLayout] = info.layouts[1]
-    end
-end
-
-local function InstallLayoutFixHook()
-    if EditModeManagerFrame and not EditModeManagerFrame.DFUILayoutHooked then
-        hooksecurefunc(EditModeManagerFrame, 'UpdateLayoutInfo', function()
-            addonTable:FixBlizzEditModeManagerLayouts()
-        end)
-        EditModeManagerFrame.DFUILayoutHooked = true
-    end
-    if EditModeManagerFrameMixin and EditModeManagerFrameMixin.UpdateLayoutInfo and not EditModeManagerFrameMixin.DFUILayoutHooked then
-        hooksecurefunc(EditModeManagerFrameMixin, 'UpdateLayoutInfo', function()
-            addonTable:FixBlizzEditModeManagerLayouts()
-        end)
-        EditModeManagerFrameMixin.DFUILayoutHooked = true
-    end
-    addonTable:FixBlizzEditModeManagerLayouts()
-end
-InstallLayoutFixHook()
-
-local layoutFixWatcher = CreateFrame('Frame')
-layoutFixWatcher:RegisterEvent('ADDON_LOADED')
-layoutFixWatcher:RegisterEvent('EDIT_MODE_LAYOUTS_UPDATED')
-layoutFixWatcher:SetScript('OnEvent', function(_, event, addon)
-    if event == 'ADDON_LOADED' and (addon == 'Blizzard_EditMode' or EditModeManagerFrame ~= nil) then
-        InstallLayoutFixHook()
-    elseif event == 'EDIT_MODE_LAYOUTS_UPDATED' then
-        addonTable:FixBlizzEditModeManagerLayouts()
-    end
-end)
-
-function addonTable:SanitizeBlizzardEditModeLayouts()
-    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
-
-    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
-    if not (ok and layoutInfo and layoutInfo.layouts) then return end
-
-    local changed = false
-    for _, layout in ipairs(layoutInfo.layouts) do
-        if layout.systems then
-            for _, sys in ipairs(layout.systems) do
-                if sys.anchorInfo and sys.anchorInfo.relativeTo then
-                    local rel = tostring(sys.anchorInfo.relativeTo)
-                    if string.find(rel, '^DragonflightUI') then
-                        sys.anchorInfo.relativeTo = 'UIParent'
-                        changed = true
-                    end
-                end
-                if sys.anchorInfo2 and sys.anchorInfo2.relativeTo then
-                    local rel = tostring(sys.anchorInfo2.relativeTo)
-                    if string.find(rel, '^DragonflightUI') then
-                        sys.anchorInfo2.relativeTo = 'UIParent'
-                        changed = true
-                    end
-                end
-            end
-        end
-    end
-
-    if EditModeManagerFrame and EditModeManagerFrame.layoutInfo and EditModeManagerFrame.layoutInfo.layouts then
-        for _, layout in ipairs(EditModeManagerFrame.layoutInfo.layouts) do
-            if layout.systems then
-                for _, sys in ipairs(layout.systems) do
-                    if sys.anchorInfo and sys.anchorInfo.relativeTo then
-                        local rel = tostring(sys.anchorInfo.relativeTo)
-                        if string.find(rel, '^DragonflightUI') then
-                            sys.anchorInfo.relativeTo = 'UIParent'
-                        end
-                    end
-                    if sys.anchorInfo2 and sys.anchorInfo2.relativeTo then
-                        local rel = tostring(sys.anchorInfo2.relativeTo)
-                        if string.find(rel, '^DragonflightUI') then
-                            sys.anchorInfo2.relativeTo = 'UIParent'
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    if changed then
-        pcall(C_EditMode.SaveLayouts, layoutInfo)
     end
 end
 
