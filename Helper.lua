@@ -31,62 +31,70 @@ function addonTable:OverrideBlizzEditmode(f, ...)
     end
 end
 
+local safeFallbackLayout = {
+    layoutType = 0,
+    layoutName = 'Default',
+    systems = {},
+}
+
+local function ProtectBlizzardEditModeManager()
+    local function SafeGetActiveLayoutInfo(self, orig)
+        local info = orig and orig(self)
+        if info and info.systems then return info end
+        if self and self.layoutInfo and self.layoutInfo.layouts then
+            local active = self.layoutInfo.activeLayout
+            local layout = (active and self.layoutInfo.layouts[active]) or self.layoutInfo.layouts[1]
+            if layout and layout.systems then return layout end
+        end
+        return safeFallbackLayout
+    end
+
+    if EditModeManagerFrameMixin and EditModeManagerFrameMixin.GetActiveLayoutInfo and not EditModeManagerFrameMixin.DFUISafeguarded then
+        local orig = EditModeManagerFrameMixin.GetActiveLayoutInfo
+        EditModeManagerFrameMixin.GetActiveLayoutInfo = function(self)
+            return SafeGetActiveLayoutInfo(self, orig)
+        end
+        EditModeManagerFrameMixin.DFUISafeguarded = true
+    end
+
+    if EditModeManagerFrame and EditModeManagerFrame.GetActiveLayoutInfo and not EditModeManagerFrame.DFUISafeguarded then
+        local orig = EditModeManagerFrame.GetActiveLayoutInfo
+        EditModeManagerFrame.GetActiveLayoutInfo = function(self)
+            return SafeGetActiveLayoutInfo(self, orig)
+        end
+        EditModeManagerFrame.DFUISafeguarded = true
+    end
+end
+ProtectBlizzardEditModeManager()
+
+local editModeBugWatcher = CreateFrame('Frame')
+editModeBugWatcher:RegisterEvent('ADDON_LOADED')
+editModeBugWatcher:SetScript('OnEvent', function(_, _, addon)
+    if addon == 'Blizzard_EditMode' or EditModeManagerFrame ~= nil then
+        ProtectBlizzardEditModeManager()
+    end
+end)
+
 function addonTable:FixBlizzEditModeManagerLayouts()
     if not (EditModeManagerFrame and EditModeManagerFrame.layoutInfo) then return end
     local info = EditModeManagerFrame.layoutInfo
-    info.layouts = info.layouts or {}
+    if not info.layouts then return end
 
-    if EditModePresetLayoutManager and EditModePresetLayoutManager.GetCopyOfPresetLayouts then
-        local ok, presets = pcall(EditModePresetLayoutManager.GetCopyOfPresetLayouts, EditModePresetLayoutManager)
-        if ok and presets and #presets > 0 then
-            local merged = {}
-            for _, p in ipairs(presets) do table.insert(merged, p) end
-            for _, c in ipairs(info.layouts) do table.insert(merged, c) end
-            info.layouts = merged
+    if info.activeLayout and info.activeLayout > #info.layouts then
+        if EditModePresetLayoutManager and EditModePresetLayoutManager.GetCopyOfPresetLayouts then
+            local ok, presets = pcall(EditModePresetLayoutManager.GetCopyOfPresetLayouts, EditModePresetLayoutManager)
+            if ok and presets and #presets > 0 then
+                local merged = {}
+                for _, p in ipairs(presets) do table.insert(merged, p) end
+                for _, c in ipairs(info.layouts) do table.insert(merged, c) end
+                info.layouts = merged
+            end
         end
     end
-
-    if #info.layouts == 0 then
-        table.insert(info.layouts, {
-            layoutType = 0,
-            layoutName = 'Default',
-            systems = {},
-        })
-    end
-
-    info.activeLayout = info.activeLayout or 1
-    if not info.layouts[info.activeLayout] then
+    if info.activeLayout and not info.layouts[info.activeLayout] and info.layouts[1] then
         info.layouts[info.activeLayout] = info.layouts[1]
     end
 end
-
-local function InstallLayoutFixHook()
-    if EditModeManagerFrame and not EditModeManagerFrame.DFUILayoutHooked then
-        hooksecurefunc(EditModeManagerFrame, 'UpdateLayoutInfo', function()
-            addonTable:FixBlizzEditModeManagerLayouts()
-        end)
-        EditModeManagerFrame.DFUILayoutHooked = true
-    end
-    if EditModeManagerFrameMixin and EditModeManagerFrameMixin.UpdateLayoutInfo and not EditModeManagerFrameMixin.DFUILayoutHooked then
-        hooksecurefunc(EditModeManagerFrameMixin, 'UpdateLayoutInfo', function()
-            addonTable:FixBlizzEditModeManagerLayouts()
-        end)
-        EditModeManagerFrameMixin.DFUILayoutHooked = true
-    end
-    addonTable:FixBlizzEditModeManagerLayouts()
-end
-InstallLayoutFixHook()
-
-local layoutFixWatcher = CreateFrame('Frame')
-layoutFixWatcher:RegisterEvent('ADDON_LOADED')
-layoutFixWatcher:RegisterEvent('EDIT_MODE_LAYOUTS_UPDATED')
-layoutFixWatcher:SetScript('OnEvent', function(_, event, addon)
-    if event == 'ADDON_LOADED' and (addon == 'Blizzard_EditMode' or EditModeManagerFrame ~= nil) then
-        InstallLayoutFixHook()
-    elseif event == 'EDIT_MODE_LAYOUTS_UPDATED' then
-        addonTable:FixBlizzEditModeManagerLayouts()
-    end
-end)
 
 function addonTable:SanitizeBlizzardEditModeLayouts()
     if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
