@@ -304,6 +304,10 @@ function Module:OnEnable()
 
     self:EnableAddonSpecific()
 
+    if addonTable and addonTable.SanitizeBlizzardEditModeLayouts then
+        addonTable:SanitizeBlizzardEditModeLayouts()
+    end
+
     Module:CreateGrid()
     Module:SetupMainmenuButton()
 
