@@ -31,6 +31,50 @@ function addonTable:OverrideBlizzEditmode(f, ...)
     end
 end
 
+local safeFallbackLayout = {
+    layoutType = 0,
+    layoutName = 'Default',
+    systems = {},
+}
+
+local function ProtectBlizzardEditModeManager()
+    local function SafeGetActiveLayoutInfo(self, orig)
+        local info = orig and orig(self)
+        if info and info.systems then return info end
+        if self and self.layoutInfo and self.layoutInfo.layouts then
+            local active = self.layoutInfo.activeLayout
+            local layout = (active and self.layoutInfo.layouts[active]) or self.layoutInfo.layouts[1]
+            if layout and layout.systems then return layout end
+        end
+        return safeFallbackLayout
+    end
+
+    if EditModeManagerFrameMixin and EditModeManagerFrameMixin.GetActiveLayoutInfo and not EditModeManagerFrameMixin.DFUISafeguarded then
+        local orig = EditModeManagerFrameMixin.GetActiveLayoutInfo
+        EditModeManagerFrameMixin.GetActiveLayoutInfo = function(self)
+            return SafeGetActiveLayoutInfo(self, orig)
+        end
+        EditModeManagerFrameMixin.DFUISafeguarded = true
+    end
+
+    if EditModeManagerFrame and EditModeManagerFrame.GetActiveLayoutInfo and not EditModeManagerFrame.DFUISafeguarded then
+        local orig = EditModeManagerFrame.GetActiveLayoutInfo
+        EditModeManagerFrame.GetActiveLayoutInfo = function(self)
+            return SafeGetActiveLayoutInfo(self, orig)
+        end
+        EditModeManagerFrame.DFUISafeguarded = true
+    end
+end
+ProtectBlizzardEditModeManager()
+
+local editModeBugWatcher = CreateFrame('Frame')
+editModeBugWatcher:RegisterEvent('ADDON_LOADED')
+editModeBugWatcher:SetScript('OnEvent', function(_, _, addon)
+    if addon == 'Blizzard_EditMode' or EditModeManagerFrame ~= nil then
+        ProtectBlizzardEditModeManager()
+    end
+end)
+
 function addonTable:FixBlizzEditModeManagerLayouts()
     if not (EditModeManagerFrame and EditModeManagerFrame.layoutInfo) then return end
     local info = EditModeManagerFrame.layoutInfo
@@ -49,6 +93,60 @@ function addonTable:FixBlizzEditModeManagerLayouts()
     end
     if info.activeLayout and not info.layouts[info.activeLayout] and info.layouts[1] then
         info.layouts[info.activeLayout] = info.layouts[1]
+    end
+end
+
+function addonTable:SanitizeBlizzardEditModeLayouts()
+    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
+
+    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
+    if not (ok and layoutInfo and layoutInfo.layouts) then return end
+
+    local changed = false
+    for _, layout in ipairs(layoutInfo.layouts) do
+        if layout.systems then
+            for _, sys in ipairs(layout.systems) do
+                if sys.anchorInfo and sys.anchorInfo.relativeTo then
+                    local rel = tostring(sys.anchorInfo.relativeTo)
+                    if string.find(rel, '^DragonflightUI') then
+                        sys.anchorInfo.relativeTo = 'UIParent'
+                        changed = true
+                    end
+                end
+                if sys.anchorInfo2 and sys.anchorInfo2.relativeTo then
+                    local rel = tostring(sys.anchorInfo2.relativeTo)
+                    if string.find(rel, '^DragonflightUI') then
+                        sys.anchorInfo2.relativeTo = 'UIParent'
+                        changed = true
+                    end
+                end
+            end
+        end
+    end
+
+    if EditModeManagerFrame and EditModeManagerFrame.layoutInfo and EditModeManagerFrame.layoutInfo.layouts then
+        for _, layout in ipairs(EditModeManagerFrame.layoutInfo.layouts) do
+            if layout.systems then
+                for _, sys in ipairs(layout.systems) do
+                    if sys.anchorInfo and sys.anchorInfo.relativeTo then
+                        local rel = tostring(sys.anchorInfo.relativeTo)
+                        if string.find(rel, '^DragonflightUI') then
+                            sys.anchorInfo.relativeTo = 'UIParent'
+                        end
+                    end
+                    if sys.anchorInfo2 and sys.anchorInfo2.relativeTo then
+                        local rel = tostring(sys.anchorInfo2.relativeTo)
+                        if string.find(rel, '^DragonflightUI') then
+                            sys.anchorInfo2.relativeTo = 'UIParent'
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if changed then
+        pcall(C_EditMode.SaveLayouts, layoutInfo)
     end
 end
 

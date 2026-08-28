@@ -43,6 +43,9 @@ DF.ChangelogData = {
                 title = 'Core & Architecture',
                 items = {
                     'Decoupled EditMode completely from LibEditModeOverride and permanently blocked Blizzard EditMode if DF UI is active.',
+                    'Edit Mode Layout Sanitization: automatically detects and migrates legacy DragonflightUI anchor references in saved Blizzard layouts back to UIParent, eliminating warnings when DF UI is disabled.',
+                    'EditModeManager Nil-Guard: centrally safeguarded GetActiveLayoutInfo against nil-dereference errors during layout updates and action bar transitions.',
+                    'Cleaned up obsolete ShowEditmodeWarning and setting conflict checks.',
                     'Streamlined Version.API.lua with universal expansion detection (Era, TBC, Wrath, Cata, MoP) and capability mirroring.',
                     'Removed on-screen combat reload warning banner to keep UI clean during reloads.',
                     'Reduced post-combat reapply delay to 100ms for faster responsiveness.'
