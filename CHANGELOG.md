@@ -15,6 +15,9 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 
 ### Core & Architecture
 - **Decoupled from Blizzard EditMode:** permanently suppressed Blizzard's EditModeManager and removed reliance on LibEditModeOverride to eliminate frame taint and layout overrides if DragonflightUI is active.
+- **Edit Mode Layout Sanitization:** automatically detects and migrates legacy `DragonflightUI...` anchor references in saved Blizzard Edit Mode layouts back to `UIParent`, eliminating `Couldn't find region` warnings when DragonflightUI is disabled.
+- **EditModeManager Crash Prevention:** centrally safeguarded `EditModeManagerFrame:GetActiveLayoutInfo()` against nil-dereference errors during layout updates and action bar transitions.
+- **Legacy Warning Cleanup:** removed obsolete `ShowEditmodeWarning` and Blizzard Edit Mode setting conflict checks.
 - **Version.API Refactoring:** streamlined universal expansion detection across Era, TBC, Wrath, Cata, and MoP with automatic capability mirroring (`DF.Caps`).
 - **Combat Reload Banner:** silenced on-screen reload state banner to preserve a clean UI during in-combat reloads.
 - **Post-Combat Recovery:** reduced post-combat reapply delay to 100ms for immediate UI responsiveness.
