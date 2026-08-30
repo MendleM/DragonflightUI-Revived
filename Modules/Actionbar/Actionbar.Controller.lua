@@ -678,6 +678,20 @@ function Module.UpdateBagState(state)
         if slot then slot:SetScale(state.scale) end
     end
 
+    -- The keyring is part of this row, so it scales with it (Issue #30).
+    --
+    -- It was left at the SetScale(1) the styler gives it while the four bag slots
+    -- above took state.scale. At scale 1.0 that happens to match and nobody
+    -- notices; at any other scale the keyring rendered at a different size than the
+    -- bag slot it is anchored against. The button art sits at CENTER +2,-1 in each
+    -- button's own coordinate space, so that offset scaled for the bags and did not
+    -- for the keyring - which is why the seam looked wrong rather than merely the
+    -- size being off.
+    --
+    -- Same flavour guard the styler uses: on Cata and MoP the keyring is hidden
+    -- instead of styled, so there is nothing to scale.
+    if not (DF.Cata or DF.MoP) and KeyRingButton then KeyRingButton:SetScale(state.scale) end
+
     local toggle = Module.FrameBagToggle
     if toggle and CharacterBag0Slot and MainMenuBarBackpackButton then
         if state.hideArrow then
