@@ -251,8 +251,32 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
     -- EDIT_MODE_LAYOUTS_UPDATED that SaveLayouts triggers is what brings the
     -- live table back in sync - on Blizzard's own execution, not ours.
 
-    if EditModeManagerFrame and EditModeManagerFrame.OnEditModeSystemSettingChange and PartyFrame then
-        pcall(EditModeManagerFrame.OnEditModeSystemSettingChange, EditModeManagerFrame, PartyFrame, targetSetting, val)
+    -- Push the value into Blizzard's live system frame, which is what actually
+    -- switches the party frames.
+    --
+    -- This is OnSystemSettingChange, and the name matters. The call here used to
+    -- be OnEditModeSystemSettingChange, which does not exist on
+    -- EditModeManagerFrame - so the guard was nil, the block never ran, and the
+    -- layout write below was the only thing happening. That write alone does not
+    -- switch anything: Blizzard reads this setting through
+    --
+    --   UseRaidStylePartyFrames() -> GetSettingValueBool(...)
+    --     -> GetRegisteredSystemFrame(...) -> systemFrame:GetSettingValueBool(...)
+    --
+    -- so the value has to reach the registered system frame's setting map, and
+    -- the layout only feeds that on the next EDIT_MODE_LAYOUTS_UPDATED. Blizzard's
+    -- own setter does it now, and its UpdateSystemSetting hop runs
+    -- UpdateSystemSettingUseRaidStylePartyFrames -> UpdateRaidAndPartyFrames,
+    -- which is the switch itself.
+    --
+    -- Out of combat only: that chain ends in Show/Hide and SetPoint on the
+    -- protected party frames, which the client refuses mid-fight.
+    if EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and PartyFrame then
+        Helper:RunOutOfCombat('party raid style setting', function()
+            local ok, err = pcall(EditModeManagerFrame.OnSystemSettingChange, EditModeManagerFrame, PartyFrame,
+                                  targetSetting, val)
+            if not ok then geterrorhandler()('DFUI OnSystemSettingChange: ' .. tostring(err)) end
+        end)
     end
 
     if C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts then

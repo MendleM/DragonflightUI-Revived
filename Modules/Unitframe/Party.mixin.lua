@@ -225,8 +225,19 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     Helper:RunOutOfCombat('RaidStylePartyFrames', function()
         C_Timer.After(0, function()
             if InCombatLockdown() then return end
-            if PartyFrame and PartyFrame.UpdateSystem and Enum and Enum.EditModeUnitFrameSetting then
-                pcall(PartyFrame.UpdateSystem, PartyFrame, Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames)
+            -- EditModeManagerFrame:UpdateSystem, not PartyFrame:UpdateSystem.
+            --
+            -- Two different functions with different arguments. The manager's
+            -- version takes a system FRAME and looks the systemInfo up out of the
+            -- active layout; the frame's own version takes that systemInfo table
+            -- and iterates systemInfo.settings. This used to call the frame
+            -- version with a setting enum, so it indexed a number and threw
+            -- inside the pcall on every single toggle, without a word.
+            if EditModeManagerFrame and EditModeManagerFrame.UpdateSystem and PartyFrame then
+                local forceFullUpdate = true
+                local ok, err = pcall(EditModeManagerFrame.UpdateSystem, EditModeManagerFrame, PartyFrame,
+                                      forceFullUpdate)
+                if not ok then geterrorhandler()('DFUI PartyFrame UpdateSystem: ' .. tostring(err)) end
             end
             if PartyFrame and PartyFrame.UpdatePartyFrames then
                 pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
