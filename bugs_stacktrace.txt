@@ -1,243 +1,550 @@
-7x Blizzard_EditMode/Shared/EditModeManager.lua:284: attempt to index local 'layoutInfo' (a nil value)
-[Blizzard_EditMode/Shared/EditModeManager.lua]:284: in function <Blizzard_EditMode/Shared/EditModeManager.lua:278>
-[tail call]: ?
-[Blizzard_UIParentPanelManager/Classic/UIParentPanelManagerOverrides.lua]:115: in function 'ApplyPositionManagement'
-[Blizzard_UIParentPanelManager/Classic/UIParentPanelManagerOverrides.lua]:150: in function 'UIParentManageFramePositions'
-[Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua]:142: in function <...UIParentPanelManager/Shared/UIParentPanelManager.lua:128>
-[C]: in function 'SetAttribute'
-[Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua]:795: in function 'UIParent_ManageFramePositions'
-[Blizzard_ActionBarController/ActionBarController.lua]:235: in function 'ValidateActionBarTransition'
-[Blizzard_ActionBarController/ActionBarController.lua]:175: in function <...Blizzard_ActionBarController/ActionBarController.lua:143>
-[C]: in function 'ActionBarController_UpdateAll'
-[Blizzard_ActionBarController/ActionBarController.lua]:58: in function <...Blizzard_ActionBarController/ActionBarController.lua:55>
+DragonflightUI 0.44.0 | 1.15.9 | 548 entries matching "seed"
 
-
-Locals:
-self=EditModeManagerFrame <EditModeManager.xml:4>{
- advancedOptionsEnabled=true
- AccountSettings=Frame <EditModeManager.xml:133>
- RevertAllChangesButton=Button <EditModeManager.xml:517>
- LayoutDropdown=Button <EditModeManager.xml:50>
- modernSystemMap=<table>
- dirty=false
- DFChatHooked=true
- snapEnabled=true
- accountSettings=<table>
- hasActiveChanges=false
- GridSpacingSlider=Frame <EditModeManager.xml:99>
- numLayouts=<table>
- layoutApplyInProgress=true
- FramesBlockingEditMode=<table>
- modernSystems=<table>
- SaveChangesButton=Button <EditModeManager.xml:512>
- Grid=Frame <EditModeManager.xml:64>
- ShowGridCheckButton=Frame <EditModeManager.xml:79>
- EnableSnapCheckButton=Frame <EditModeManager.xml:115>
- MagnetismPreviewLinesContainer=Frame <EditModeManager.xml:55>
- CloseButton=Button <EditModeManager.xml:42>
- Tutorial=Button <EditModeManager.xml:29>
- editModeSystemAnchorDirty=true
- Title=FontString <EditModeManager.xml:13>
- fixedWidth=510
- EnableAdvancedOptionsCheckButton=Frame <EditModeManager.xml:124>
- Border=Frame <EditModeManager.xml:24>
- registeredSystemFrames=<table>
- accountSettingMap=<table>
- LayoutLabel=FontString <EditModeManager.xml:18>
-}
-systemFrame=MultiBarBottomLeft <MultiActionBars.xml:45>{
- buttonPadding=6
- downKeys=<table>
- buttonTemplate="MultiBar1ButtonTemplate"
- oldGridSettings=<table>
- dividersDirty=false
- hasActiveChanges=false
- dirty=false
- ignoreFramePositionManager=true
- gridInitialized=true
- visibility="Always"
- barArtDirty=false
- dirtySettings=<table>
- settingMap=<table>
- systemInfo=<table>
- systemIndex=2
- savedSystemInfo=<table>
- minButtonPadding=2
- settingDisplayInfoMap=<table>
- snappedFrames=<table>
- settingsDialogAnchor=<table>
- gridLayoutDirty=false
- shownButtonContainers=<table>
- actionButtons=<table>
- isShownExternal=true
- numButtonsShowable=12
- QuickKeybindGlow=Texture <MultiActionBars.xml:66>
- isNormalBar=true
- systemNameString="Aktionsleiste %d"
- skipAutomaticPositioning=true
- addButtonsToTop=true
- addButtonsToRight=true
- numRows=1
- isHorizontal=true
- commandNamePrefix="MULTIACTIONBAR1"
- flyoutDirection="DOWN"
- addSystemIndexToName=true
- system=0
- Selection=Frame <EditModeSystemTemplates.xml:64>
- numButtons=12
- hideGridEventName="ACTIONBAR_HIDEGRID"
- showGridEventName="ACTIONBAR_SHOWGRID"
-}
-forceOffsetX=0
-forceOffsetY=5
-anchorInfo=nil
-layoutInfo=nil
-(*temporary)=EditModeManagerFrame <EditModeManager.xml:4>{
- advancedOptionsEnabled=true
- AccountSettings=Frame <EditModeManager.xml:133>
- RevertAllChangesButton=Button <EditModeManager.xml:517>
- LayoutDropdown=Button <EditModeManager.xml:50>
- modernSystemMap=<table>
- dirty=false
- DFChatHooked=true
- snapEnabled=true
- accountSettings=<table>
- hasActiveChanges=false
- GridSpacingSlider=Frame <EditModeManager.xml:99>
- numLayouts=<table>
- layoutApplyInProgress=true
- FramesBlockingEditMode=<table>
- modernSystems=<table>
- SaveChangesButton=Button <EditModeManager.xml:512>
- Grid=Frame <EditModeManager.xml:64>
- ShowGridCheckButton=Frame <EditModeManager.xml:79>
- EnableSnapCheckButton=Frame <EditModeManager.xml:115>
- MagnetismPreviewLinesContainer=Frame <EditModeManager.xml:55>
- CloseButton=Button <EditModeManager.xml:42>
- Tutorial=Button <EditModeManager.xml:29>
- editModeSystemAnchorDirty=true
- Title=FontString <EditModeManager.xml:13>
- fixedWidth=510
- EnableAdvancedOptionsCheckButton=Frame <EditModeManager.xml:124>
- Border=Frame <EditModeManager.xml:24>
- registeredSystemFrames=<table>
- accountSettingMap=<table>
- LayoutLabel=FontString <EditModeManager.xml:18>
-}
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)="attempt to index local 'layoutInfo' (a nil value)"
-
-
-1x Blizzard_EditMode/Shared/EditModeManager.lua:1652: attempt to index local 'layoutInfo' (a nil value)
-[Blizzard_EditMode/Shared/EditModeManager.lua]:1652: in function 'GetDefaultAnchor'
-[Blizzard_UIParent/Shared/UIParent.lua]:78: in function <Blizzard_UIParent/Shared/UIParent.lua:47>
-[C]: in function 'UIParent_UpdateTopFramePositions'
-[Blizzard_UnitFrame/Classic/PlayerFrame.lua]:282: in function 'PlayerFrame_ResetPosition'
-[Blizzard_UnitFrame/Classic/PlayerFrame.lua]:191: in function <...ceBlizzard_UnitFrame/Classic/PlayerFrame.lua:174>
-[C]: ?
-
-
-Locals:
-self=EditModeManagerFrame <EditModeManager.xml:4>{
- advancedOptionsEnabled=true
- AccountSettings=Frame <EditModeManager.xml:133>
- RevertAllChangesButton=Button <EditModeManager.xml:517>
- LayoutDropdown=Button <EditModeManager.xml:50>
- modernSystemMap=<table>
- dirty=false
- DFChatHooked=true
- snapEnabled=true
- accountSettings=<table>
- hasActiveChanges=false
- GridSpacingSlider=Frame <EditModeManager.xml:99>
- numLayouts=<table>
- layoutApplyInProgress=true
- FramesBlockingEditMode=<table>
- modernSystems=<table>
- SaveChangesButton=Button <EditModeManager.xml:512>
- Grid=Frame <EditModeManager.xml:64>
- ShowGridCheckButton=Frame <EditModeManager.xml:79>
- EnableSnapCheckButton=Frame <EditModeManager.xml:115>
- MagnetismPreviewLinesContainer=Frame <EditModeManager.xml:55>
- CloseButton=Button <EditModeManager.xml:42>
- Tutorial=Button <EditModeManager.xml:29>
- editModeSystemAnchorDirty=true
- Title=FontString <EditModeManager.xml:13>
- fixedWidth=510
- EnableAdvancedOptionsCheckButton=Frame <EditModeManager.xml:124>
- Border=Frame <EditModeManager.xml:24>
- registeredSystemFrames=<table>
- accountSettingMap=<table>
- LayoutLabel=FontString <EditModeManager.xml:18>
-}
-frame=BuffFrame <BuffFrame.xml:6>{
- systemInfo=<table>
- downKeys=<table>
- numHideableBuffs=0
- CollapseAndExpandButton=CheckButton <BuffFrame.xml:14>
- dirtySettings=<table>
- hasActiveChanges=false
- systemIndex=1
- snappedFrames=<table>
- savedSystemInfo=<table>
- settingMap=<table>
- hiddenBuffUpdatePeriod=0.200000
- systemNameString="Buffrahmen"
- hiddenBuffUpdateTimer=0
- settingDisplayInfoMap=<table>
- settingsDialogAnchor=<table>
- auraFrames=<table>
- ConsolidatedBuffs=Button <BuffFrame.xml:42>
- exampleAuraType="Buff"
- Selection=Frame <EditModeSystemTemplates.xml:146>
- isExpanded=true
- AuraContainer=Frame <BuffFrameTemplates.xml:119>
- defaultHideSelection=true
- system=6
- maxAuras=32
-}
-layoutInfo=nil
-(*temporary)=EditModeManagerFrame <EditModeManager.xml:4>{
- advancedOptionsEnabled=true
- AccountSettings=Frame <EditModeManager.xml:133>
- RevertAllChangesButton=Button <EditModeManager.xml:517>
- LayoutDropdown=Button <EditModeManager.xml:50>
- modernSystemMap=<table>
- dirty=false
- DFChatHooked=true
- snapEnabled=true
- accountSettings=<table>
- hasActiveChanges=false
- GridSpacingSlider=Frame <EditModeManager.xml:99>
- numLayouts=<table>
- layoutApplyInProgress=true
- FramesBlockingEditMode=<table>
- modernSystems=<table>
- SaveChangesButton=Button <EditModeManager.xml:512>
- Grid=Frame <EditModeManager.xml:64>
- ShowGridCheckButton=Frame <EditModeManager.xml:79>
- EnableSnapCheckButton=Frame <EditModeManager.xml:115>
- MagnetismPreviewLinesContainer=Frame <EditModeManager.xml:55>
- CloseButton=Button <EditModeManager.xml:42>
- Tutorial=Button <EditModeManager.xml:29>
- editModeSystemAnchorDirty=true
- Title=FontString <EditModeManager.xml:13>
- fixedWidth=510
- EnableAdvancedOptionsCheckButton=Frame <EditModeManager.xml:124>
- Border=Frame <EditModeManager.xml:24>
- registeredSystemFrames=<table>
- accountSettingMap=<table>
- LayoutLabel=FontString <EditModeManager.xml:18>
-}
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)=nil
-(*temporary)="attempt to index local 'layoutInfo' (a nil value)"
+52917.00 [seed] FIRST INSECURE .unit on <pooled> (unit=party1), tainted by DragonflightUI
+52917.00 [seed] stack: [C]: in function 'UnitFrame_SetUnit' | [Interface/AddOns/Blizzard_UnitFrame/Classic/PartyMemberFrame.lua]:26: in function 'ToPlayerArt' | [Interface/AddOns/Blizzard_UnitFrame/Classic/PartyMemberFrame.lua]:11: in function 'UpdateArt' | [Interface/AddOns/Blizzard_UnitFrame/Classic/PartyMemberFrame.lua]:194: in function 'UpdateMember' | [Interface/AddOns/Blizzard_UnitFrame/Shared/PartyFrame.lua]:154: in function 'UpdatePartyFrames' | [Interface/AddOns/Blizzard_RaidFrame/Classic/RaidFrame.lua]:261: in function 'UpdateRaidAndPartyFrames' | [Interface/AddOns/Blizzard_UIParent/Vanilla/UIParent.lua]:590: in function <...erface/AddOns/Blizzard_UIParent/Vanilla/UIParent.lua:345> | [C]: ? | 
+52917.00 [seed] none of the 26 globals on that path are insecure - the seed is a field, not a global
+52917.00 [seed] FIELD member.debuffs insecure, tainted by DragonflightUI
+52917.00 [seed] FIELD member.buffs insecure, tainted by DragonflightUI
+52917.00 [seed] FIELD member.unit insecure, tainted by DragonflightUI
+52917.00 [seed] FIELD member.PetFrame: every field secure
+52917.00 [seed] FIELD parent.systemIndex insecure, tainted by DragonflightUI
+52917.00 [seed] FIELD parent.system insecure, tainted by DragonflightUI
+52917.00 [seed] FIELD PartyFrame.systemIndex insecure, tainted by DragonflightUI
+52917.00 [seed] FIELD PartyFrame.system insecure, tainted by DragonflightUI
+52917.00 [seed] frame.OnEvent secure=true blame=- value=function
+52917.00 [seed] scanned 77693 globals: 20277 tainted overall, 2275 by DragonflightUI, 534 of those NOT ours
+52917.00 [seed] SEED: ** tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton11DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton11DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton12DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton12DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: ActionButton9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: AddAutoAdjustTable tainted by DragonflightUI
+52917.00 [seed] SEED: AddButtonTable tainted by DragonflightUI
+52917.00 [seed] SEED: AddCastbarTable tainted by DragonflightUI
+52917.00 [seed] SEED: AddFlyoutTable tainted by DragonflightUI
+52917.00 [seed] SEED: AddonListTopLeftCornerDF tainted by DragonflightUI
+52917.00 [seed] SEED: AuraDurationsDB tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFACTIONBAR6 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFACTIONBAR7 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFACTIONBAR8 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT10 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT2 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT3 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT4 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT5 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT6 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT7 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT8 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DFCUSTOMFLYOUT9 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_CATEGORY_DRAGONFLIGHTUI tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFACTIONBAR6_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFACTIONBAR7_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFACTIONBAR8_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT10_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT1_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT2_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT3_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT4_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT5_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT6_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT7_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT8_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFCUSTOMFLYOUT9_BUTTON1 tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFDEBUG tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_HEADER_DFFRAMES tainted by DragonflightUI
+52917.00 [seed] SEED: BINDING_NAME_DRAGONFLIGHTUI_CAPTUREFRAME tainted by DragonflightUI
+52917.00 [seed] SEED: CUF_PROFILE_ACTIVATE_PATCH_VERSION tainted by DragonflightUI
+52917.00 [seed] SEED: ChatFrame1_DFEditModeSelection tainted by DragonflightUI
+52917.00 [seed] SEED: CommunitiesFrameTopLeftCornerDF tainted by DragonflightUI
+52917.00 [seed] SEED: ContainerFrameCurrencyBorderMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUICastbarMirrorMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUICastbarMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIConfigCategoryButtonMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIConfigCategoryListButtonMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIConfigCategoryListElementMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIConfigCategoryListHeaderMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIConfigCategoryListMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIConfigCategoryMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIConfigMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIConfigMixin2 tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIProfessionSpellbookMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIQuickKeybindButtonOverlayMixin tainted by DragonflightUI
+52917.00 [seed] SEED: DragonFlightUIQuickKeybindMixin tainted by DragonflightUI
+52917.00 [seed] SEED: FriendsFrameTopLeftCornerDF tainted by DragonflightUI
+52917.00 [seed] SEED: GetMinimapShape tainted by DragonflightUI
+52917.00 [seed] SEED: GetQuestLogRewardXP tainted by DragonflightUI
+52917.00 [seed] SEED: LFGMinimapFrame_DFEditModeSelection tainted by DragonflightUI
+52917.00 [seed] SEED: LFGMouseoverFlipbookAnimation tainted by DragonflightUI
+52917.00 [seed] SEED: LFGSearchingFlipbookAnimation tainted by DragonflightUI
+52917.00 [seed] SEED: LibClassicDurationsScanTip tainted by DragonflightUI
+52917.00 [seed] SEED: LibQuestXPDB tainted by DragonflightUI
+52917.00 [seed] SEED: LootFrameTopLeftCornerDF tainted by DragonflightUI
+52917.00 [seed] SEED: MailFrameTopLeftCornerDF tainted by DragonflightUI
+52917.00 [seed] SEED: MerchantFrameTopLeftCornerDF tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button11DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button11DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button12DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button12DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar5Button9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button11DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button11DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button12DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button12DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar6Button9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button11DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button11DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button12DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button12DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBar7Button9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton11DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton11DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton12DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton12DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomLeftButton9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton11DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton11DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton12DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton12DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarBottomRightButton9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton11DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton11DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton12DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton12DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarLeftButton9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton11DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton11DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton12DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton12DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: MultiBarRightButton9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton10DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton10DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton1DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton1DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton2DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton2DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton3DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton3DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton4DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton4DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton5DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton5DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton6DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton6DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton7DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton7DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton8DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton8DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton9DFFakeChecked tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton9DFNormalTexture2Replacement tainted by DragonflightUI
+52917.00 [seed] SEED: PetActionButton9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PortraitFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PossessBarFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1 tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1Icon tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1IconBorder tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1Missing tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1ProfessionName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1Rank tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1Specialization tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonBottom tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonBottomCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonBottomHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonBottomIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonBottomNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonBottomSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonBottomSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonTop tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonTopCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonTopHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonTopIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonTopNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonTopSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1SpellButtonTopSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBar tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarBGLeft tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarBGMiddle tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarBGRight tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarBar tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarCapped tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarCappedLockedIndicator tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarLeft tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarRank tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession1StatusBarRight tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2 tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2Icon tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2IconBorder tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2Missing tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2ProfessionName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2Rank tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2Specialization tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonBottom tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonBottomCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonBottomHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonBottomIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonBottomNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonBottomSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonBottomSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonTop tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonTopCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonTopHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonTopIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonTopNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonTopSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2SpellButtonTopSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBar tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarBGLeft tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarBGMiddle tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarBGRight tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarBar tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarCapped tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarCappedLockedIndicator tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarLeft tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarRank tainted by DragonflightUI
+52917.00 [seed] SEED: PrimaryProfession2StatusBarRight tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogCountMiddleMiddle tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle10 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle11 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle12 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle13 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle14 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle15 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle16 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle17 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle18 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle19 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle20 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle21 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle22 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle7 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle8 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestLogTitle9 tainted by DragonflightUI
+52917.00 [seed] SEED: QuestWatchFrame_DFEditModeSelection tainted by DragonflightUI
+52917.00 [seed] SEED: RestFlipbookAnimation tainted by DragonflightUI
+52917.00 [seed] SEED: ScrollableListItemMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1 tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1Missing tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1ProfessionName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1Rank tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonLeftCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonLeftHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonLeftIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonLeftNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonLeftSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonLeftSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonRightCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonRightHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonRightIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonRightNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonRightSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1SpellButtonRightSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBar tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarBGLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarBGMiddle tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarBGRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarBar tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarCapped tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarCappedLockedIndicator tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarRank tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession1StatusBarRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2 tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2Missing tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2ProfessionName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2Rank tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonLeftCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonLeftHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonLeftIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonLeftNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonLeftSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonLeftSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonRightCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonRightHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonRightIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonRightNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonRightSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2SpellButtonRightSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBar tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarBGLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarBGMiddle tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarBGRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarBar tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarCapped tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarCappedLockedIndicator tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarRank tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession2StatusBarRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3 tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3Missing tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3ProfessionName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3Rank tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonLeftCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonLeftHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonLeftIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonLeftNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonLeftSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonLeftSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonRightCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonRightHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonRightIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonRightNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonRightSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3SpellButtonRightSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBar tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarBGLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarBGMiddle tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarBGRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarBar tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarCapped tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarCappedLockedIndicator tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarRank tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession3StatusBarRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4 tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4Missing tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4ProfessionName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4Rank tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonLeftCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonLeftHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonLeftIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonLeftNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonLeftSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonLeftSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonRightCooldown tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonRightHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonRightIconTexture tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonRightNameFrame tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonRightSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4SpellButtonRightSubSpellName tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBar tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarBGLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarBGMiddle tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarBGRight tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarBar tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarCapped tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarCappedLockedIndicator tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarLeft tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarRank tainted by DragonflightUI
+52917.00 [seed] SEED: SecondaryProfession4StatusBarRight tainted by DragonflightUI
+52917.00 [seed] SEED: SelectionPopoutButtonMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SelectionPopoutMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SettingsButtonControlMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SettingsCategoryListMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SettingsCheckBoxMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SettingsDropdownMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SettingsListMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SettingsSelectionPopoutDetailsMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SettingsSelectionPopoutEntryMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: SettingsSliderMixinDF tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton10DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton10DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton1DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton1DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton2DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton2DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton3DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton3DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton4DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton4DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton5DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton5DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton6DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton6DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton7DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton7DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton8DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton8DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton9DFFakeHighlight tainted by DragonflightUI
+52917.00 [seed] SEED: StanceButton9DFOnTopFrame tainted by DragonflightUI
+52917.00 [seed] SEED: TAXI_MAP_HEIGHT tainted by DragonflightUI
+52917.00 [seed] SEED: TAXI_MAP_WIDTH tainted by DragonflightUI
+52917.00 [seed] SEED: TargetFrameHandler tainted by DragonflightUI
+52917.00 [seed] SEED: TargetFrameHandlerAlpha tainted by DragonflightUI
+52917.00 [seed] SEED: TargetFrameHandlerOnEnterLeave tainted by DragonflightUI
+52917.00 [seed] SEED: TargetFrameShower tainted by DragonflightUI
+52917.00 [seed] SEED: TimeManagerFrameTopLeftCornerDF tainted by DragonflightUI
+52917.00 [seed] SEED: TradeFrameTopLeftCornerDF tainted by DragonflightUI
+52917.00 [seed] SEED: UIDD_REFRESH_OVERREAD_PATCH_VERSION tainted by DragonflightUI
+52917.00 [seed] SEED: UIDROPDOWNMENU_OPEN_PATCH_VERSION tainted by DragonflightUI
+52917.00 [seed] SEED: sss tainted by DragonflightUI
+52917.00 [seed] (1741 of ours, e.g. **)
