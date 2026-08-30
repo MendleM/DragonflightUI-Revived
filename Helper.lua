@@ -31,26 +31,167 @@ function addonTable:OverrideBlizzEditmode(f, ...)
     end
 end
 
-function addonTable:FixBlizzEditModeManagerLayouts()
-    if not (EditModeManagerFrame and EditModeManagerFrame.layoutInfo) then return end
-    local info = EditModeManagerFrame.layoutInfo
-    if not info.layouts then return end
+-- EditModeManagerFrame.layoutInfo is Blizzard's, and nothing here may write it.
+--
+-- There used to be a FixBlizzEditModeManagerLayouts() at this spot that
+-- "repaired" layoutInfo when activeLayout pointed past the end of layouts. It
+-- was treating damage this file caused, and it caused more of its own:
+--
+--   1. Blizzard already builds that list as presets .. savedLayouts, at the top
+--      of UpdateLayoutInfo. Merging GetCopyOfPresetLayouts() in a second time
+--      duplicated every preset and shifted every index, which is what made
+--      activeLayout run past the end in the first place.
+--   2. Assigning info.layouts / info.layouts[i] from here is an addon write
+--      into a Blizzard table. Blizzard walks that table under
+--      secureexecuterange (InitSystemAnchors, UpdateSystems) and ends up
+--      calling SetPoint on the action bars and unit frames with it, so the
+--      taint lands on protected frames and their actions get blocked.
+--
+-- The condition it checked cannot occur once the argument-less
+-- UpdateLayoutInfo() call below is gone: that call was what nil'd layoutInfo.
+-- Read layouts through C_EditMode.GetLayouts(), which hands out a copy, mutate
+-- that, and give it to C_EditMode.SaveLayouts(). Never touch the live table.
 
-    if info.activeLayout and info.activeLayout > #info.layouts then
-        if EditModePresetLayoutManager and EditModePresetLayoutManager.GetCopyOfPresetLayouts then
-            local ok, presets = pcall(EditModePresetLayoutManager.GetCopyOfPresetLayouts, EditModePresetLayoutManager)
-            if ok and presets and #presets > 0 then
-                local merged = {}
-                for _, p in ipairs(presets) do table.insert(merged, p) end
-                for _, c in ipairs(info.layouts) do table.insert(merged, c) end
-                info.layouts = merged
+-- One-time repair of leftover DragonflightUI anchors in Blizzard's Edit Mode layout.
+--
+-- An earlier version of this addon anchored Blizzard's Edit Mode systems to its
+-- own holder frames and let that be written into Blizzard's layout. Those
+-- layouts live on Blizzard's server, so the references outlived every reinstall
+-- and every WTF wipe: with DragonflightUI disabled, the client restored a layout
+-- anchoring PlayerFrame to DragonflightUIPlayerFrame - a frame that no longer
+-- exists - and the UI came up broken.
+--
+-- Repointing those anchors at UIParent, which is what the first attempt at this
+-- did, is not a repair. The offsets stored beside them were measured against a
+-- DragonflightUI frame, so keeping point/relativePoint/offsetX/offsetY and only
+-- swapping the reference leaves the frame at a position that means nothing - and
+-- then saves it back to the server as though it were deliberate.
+--
+-- Blizzard's own answer to "this system has no custom position" is
+-- EditModeSystemMixin:ResetToDefaultPosition:
+--
+--     self.systemInfo.anchorInfo = EditModePresetLayoutManager:GetDefaultSystemAnchorInfo(...)
+--     self.systemInfo.anchorInfo2 = nil
+--     self.systemInfo.isInDefaultPosition = true
+--
+-- isInDefaultPosition is the flag the rest of the system actually reads -
+-- initSystemAnchor skips managed frames that report it, and the action bar
+-- placement only positions bars that report it - so that is what this sets, on
+-- the copy C_EditMode.GetLayouts() hands out.
+local ANCHOR_MIGRATION_VERSION = 1
+local migrationRunning = false
+
+local function IsLegacyDFUIAnchor(anchorInfo)
+    if not (anchorInfo and anchorInfo.relativeTo) then return false end
+
+    -- Narrow on purpose. The frames that can legitimately turn up here are the
+    -- holders this addon anchors Blizzard systems to, and every one of them is
+    -- named DragonflightUI* (PlayerFrame, TargetFrame, PartyMoveFrame, the edit
+    -- mode frames). Also matching '^DF' would catch DFTrainerInset*, which is
+    -- never an anchor target, at the price of resetting positions the player
+    -- chose themselves.
+    return tostring(anchorInfo.relativeTo):find('^DragonflightUI') ~= nil
+end
+
+local function ResetSystemToDefaultPosition(sys)
+    if not (sys and sys.system) then return false end
+    if not (EditModePresetLayoutManager and EditModePresetLayoutManager.GetDefaultSystemAnchorInfo) then
+        return false
+    end
+
+    local ok, defaultAnchor = pcall(EditModePresetLayoutManager.GetDefaultSystemAnchorInfo,
+                                    EditModePresetLayoutManager, sys.system, sys.systemIndex)
+
+    -- A half-finished reset is worse than none. ApplySystemAnchor indexes
+    -- anchorInfo.point without checking, and C_EditMode.SaveLayouts validates
+    -- the structure and throws on a malformed one - which is exactly how people
+    -- end up with a layout that is corrupt on the server for good. If Blizzard
+    -- will not hand over the default for this system, leave the system alone.
+    if not (ok and type(defaultAnchor) == 'table' and defaultAnchor.point) then return false end
+
+    sys.anchorInfo = defaultAnchor
+    sys.anchorInfo2 = nil
+    sys.isInDefaultPosition = true
+    return true
+end
+
+-- Returns true once this character has nothing left to migrate.
+function addonTable:SanitizeLegacyEditModeAnchors()
+    if migrationRunning then return false end
+    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return false end
+
+    -- Per character, not global. GetLayouts() only ever returns the layouts that
+    -- apply to the character you are on, so a character-scoped layout carrying a
+    -- stale anchor is invisible until that character logs in. A global flag would
+    -- mark the job done after the first one and never look at the rest.
+    local db = DF.db and DF.db.char
+    if not db then return false end
+    if (db.editModeAnchorMigration or 0) >= ANCHOR_MIGRATION_VERSION then return true end
+
+    migrationRunning = true
+
+    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
+    if not (ok and layoutInfo and layoutInfo.layouts) then
+        migrationRunning = false
+        return false
+    end
+
+    local repaired, skipped = 0, 0
+    for _, layout in ipairs(layoutInfo.layouts) do
+        if layout.systems then
+            for _, sys in ipairs(layout.systems) do
+                if IsLegacyDFUIAnchor(sys.anchorInfo) or IsLegacyDFUIAnchor(sys.anchorInfo2) then
+                    if ResetSystemToDefaultPosition(sys) then
+                        repaired = repaired + 1
+                    else
+                        skipped = skipped + 1
+                    end
+                end
             end
         end
     end
-    if info.activeLayout and not info.layouts[info.activeLayout] and info.layouts[1] then
-        info.layouts[info.activeLayout] = info.layouts[1]
+
+    if repaired > 0 then
+        pcall(C_EditMode.SaveLayouts, layoutInfo)
+        DF:Print(string.format('reset %d frame(s) in Blizzard\'s Edit Mode layout that were still anchored to ' ..
+                                   'DragonflightUI frames from an older version. They are back at their default ' ..
+                                   'position and this will not run again.', repaired))
     end
+
+    -- A clean scan counts as done: it is the same answer the next login would
+    -- get, and re-scanning only risks another write to a server-side layout.
+    -- Anything we could not reset safely leaves the flag unset, so a later
+    -- client - or a later login - gets another attempt. That costs a scan and
+    -- never a write, because repaired stays 0.
+    if skipped == 0 then
+        db.editModeAnchorMigration = ANCHOR_MIGRATION_VERSION
+    else
+        DF:Debug(DF, string.format('editmode anchor migration: %d system(s) had no default anchor, deferred', skipped))
+    end
+
+    migrationRunning = false
+    return skipped == 0
 end
+
+-- EDIT_MODE_LAYOUTS_UPDATED, not PLAYER_LOGIN.
+--
+-- The first attempt ran this out of Editmode's OnEnable, where C_EditMode need
+-- not exist yet: Blizzard_EditMode is load-on-demand and no TOC in this addon
+-- lists it under OptionalDeps, so the call returned silently and the migration
+-- simply never happened that session. This event is the moment the layout data
+-- is known to be present - it is the one Blizzard's own OnEvent uses to fill
+-- layoutInfo in the first place.
+local anchorMigrationWatcher = CreateFrame('Frame')
+anchorMigrationWatcher:SetScript('OnEvent', function(self)
+    -- SaveLayouts drags the whole layout-apply chain behind it, and that ends in
+    -- SetPoint on the action bars and unit frames, which the client refuses in
+    -- combat. RunOutOfCombat queues by label, so a fight only delays it.
+    Helper:RunOutOfCombat('editmode anchor migration', function()
+        if addonTable:SanitizeLegacyEditModeAnchors() then self:UnregisterAllEvents() end
+    end)
+end)
+-- Not every flavour has this event, and RegisterEvent throws on an unknown one.
+pcall(anchorMigrationWatcher.RegisterEvent, anchorMigrationWatcher, 'EDIT_MODE_LAYOUTS_UPDATED')
 
 function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
     local val = (enabled and 1) or 0
@@ -68,10 +209,6 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
     if PartyFrame then
         PartyFrame.system = PartyFrame.system or targetSystem
         PartyFrame.systemIndex = PartyFrame.systemIndex or targetSystemIndex
-    end
-
-    if addonTable.FixBlizzEditModeManagerLayouts then
-        addonTable:FixBlizzEditModeManagerLayouts()
     end
 
     local function EnsureSettingInLayout(layout)
@@ -106,11 +243,13 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
         end
     end
 
-    if EditModeManagerFrame and EditModeManagerFrame.layoutInfo and EditModeManagerFrame.layoutInfo.layouts then
-        for _, layout in ipairs(EditModeManagerFrame.layoutInfo.layouts) do
-            EnsureSettingInLayout(layout)
-        end
-    end
+    -- The live EditModeManagerFrame.layoutInfo.layouts is deliberately not
+    -- written here. It holds Blizzard's preset layouts alongside the saved ones,
+    -- so writing settings into it both corrupts the presets and taints the table
+    -- Blizzard hands to SetPoint on protected frames. The GetLayouts() copy
+    -- below carries the same change into the saved data, and the
+    -- EDIT_MODE_LAYOUTS_UPDATED that SaveLayouts triggers is what brings the
+    -- live table back in sync - on Blizzard's own execution, not ours.
 
     if EditModeManagerFrame and EditModeManagerFrame.OnEditModeSystemSettingChange and PartyFrame then
         pcall(EditModeManagerFrame.OnEditModeSystemSettingChange, EditModeManagerFrame, PartyFrame, targetSetting, val)
@@ -174,12 +313,31 @@ function addonTable:SetBlizzEditmodeFrameSetting(frame, setting, value, apply)
 
     pcall(C_EditMode.SaveLayouts, layoutInfo)
 
-    if EditModeManagerFrame then
-        if EditModeManagerFrame.UpdateLayoutInfo then
-            pcall(EditModeManagerFrame.UpdateLayoutInfo, EditModeManagerFrame)
-        end
-        addonTable:FixBlizzEditModeManagerLayouts()
-    end
+    -- Do NOT call EditModeManagerFrame:UpdateLayoutInfo() from here.
+    --
+    -- This is the line that broke Blizzard's Edit Mode for the whole session.
+    -- UpdateLayoutInfo is not a refresh - it is the setter behind
+    -- EDIT_MODE_LAYOUTS_UPDATED, and the layout table is its first argument:
+    --
+    --   function EditModeManagerFrameMixin:UpdateLayoutInfo(layoutInfo, reconcileLayouts)
+    --       self.layoutApplyInProgress = true;
+    --       self.layoutInfo = layoutInfo;          -- nil when called with no args
+    --       ...
+    --       local savedLayouts = self.layoutInfo.layouts;   -- throws here
+    --       ...
+    --       self.layoutApplyInProgress = false;             -- never reached
+    --
+    -- Called with no argument it set layoutInfo to nil, threw on the next line,
+    -- and left layoutApplyInProgress stuck at true. The pcall swallowed the
+    -- error, so nothing was reported. From that moment EditModeManagerFrame
+    -- had no layoutInfo, IsInitialized() answered false, and every Blizzard
+    -- caller that reads the active layout died on the nil - GetDefaultAnchor
+    -- via PlayerFrame_ResetPosition, and the system-anchor path via
+    -- UIParent_ManageFramePositions, which is the error spam on every reposition.
+    --
+    -- SaveLayouts above already makes the client fire EDIT_MODE_LAYOUTS_UPDATED,
+    -- and Blizzard's own OnEvent then calls UpdateLayoutInfo with the real
+    -- payload. There is nothing left to do here.
 
     if UIParent_UpdateRaidAndPartyFrames then
         pcall(UIParent_UpdateRaidAndPartyFrames)
