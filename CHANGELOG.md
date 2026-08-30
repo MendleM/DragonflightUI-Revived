@@ -11,20 +11,26 @@ Everything before v0.40.3 is in
 
 Complete stability and architecture overhaul: permanent decoupling from Blizzard Edit Mode, combat reload visual preservation, robust TBC totem positioning, solid ChatFrame anchoring, and instant live Darkmode switching.
 
-**Highlights** — Decoupled from Blizzard EditMode & LibEditModeOverride · seamless combat reload holder positioning · TBC/Era chat frame permanence · Shaman totem anchoring · live Darkmode toggle without /reload · actionbar dividers restricted to main bar
+**Highlights** — login Lua errors fixed at the cause (#26, #28) · party frame taint seed found and removed · genuinely decoupled from Blizzard EditMode · seamless combat reload holder positioning · TBC/Era chat frame permanence · Shaman totem anchoring · live Darkmode toggle without /reload · actionbar dividers restricted to main bar
 
 ### Core & Architecture
-- **Decoupled from Blizzard EditMode:** permanently suppressed Blizzard's EditModeManager and removed reliance on LibEditModeOverride to eliminate frame taint and layout overrides if DragonflightUI is active.
+- **Login Lua errors fixed at the cause (Issues #26, #28):** `EditModeManagerFrame:UpdateLayoutInfo` is Blizzard's setter behind `EDIT_MODE_LAYOUTS_UPDATED` and takes the layout table as its first argument. This addon called it with no argument, which set `layoutInfo` to `nil` and then threw on the next line inside a `pcall`, so nothing was ever reported. For the rest of the session Blizzard's edit mode had no layout: `IsInitialized()` answered false, `GetDefaultAnchor` failed through `PlayerFrame_ResetPosition`, and `SetToLayoutAnchor` failed through `UIParent_ManageFramePositions` on every reposition and every action bar transition.
+- **Decoupled from Blizzard EditMode:** permanently suppressed Blizzard's EditModeManager through Blizzard's own `BlockEnteringEditMode` gate, and stopped replacing Blizzard functions altogether. The chat window now uses `hooksecurefunc`; the one remaining exception, on the background action bars, is documented in place with the reason it cannot be a hook.
+- **Settings moved out of Blizzard's layout:** five settings used to be written to Blizzard's server-side layout on every login. Four are now applied directly to the frame, the way Blizzard's own appliers do it, and stored in the DragonflightUI profile. The fifth drives which party frame system Blizzard shows and is documented as unavoidable. No anchor pointing at a DragonflightUI frame is ever written again — that was what left the interface broken with the addon disabled.
+- **Leftover `DragonflightUI_Layout` (Issue #27):** a version up to and including `cda4133` created a character-specific Blizzard edit mode layout and made it active. Edit mode layouts live on Blizzard's server, so it outlived the code that made it. The addon now detects it, explains once how to remove it, and offers an opt-out; `/df layoutnotice` brings the message back. Stale anchors inside it are cleaned up automatically, once per character, using Blizzard's own `ResetToDefaultPosition` semantics rather than repointing everything at `UIParent`.
+- **LibEditModeOverride removed:** it was loaded on all six flavours and never called once. Two comments claiming the addon wrote layouts through it were wrong and have been corrected.
 - **Version.API Refactoring:** streamlined universal expansion detection across Era, TBC, Wrath, Cata, and MoP with automatic capability mirroring (`DF.Caps`).
 - **Combat Reload Banner:** silenced on-screen reload state banner to preserve a clean UI during in-combat reloads.
 - **Post-Combat Recovery:** reduced post-combat reapply delay to 100ms for immediate UI responsiveness.
-- **Under the Hood:** Escape closes our windows again without taking keyboard focus; stopped leaking sixteen generic global names.
+- **Under the Hood:** Escape closes our windows again without taking keyboard focus. Stopped leaking generic names into `_G` — sixteen earlier in the cycle, and since then four option-builder helpers plus two frames that shipped under the placeholder names `sss` and `**`.
 
 ### Chat
 - **TBC & Era Chat Permanence:** decoupled `ChatFrame1` from Blizzard's EditModeManager and legacy position manager. The chat window stays firmly anchored through loading screens, reloads, and window resizing without disappearing.
 
 ### Unit Frames & Party / Raid
-- **Party & Raid Frame Toggle (Issue #14):** Fixed "Use Raid-Style Party Frames" (Gruppen wie Schlachtzug anzeigen) to switch immediately and live between portrait party frames and compact raid frames without requiring a `/reload`. Decoupled setting persistence to DragonflightUI database as the single source of truth and hooked `EditModeManagerFrame:UseRaidStylePartyFrames()`.
+- **Party & Raid Frame Toggle (Issue #14):** Fixed "Use Raid-Style Party Frames" (Gruppen wie Schlachtzug anzeigen) to switch immediately and live between portrait party frames and compact raid frames without requiring a `/reload`. The DragonflightUI database is the single source of truth and the sync to Blizzard is one-way, through Blizzard's own `OnSystemSettingChange`.
+- **Party frame blocked actions, fixed at the seed:** this addon wrote `PartyFrame.system` and `PartyFrame.systemIndex`. Those are the two fields Blizzard uses to identify a registered edit mode system, and it reads them inside `secureexecuterange` on every `UseRaidStylePartyFrames()` call — which both party visibility paths ask. Writing them from addon code made them insecure for the session, and the taint travelled through `UpdateRaidAndPartyFrames` → `UpdatePartyFrames` → `UpdateMember` into the pooled members' `unit`, `buffs` and `debuffs`. Neither field was ever read by this addon; they only existed for a helper that no longer exists.
+- **Removed the workaround that caused it:** Blizzard's `EditModeManagerFrame:UseRaidStylePartyFrames` was being replaced outright, and reinstalled on every `ADDON_LOADED`, so Blizzard's own visibility checks ran addon code on a protected path. It had been added one commit after the `UpdateLayoutInfo` bug above broke the real accessor — a workaround for a symptom whose cause is now fixed.
 - **Party Frame Positioning & Fonts:** Unified party member names and health/mana status text typography to FRIZQT outline font, and anchored the pooled modern `PartyFrame` container directly to `DragonflightUIPartyMoveFrame`.
 - **Edit Mode Party Preview:** Dynamic preview switching between 4 portrait party member frames and 5 compact raid member boxes based on the active raid-style party frame setting.
 - **Shaman Totem Bar:** dynamic `HasTotemBar` detection and anchored positioning to prevent active totem icons from snapping below player frame.
@@ -49,12 +55,14 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 - **MoP Bag Counter:** fixed free bag slots counter placement and text sizing inside the backpack button.
 
 ### Professions
+- **Skill rank text restored (Issue #29):** the number on the profession rank bar was being created on the bar's parent frame, which puts it behind the bar's own fill texture — a child frame draws above every draw layer of its parent, `OVERLAY` included. The bar was fully drawn and the text was underneath it. It now lives on the bar itself.
 - **Beast Training:** restored Beast Training (Wildtierausbildung) and CraftFrame support for Hunter pets in Classic Era, Season of Discovery, and TBC with spellbook tab scanning, training points counter, and legacy craft frame suppression.
 - **MoP & Cataclysm Crash Fix:** included `LibTradeSkillRecipes` in MoP and Cata TOC files and hardened mixins to prevent startup errors and restore the Dragonflight UI profession window.
 
 ### Dark Mode
 - **Live Toggle:** Dark Mode can now be toggled on and off live with immediate color and saturation restoration without requiring `/reload`.
 - **Dynamic State Lookup:** unit frame hooks, action bar buttons, and flyouts dynamically fetch active settings to avoid stale styling closures.
+- **Party Member Borders:** the golden party border now goes dark with every other unit frame. Dark Mode was walking `PartyMemberFrame1` through `4`, globals that do not exist on Era 1.15.9, TBC 2.5.6 and MoP 5.5.4 where the member frames come out of `PartyFrame.PartyMemberFramePool` — so the loop found nothing and failed quietly. The border also survives a roster change now, which previously restored the golden art.
 
 ### Nameplates
 - Fixed an error that could repeat hundreds of times in a session from querying a nameplate's parent when the element was not a frame. Reported with Plater.
