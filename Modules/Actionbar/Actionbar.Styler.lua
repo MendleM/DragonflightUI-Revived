@@ -351,9 +351,9 @@ function Module.ChangeBackpack()
         end
     end
 
-    -- Outside the BagsBar check on purpose: the UIParent_ManageFramePositions hook
-    -- inside does not need BagsBar to exist, and it used to be skipped entirely on
-    -- flavours that have no BagsBar.
+    -- Outside the BagsBar check on purpose: the hook inside goes on
+    -- MainMenuBarBagManager, not on BagsBar, and it used to be skipped entirely on
+    -- flavours where BagsBar does not exist.
     Module.HookBagBarLayout()
 end
 
@@ -397,45 +397,51 @@ end
 
 -- Re-assert our bag row after Blizzard has laid its own out.
 --
--- Blizzard's bag bar layout anchors all five buttons - the four bag slots and the
--- keyring - with a uniform childXPadding of -5, and it overwrites the -12 gap that
--- bag 0 needs for the expand arrow. /df log watch caught it exactly:
+-- BagsBarMixin:Layout re-anchors the whole row off self.bagPadding, which is 5, so
+-- every button ends up at -5 and bag 0 loses the -12 gap it needs for the expand
+-- arrow. /df log watch caught it exactly:
 --
 --   CharacterBag0Slot: RIGHT -> MainMenuBarBackpackButton LEFT (-12,0) => (-5,0)
 --   CharacterBag1Slot: RIGHT -> CharacterBag0Slot LEFT (-0,0) => (-5,0)
 --   KeyRingButton:     RIGHT -> CharacterBag3Slot LEFT (0,0) => (-5,0)
 --
--- Hooking BagsBar:Layout alone was not enough, which is why the row still spread
--- out when a tooltip appeared. The trigger is UIParent_ManageFramePositions: it
--- ends in UIParentManageRightFrameContainer, which calls Layout() on the managed
--- containers, and a tooltip showing is one of the things that runs it.
+-- Hooking BagsBar.Layout does not work, and that is worth writing down because it
+-- cost three attempts. BagsBarMixin:OnLoad registers the callback like this:
 --
--- That function only sets a secure attribute and the real work happens in a secure
--- snippet afterwards, so re-anchoring inside the hook would run too early. Hence
--- the next-frame timer, coalesced so a burst of manage passes costs one pass, and
--- combat-guarded in AnchorBagSlots because moving these buttons is protected.
-local anchorPending = false
-
-local function QueueAnchorBagSlots()
-    if anchorPending then return end
-    anchorPending = true
-
-    C_Timer.After(0, function()
-        anchorPending = false
-        Module.AnchorBagSlots()
-    end)
+--   EventRegistry:RegisterCallback("MainMenuBarManager.OnExpandChanged", self.Layout, self)
+--
+-- The registry stores the function VALUE at load time. hooksecurefunc replaces the
+-- table field BagsBar.Layout, so the registry keeps calling the original and the
+-- hook never fires. Same for the VARIABLES_LOADED pass, which goes through
+-- GenerateClosure(self.Layout, self) and captures it too.
+--
+-- What does work is MainMenuBarBagManager:OnExpandBarChanged. It is invoked as
+-- self:OnExpandBarChanged(), a live table lookup, so a hook on it fires - and it
+-- fires after TriggerEvent has returned, meaning after Layout has already run. No
+-- timer needed, so the row never draws in the wrong place.
+--
+-- Both SetExpandBar and SetExpandBarAuto funnel through it, which covers the
+-- trigger the report described: OnCursorChanged calls SetExpandBarAuto on every
+-- CURSOR_CHANGED. Hovering an NPC is not a "relevant cursor type", so it passes
+-- false, and on the first hover after login the previous value is nil. nil ~= false
+-- counts as a change, so the row gets laid out again for no visible reason.
+--
+-- Verified byte-identical in classic_era, classic_anniversary and classic.
+local function ReanchorBagRow()
+    -- Moving these buttons is protected, and AnchorBagSlots bails out in combat.
+    -- Without this the row would keep Blizzard's spacing until something else
+    -- happened to re-anchor it, so park the work and run it once combat drops.
+    Helper:RunOutOfCombat('bag row re-anchor', Module.AnchorBagSlots)
 end
 
 function Module.HookBagBarLayout()
     if Module.BagBarLayoutHooked then return end
+
+    local mgr = _G['MainMenuBarBagManager']
+    if not (mgr and mgr.OnExpandBarChanged) then return end
+
     Module.BagBarLayoutHooked = true
-
-    local bar = _G['BagsBar']
-    if bar and bar.Layout then hooksecurefunc(bar, 'Layout', QueueAnchorBagSlots) end
-
-    if UIParent_ManageFramePositions then
-        hooksecurefunc('UIParent_ManageFramePositions', QueueAnchorBagSlots)
-    end
+    hooksecurefunc(mgr, 'OnExpandBarChanged', ReanchorBagRow)
 end
 
 function Module.UpdateBagSlotIcons()
