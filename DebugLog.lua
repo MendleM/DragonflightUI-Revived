@@ -65,6 +65,10 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          optional name (or 'mouse') adds a frame the list
 --                          does not cover
 --     /df log watch reset  drop the baseline and start again
+--     /df log bagtrace     log every SetPoint on the bag row, backpack and
+--                          keyring included, each with the stack of whoever
+--                          called it. watch says what moved; this says who
+--                          moved it. 'off' stops it, 'copy' opens the window
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
 --
@@ -1579,6 +1583,75 @@ function DF:LogPartyTaint(tag)
     end
 end
 
+-- /df log bagtrace - name whoever re-anchors the bag row.
+--
+-- /df log watch proves WHAT happens: all five buttons, the four bag slots and the
+-- keyring, end up with a uniform -5 offset, and bag 0 loses the -12 gap it needs
+-- for the expand arrow. It cannot say WHO does it. Three fixes aimed at guessed
+-- callers - BagsBar:Layout, ignoreFramePositionManager and
+-- UIParent_ManageFramePositions - all failed, so stop guessing and hook the write
+-- itself. Whoever sets the offset gets named, with its stack.
+local bagTraceOn = false
+local bagTraceHits = 0
+local bagTraceHooked = false
+local BAG_TRACE_MAX = 24
+
+local BAG_TRACE_BUTTONS = {
+    'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot',
+    'KeyRingButton'
+}
+
+local function BagTraceName(rel)
+    if type(rel) == 'string' then return rel end
+    if type(rel) == 'table' and rel.GetName then return rel:GetName() or '<anon>' end
+    return '-'
+end
+
+local function BagTraceHook(self, point, rel, relPoint, x, y)
+    if not bagTraceOn or bagTraceHits >= BAG_TRACE_MAX then return end
+    bagTraceHits = bagTraceHits + 1
+
+    DF:Log('bagtrace', '%s:SetPoint(%s -> %s %s, %s, %s)', (self.GetName and self:GetName()) or '<anon>',
+           tostring(point), BagTraceName(rel), tostring(relPoint), tostring(x), tostring(y))
+    DF:Log('bagtrace', '  stack: %s', tostring(debugstack(2, 12, 0)):gsub('\n', ' | '):sub(1, 1200))
+
+    if bagTraceHits >= BAG_TRACE_MAX then
+        DF:Log('bagtrace', 'hit the cap of %d calls - tracing stopped.', BAG_TRACE_MAX)
+    end
+end
+
+function DF:LogBagTrace(on)
+    if on and not bagTraceHooked then
+        local found = 0
+        for _, name in ipairs(BAG_TRACE_BUTTONS) do
+            local btn = _G[name]
+            if btn and btn.SetPoint then
+                found = found + 1
+                hooksecurefunc(btn, 'SetPoint', BagTraceHook)
+            end
+        end
+
+        if found == 0 then
+            print(PREFIX .. 'no bag buttons exist yet - nothing to trace.')
+            return
+        end
+
+        -- The hooks stay for the session; the flag is what turns logging on and
+        -- off. Re-hooking on every toggle would stack duplicates.
+        bagTraceHooked = true
+        print(PREFIX .. ('bag trace hooked %d button(s).'):format(found))
+    end
+
+    bagTraceOn = on and true or false
+
+    if bagTraceOn then
+        bagTraceHits = 0
+        print(PREFIX .. 'bag trace ON - hover an NPC until the row spreads, then |cffffff78/df log bagtrace copy|r')
+    else
+        print(PREFIX .. ('bag trace OFF - %d call(s) captured.'):format(bagTraceHits))
+    end
+end
+
 -- Returns true when the input was a log command and has been handled.
 function DF:HandleLogCommand(rest)
     rest = rest or ''
@@ -1639,6 +1712,15 @@ function DF:HandleLogCommand(rest)
         else
             DF:LogToT('totdump')
             DF:LogDump('totdump', 40)
+        end
+    elseif sub == 'bagtrace' then
+        local a = arg:lower()
+        if a == 'off' then
+            DF:LogBagTrace(false)
+        elseif a == 'copy' then
+            DF:LogCopy('bagtrace')
+        else
+            DF:LogBagTrace(true)
         end
     elseif sub == 'globals' then
         DF:LogTaintedGlobals('globals')
