@@ -349,12 +349,29 @@ function Module.ChangeBackpack()
             _G['BagsBar']:ClearAllPoints()
             _G['BagsBar']:SetPoint('RIGHT', f, 'RIGHT', 0, 0)
         end
-        Module.HookBagBarLayout()
     end
+
+    -- Outside the BagsBar check on purpose: the UIParent_ManageFramePositions hook
+    -- inside does not need BagsBar to exist, and it used to be skipped entirely on
+    -- flavours that have no BagsBar.
+    Module.HookBagBarLayout()
 end
 
 function Module.AnchorBagSlots()
     if not (MainMenuBarBackpackButton and _G['CharacterBag0Slot']) then return end
+    if Helper:IsCombatLocked() then return end
+
+    -- The backpack goes back onto our own holder first.
+    --
+    -- /df log watch showed Blizzard's bag bar layout claiming it: the button ends
+    -- up anchored to BagsBar RIGHT even though UpdateBagState anchors it to
+    -- DragonflightUIBagBar. Everything below hangs off the backpack, so if it is
+    -- left where Blizzard put it the whole row follows.
+    local holder = _G['DragonflightUIBagBar']
+    if holder then
+        MainMenuBarBackpackButton:ClearAllPoints()
+        MainMenuBarBackpackButton:SetPoint('RIGHT', holder, 'RIGHT', 0, 0)
+    end
 
     _G['CharacterBag0Slot']:ClearAllPoints()
     _G['CharacterBag0Slot']:SetPoint('RIGHT', MainMenuBarBackpackButton, 'LEFT', -12, 0)
@@ -378,13 +395,47 @@ function Module.AnchorBagSlots()
     end
 end
 
+-- Re-assert our bag row after Blizzard has laid its own out.
+--
+-- Blizzard's bag bar layout anchors all five buttons - the four bag slots and the
+-- keyring - with a uniform childXPadding of -5, and it overwrites the -12 gap that
+-- bag 0 needs for the expand arrow. /df log watch caught it exactly:
+--
+--   CharacterBag0Slot: RIGHT -> MainMenuBarBackpackButton LEFT (-12,0) => (-5,0)
+--   CharacterBag1Slot: RIGHT -> CharacterBag0Slot LEFT (-0,0) => (-5,0)
+--   KeyRingButton:     RIGHT -> CharacterBag3Slot LEFT (0,0) => (-5,0)
+--
+-- Hooking BagsBar:Layout alone was not enough, which is why the row still spread
+-- out when a tooltip appeared. The trigger is UIParent_ManageFramePositions: it
+-- ends in UIParentManageRightFrameContainer, which calls Layout() on the managed
+-- containers, and a tooltip showing is one of the things that runs it.
+--
+-- That function only sets a secure attribute and the real work happens in a secure
+-- snippet afterwards, so re-anchoring inside the hook would run too early. Hence
+-- the next-frame timer, coalesced so a burst of manage passes costs one pass, and
+-- combat-guarded in AnchorBagSlots because moving these buttons is protected.
+local anchorPending = false
+
+local function QueueAnchorBagSlots()
+    if anchorPending then return end
+    anchorPending = true
+
+    C_Timer.After(0, function()
+        anchorPending = false
+        Module.AnchorBagSlots()
+    end)
+end
+
 function Module.HookBagBarLayout()
     if Module.BagBarLayoutHooked then return end
-    local bar = _G['BagsBar']
-    if not (bar and bar.Layout) then return end
-
     Module.BagBarLayoutHooked = true
-    hooksecurefunc(bar, 'Layout', function() Module.AnchorBagSlots() end)
+
+    local bar = _G['BagsBar']
+    if bar and bar.Layout then hooksecurefunc(bar, 'Layout', QueueAnchorBagSlots) end
+
+    if UIParent_ManageFramePositions then
+        hooksecurefunc('UIParent_ManageFramePositions', QueueAnchorBagSlots)
+    end
 end
 
 function Module.UpdateBagSlotIcons()
