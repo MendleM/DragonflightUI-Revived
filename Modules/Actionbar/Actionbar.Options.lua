@@ -769,7 +769,8 @@ local function frameTableWithout(without)
     return newTable
 end
 
-function AddButtonTable(optionTable, sub)
+-- local, not global: only this file calls it. See Castbar.lua for the reasoning.
+local function AddButtonTable(optionTable, sub)
     local extraOptions = {
         activate = {
             type = 'toggle',

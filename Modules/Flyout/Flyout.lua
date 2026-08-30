@@ -725,7 +725,8 @@ local function setPreset(T, preset, sub)
     Module:RefreshOptionScreens()
 end
 
-function AddFlyoutTable(optionTable, sub)
+-- local, not global: only this file calls it. See Castbar.lua for the reasoning.
+local function AddFlyoutTable(optionTable, sub)
     local extraOptions = {
         headerFlyout = {
             type = 'header',
