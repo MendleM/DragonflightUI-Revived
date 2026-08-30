@@ -1,0 +1,243 @@
+7x Blizzard_EditMode/Shared/EditModeManager.lua:284: attempt to index local 'layoutInfo' (a nil value)
+[Blizzard_EditMode/Shared/EditModeManager.lua]:284: in function <Blizzard_EditMode/Shared/EditModeManager.lua:278>
+[tail call]: ?
+[Blizzard_UIParentPanelManager/Classic/UIParentPanelManagerOverrides.lua]:115: in function 'ApplyPositionManagement'
+[Blizzard_UIParentPanelManager/Classic/UIParentPanelManagerOverrides.lua]:150: in function 'UIParentManageFramePositions'
+[Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua]:142: in function <...UIParentPanelManager/Shared/UIParentPanelManager.lua:128>
+[C]: in function 'SetAttribute'
+[Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua]:795: in function 'UIParent_ManageFramePositions'
+[Blizzard_ActionBarController/ActionBarController.lua]:235: in function 'ValidateActionBarTransition'
+[Blizzard_ActionBarController/ActionBarController.lua]:175: in function <...Blizzard_ActionBarController/ActionBarController.lua:143>
+[C]: in function 'ActionBarController_UpdateAll'
+[Blizzard_ActionBarController/ActionBarController.lua]:58: in function <...Blizzard_ActionBarController/ActionBarController.lua:55>
+
+
+Locals:
+self=EditModeManagerFrame <EditModeManager.xml:4>{
+ advancedOptionsEnabled=true
+ AccountSettings=Frame <EditModeManager.xml:133>
+ RevertAllChangesButton=Button <EditModeManager.xml:517>
+ LayoutDropdown=Button <EditModeManager.xml:50>
+ modernSystemMap=<table>
+ dirty=false
+ DFChatHooked=true
+ snapEnabled=true
+ accountSettings=<table>
+ hasActiveChanges=false
+ GridSpacingSlider=Frame <EditModeManager.xml:99>
+ numLayouts=<table>
+ layoutApplyInProgress=true
+ FramesBlockingEditMode=<table>
+ modernSystems=<table>
+ SaveChangesButton=Button <EditModeManager.xml:512>
+ Grid=Frame <EditModeManager.xml:64>
+ ShowGridCheckButton=Frame <EditModeManager.xml:79>
+ EnableSnapCheckButton=Frame <EditModeManager.xml:115>
+ MagnetismPreviewLinesContainer=Frame <EditModeManager.xml:55>
+ CloseButton=Button <EditModeManager.xml:42>
+ Tutorial=Button <EditModeManager.xml:29>
+ editModeSystemAnchorDirty=true
+ Title=FontString <EditModeManager.xml:13>
+ fixedWidth=510
+ EnableAdvancedOptionsCheckButton=Frame <EditModeManager.xml:124>
+ Border=Frame <EditModeManager.xml:24>
+ registeredSystemFrames=<table>
+ accountSettingMap=<table>
+ LayoutLabel=FontString <EditModeManager.xml:18>
+}
+systemFrame=MultiBarBottomLeft <MultiActionBars.xml:45>{
+ buttonPadding=6
+ downKeys=<table>
+ buttonTemplate="MultiBar1ButtonTemplate"
+ oldGridSettings=<table>
+ dividersDirty=false
+ hasActiveChanges=false
+ dirty=false
+ ignoreFramePositionManager=true
+ gridInitialized=true
+ visibility="Always"
+ barArtDirty=false
+ dirtySettings=<table>
+ settingMap=<table>
+ systemInfo=<table>
+ systemIndex=2
+ savedSystemInfo=<table>
+ minButtonPadding=2
+ settingDisplayInfoMap=<table>
+ snappedFrames=<table>
+ settingsDialogAnchor=<table>
+ gridLayoutDirty=false
+ shownButtonContainers=<table>
+ actionButtons=<table>
+ isShownExternal=true
+ numButtonsShowable=12
+ QuickKeybindGlow=Texture <MultiActionBars.xml:66>
+ isNormalBar=true
+ systemNameString="Aktionsleiste %d"
+ skipAutomaticPositioning=true
+ addButtonsToTop=true
+ addButtonsToRight=true
+ numRows=1
+ isHorizontal=true
+ commandNamePrefix="MULTIACTIONBAR1"
+ flyoutDirection="DOWN"
+ addSystemIndexToName=true
+ system=0
+ Selection=Frame <EditModeSystemTemplates.xml:64>
+ numButtons=12
+ hideGridEventName="ACTIONBAR_HIDEGRID"
+ showGridEventName="ACTIONBAR_SHOWGRID"
+}
+forceOffsetX=0
+forceOffsetY=5
+anchorInfo=nil
+layoutInfo=nil
+(*temporary)=EditModeManagerFrame <EditModeManager.xml:4>{
+ advancedOptionsEnabled=true
+ AccountSettings=Frame <EditModeManager.xml:133>
+ RevertAllChangesButton=Button <EditModeManager.xml:517>
+ LayoutDropdown=Button <EditModeManager.xml:50>
+ modernSystemMap=<table>
+ dirty=false
+ DFChatHooked=true
+ snapEnabled=true
+ accountSettings=<table>
+ hasActiveChanges=false
+ GridSpacingSlider=Frame <EditModeManager.xml:99>
+ numLayouts=<table>
+ layoutApplyInProgress=true
+ FramesBlockingEditMode=<table>
+ modernSystems=<table>
+ SaveChangesButton=Button <EditModeManager.xml:512>
+ Grid=Frame <EditModeManager.xml:64>
+ ShowGridCheckButton=Frame <EditModeManager.xml:79>
+ EnableSnapCheckButton=Frame <EditModeManager.xml:115>
+ MagnetismPreviewLinesContainer=Frame <EditModeManager.xml:55>
+ CloseButton=Button <EditModeManager.xml:42>
+ Tutorial=Button <EditModeManager.xml:29>
+ editModeSystemAnchorDirty=true
+ Title=FontString <EditModeManager.xml:13>
+ fixedWidth=510
+ EnableAdvancedOptionsCheckButton=Frame <EditModeManager.xml:124>
+ Border=Frame <EditModeManager.xml:24>
+ registeredSystemFrames=<table>
+ accountSettingMap=<table>
+ LayoutLabel=FontString <EditModeManager.xml:18>
+}
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)="attempt to index local 'layoutInfo' (a nil value)"
+
+
+1x Blizzard_EditMode/Shared/EditModeManager.lua:1652: attempt to index local 'layoutInfo' (a nil value)
+[Blizzard_EditMode/Shared/EditModeManager.lua]:1652: in function 'GetDefaultAnchor'
+[Blizzard_UIParent/Shared/UIParent.lua]:78: in function <Blizzard_UIParent/Shared/UIParent.lua:47>
+[C]: in function 'UIParent_UpdateTopFramePositions'
+[Blizzard_UnitFrame/Classic/PlayerFrame.lua]:282: in function 'PlayerFrame_ResetPosition'
+[Blizzard_UnitFrame/Classic/PlayerFrame.lua]:191: in function <...ceBlizzard_UnitFrame/Classic/PlayerFrame.lua:174>
+[C]: ?
+
+
+Locals:
+self=EditModeManagerFrame <EditModeManager.xml:4>{
+ advancedOptionsEnabled=true
+ AccountSettings=Frame <EditModeManager.xml:133>
+ RevertAllChangesButton=Button <EditModeManager.xml:517>
+ LayoutDropdown=Button <EditModeManager.xml:50>
+ modernSystemMap=<table>
+ dirty=false
+ DFChatHooked=true
+ snapEnabled=true
+ accountSettings=<table>
+ hasActiveChanges=false
+ GridSpacingSlider=Frame <EditModeManager.xml:99>
+ numLayouts=<table>
+ layoutApplyInProgress=true
+ FramesBlockingEditMode=<table>
+ modernSystems=<table>
+ SaveChangesButton=Button <EditModeManager.xml:512>
+ Grid=Frame <EditModeManager.xml:64>
+ ShowGridCheckButton=Frame <EditModeManager.xml:79>
+ EnableSnapCheckButton=Frame <EditModeManager.xml:115>
+ MagnetismPreviewLinesContainer=Frame <EditModeManager.xml:55>
+ CloseButton=Button <EditModeManager.xml:42>
+ Tutorial=Button <EditModeManager.xml:29>
+ editModeSystemAnchorDirty=true
+ Title=FontString <EditModeManager.xml:13>
+ fixedWidth=510
+ EnableAdvancedOptionsCheckButton=Frame <EditModeManager.xml:124>
+ Border=Frame <EditModeManager.xml:24>
+ registeredSystemFrames=<table>
+ accountSettingMap=<table>
+ LayoutLabel=FontString <EditModeManager.xml:18>
+}
+frame=BuffFrame <BuffFrame.xml:6>{
+ systemInfo=<table>
+ downKeys=<table>
+ numHideableBuffs=0
+ CollapseAndExpandButton=CheckButton <BuffFrame.xml:14>
+ dirtySettings=<table>
+ hasActiveChanges=false
+ systemIndex=1
+ snappedFrames=<table>
+ savedSystemInfo=<table>
+ settingMap=<table>
+ hiddenBuffUpdatePeriod=0.200000
+ systemNameString="Buffrahmen"
+ hiddenBuffUpdateTimer=0
+ settingDisplayInfoMap=<table>
+ settingsDialogAnchor=<table>
+ auraFrames=<table>
+ ConsolidatedBuffs=Button <BuffFrame.xml:42>
+ exampleAuraType="Buff"
+ Selection=Frame <EditModeSystemTemplates.xml:146>
+ isExpanded=true
+ AuraContainer=Frame <BuffFrameTemplates.xml:119>
+ defaultHideSelection=true
+ system=6
+ maxAuras=32
+}
+layoutInfo=nil
+(*temporary)=EditModeManagerFrame <EditModeManager.xml:4>{
+ advancedOptionsEnabled=true
+ AccountSettings=Frame <EditModeManager.xml:133>
+ RevertAllChangesButton=Button <EditModeManager.xml:517>
+ LayoutDropdown=Button <EditModeManager.xml:50>
+ modernSystemMap=<table>
+ dirty=false
+ DFChatHooked=true
+ snapEnabled=true
+ accountSettings=<table>
+ hasActiveChanges=false
+ GridSpacingSlider=Frame <EditModeManager.xml:99>
+ numLayouts=<table>
+ layoutApplyInProgress=true
+ FramesBlockingEditMode=<table>
+ modernSystems=<table>
+ SaveChangesButton=Button <EditModeManager.xml:512>
+ Grid=Frame <EditModeManager.xml:64>
+ ShowGridCheckButton=Frame <EditModeManager.xml:79>
+ EnableSnapCheckButton=Frame <EditModeManager.xml:115>
+ MagnetismPreviewLinesContainer=Frame <EditModeManager.xml:55>
+ CloseButton=Button <EditModeManager.xml:42>
+ Tutorial=Button <EditModeManager.xml:29>
+ editModeSystemAnchorDirty=true
+ Title=FontString <EditModeManager.xml:13>
+ fixedWidth=510
+ EnableAdvancedOptionsCheckButton=Frame <EditModeManager.xml:124>
+ Border=Frame <EditModeManager.xml:24>
+ registeredSystemFrames=<table>
+ accountSettingMap=<table>
+ LayoutLabel=FontString <EditModeManager.xml:18>
+}
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)=nil
+(*temporary)="attempt to index local 'layoutInfo' (a nil value)"
