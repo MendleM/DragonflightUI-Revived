@@ -18,7 +18,7 @@ addonTable.SubModuleMixins = {}
 -- character logs in. See Helper.lua:SanitizeLegacyEditModeAnchors.
 local defaults = {
     profile = {bestnumber = 42},
-    global = {lastSeenVersion = ''},
+    global = {lastSeenVersion = '', editModeLayoutNoticeDismissed = false},
     char = {editModeAnchorMigration = 0}
 }
 

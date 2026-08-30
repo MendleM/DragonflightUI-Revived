@@ -181,17 +181,107 @@ end
 -- simply never happened that session. This event is the moment the layout data
 -- is known to be present - it is the one Blizzard's own OnEvent uses to fill
 -- layoutInfo in the first place.
-local anchorMigrationWatcher = CreateFrame('Frame')
-anchorMigrationWatcher:SetScript('OnEvent', function(self)
+-- The leftover layout, which is the one thing here that cannot be cleaned up in
+-- code - so the player gets told instead.
+--
+-- A version of this addon up to and including cda4133 did this on every login:
+--
+--   LibEditModeOverride:AddLayout(Enum.EditModeLayoutType.Character, 'DragonflightUI_Layout')
+--   LibEditModeOverride:SetActiveLayout('DragonflightUI_Layout')
+--
+-- It created a character-specific layout in Blizzard's Edit Mode and made it the
+-- active one. That code is long gone, but the layout is not: Edit Mode layouts
+-- live on Blizzard's server, so it survives uninstalling the addon, wiping WTF
+-- and reinstalling the game. SanitizeLegacyEditModeAnchors above cleans the
+-- dangling anchors inside it, which is what caused the visible damage, but the
+-- layout itself stays.
+--
+-- Deleting it from here is not safe. Blizzard's DeleteLayout indexes
+-- self.layoutInfo.layouts, which is presets .. saved, while C_EditMode.GetLayouts()
+-- returns the saved ones only - two different index spaces for the same data. Get
+-- that wrong and you delete somebody else's layout, on the server, permanently.
+-- Blizzard's own dropdown computes the index correctly, so the player is the safer
+-- tool here.
+local LEGACY_LAYOUT_NAME = 'DragonflightUI_Layout'
+local legacyLayoutNoticeShown = false
+
+local function HasLegacyEditModeLayout()
+    if not (C_EditMode and C_EditMode.GetLayouts) then return false end
+
+    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
+    if not (ok and layoutInfo and layoutInfo.layouts) then return false end
+
+    for _, layout in ipairs(layoutInfo.layouts) do
+        if layout.layoutName == LEGACY_LAYOUT_NAME then return true end
+    end
+
+    return false
+end
+
+StaticPopupDialogs['DragonflightUILegacyLayoutNotice'] = {
+    text = 'DragonflightUI found a leftover Edit Mode layout called |cff8080ff' .. LEGACY_LAYOUT_NAME ..
+        '|r on this character.\n\n' ..
+        'An older version created it and made it active. It is stored on Blizzard\'s server, so this addon cannot ' ..
+        'remove it for you without risking your other layouts. Leaving it active can make the interface look ' ..
+        'broken while DragonflightUI is disabled.\n\n' ..
+        'To remove it:\n' .. '1. Disable DragonflightUI and reload\n' .. '2. Escape, then Edit Mode\n' ..
+        '3. Switch the layout to a preset or one of your own\n' .. '4. Delete ' .. LEGACY_LAYOUT_NAME .. '\n' ..
+        '5. Enable DragonflightUI again\n\n' ..
+        'It is character-specific, so repeat this on any other character that shows this message.',
+    button1 = 'Do not show again',
+    button2 = CLOSE or 'Close',
+    showAlert = true,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+    -- button1 is the only thing that silences it for good. Escape and Close leave
+    -- the flag alone, so closing it by accident brings it back next login - which
+    -- is what was asked for in issue #27.
+    OnAccept = function()
+        local db = DF.db and DF.db.global
+        if db then db.editModeLayoutNoticeDismissed = true end
+        DF:Print('Notice about ' .. LEGACY_LAYOUT_NAME .. ' will not be shown again. ' ..
+                     'Type /df layoutnotice to bring it back.')
+    end
+}
+
+-- Returns true when there is nothing left to tell the player.
+function addonTable:ShowLegacyEditModeLayoutNotice(force)
+    if not force then
+        if legacyLayoutNoticeShown then return false end
+
+        local db = DF.db and DF.db.global
+        if db and db.editModeLayoutNoticeDismissed then return true end
+    end
+
+    if not HasLegacyEditModeLayout() then return true end
+
+    legacyLayoutNoticeShown = true
+    StaticPopup_Show('DragonflightUILegacyLayoutNotice')
+
+    -- Also in chat, because the popup can be dismissed before it is read and the
+    -- steps are the part people need again later.
+    DF:Print('Leftover Edit Mode layout |cff8080ff' .. LEGACY_LAYOUT_NAME .. '|r found. Disable DragonflightUI, ' ..
+                 'open Blizzard\'s Edit Mode, switch to another layout, delete it, then enable DragonflightUI again.')
+
+    return false
+end
+
+local legacyEditModeWatcher = CreateFrame('Frame')
+legacyEditModeWatcher:SetScript('OnEvent', function(self)
     -- SaveLayouts drags the whole layout-apply chain behind it, and that ends in
     -- SetPoint on the action bars and unit frames, which the client refuses in
     -- combat. RunOutOfCombat queues by label, so a fight only delays it.
-    Helper:RunOutOfCombat('editmode anchor migration', function()
-        if addonTable:SanitizeLegacyEditModeAnchors() then self:UnregisterAllEvents() end
+    Helper:RunOutOfCombat('editmode legacy cleanup', function()
+        local anchorsSettled = addonTable:SanitizeLegacyEditModeAnchors()
+        local noticeSettled = addonTable:ShowLegacyEditModeLayoutNotice()
+
+        if anchorsSettled and noticeSettled then self:UnregisterAllEvents() end
     end)
 end)
 -- Not every flavour has this event, and RegisterEvent throws on an unknown one.
-pcall(anchorMigrationWatcher.RegisterEvent, anchorMigrationWatcher, 'EDIT_MODE_LAYOUTS_UPDATED')
+pcall(legacyEditModeWatcher.RegisterEvent, legacyEditModeWatcher, 'EDIT_MODE_LAYOUTS_UPDATED')
 
 function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
     local val = (enabled and 1) or 0
@@ -206,10 +296,32 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
 
     if not targetSystem or not targetSetting then return end
 
-    if PartyFrame then
-        PartyFrame.system = PartyFrame.system or targetSystem
-        PartyFrame.systemIndex = PartyFrame.systemIndex or targetSystemIndex
-    end
+    -- PartyFrame.system / PartyFrame.systemIndex are NOT written here any more,
+    -- and must not be. They were the party taint seed.
+    --
+    -- Blizzard identifies a registered Edit Mode system by exactly these two
+    -- fields, and it reads them inside secureexecuterange:
+    --
+    --   local function findSystem(index, systemFrame)
+    --       if not foundSystem and systemFrame.system == system and systemFrame.systemIndex == systemIndex then
+    --   secureexecuterange(self.registeredSystemFrames, findSystem);
+    --
+    -- That runs on every GetSettingValueBool, so on every
+    -- UseRaidStylePartyFrames() - which both party ShouldShow paths ask. Writing
+    -- the fields from addon code made them insecure for the session, and the taint
+    -- then travelled down UpdateRaidAndPartyFrames -> UpdatePartyFrames ->
+    -- UpdateMember into member.unit, member.buffs and member.debuffs, which is
+    -- where the blocked actions on the party frames came from.
+    --
+    -- /df log seed proved it: "the seed is a field, not a global", followed by
+    -- PartyFrame.system and PartyFrame.systemIndex insecure, tainted by
+    -- DragonflightUI.
+    --
+    -- They were only ever set so that the old SetBlizzEditmodeFrameSetting could
+    -- find its layout entry through frame.system. That function is gone, and
+    -- nothing in this addon reads either field - the sys.system reads above are on
+    -- plain layout tables, not on the frame. Blizzard sets both itself when it
+    -- registers PartyFrame as a system.
 
     local function EnsureSettingInLayout(layout)
         if not layout then return end
