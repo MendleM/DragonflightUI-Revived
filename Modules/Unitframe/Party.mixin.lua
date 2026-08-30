@@ -981,6 +981,25 @@ function SubModuleMixin:SetupModern()
         end
     end
 
+    -- A newly styled member frame gets the golden art, so anything Darkmode had
+    -- recolored is undone the moment the roster changes. Rather than reading
+    -- Darkmode's settings from here, ask it to re-apply - the same shape as
+    -- Actionbar.lua's DarkmodeReapply step.
+    --
+    -- Deferred by a frame and coalesced: styleAll can run several times during one
+    -- roster update, and a re-apply per member would be wasted work.
+    local darkmodeReapplyPending = false
+    local function ReapplyDarkmode()
+        if darkmodeReapplyPending then return end
+        darkmodeReapplyPending = true
+
+        C_Timer.After(0, function()
+            darkmodeReapplyPending = false
+            local dm = DF:GetModule('Darkmode', true)
+            if dm and dm.GetWasEnabled and dm:GetWasEnabled() then pcall(dm.ApplySettings, dm) end
+        end)
+    end
+
     local function styleAll()
         if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
         local count = 0
@@ -990,6 +1009,8 @@ function SubModuleMixin:SetupModern()
             if not ok then geterrorhandler()('DFPartyModern: ' .. tostring(err)) end
             pcall(UpdateBars, pf)
         end
+
+        if count > 0 then ReapplyDarkmode() end
     end
 
     if PartyFrame and PartyFrame.InitializePartyMemberFrames then
@@ -1002,6 +1023,23 @@ function SubModuleMixin:SetupModern()
     -- were InitializePartyMemberFrames above and the roster watcher below -
     -- both of which only fire when the group itself changes.
     subModule.RestyleModernParty = styleAll
+
+    -- How Darkmode reaches the frame art on pooled member frames.
+    --
+    -- It cannot look the textures up itself. On this client there are no
+    -- PartyMemberFrame1..4 globals to walk, and our border texture deliberately
+    -- does not live on the frame - see the comment above memberState: writing
+    -- pf.DFPartyFrameBorder is what tainted the pooled members in the first place.
+    -- So the table stays private and callers get an iterator instead.
+    subModule.ForEachPartyBorder = function(fn)
+        if type(fn) ~= 'function' then return end
+        if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
+
+        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            local st = memberState[pf]
+            if st and st.styled and st.border then pcall(fn, st.border) end
+        end
+    end
 
     -- Gradient coloring follows current health, so it needs health events.
     -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would

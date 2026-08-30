@@ -623,15 +623,30 @@ function Module:UpdatePartyFrame(state)
     local f = unitModule.SubParty
     local c = CreateColorFromRGBHexString(state.unitframeColor)
 
+    -- Modern pooled party frames (Era 1.15.9+, TBC 2.5.6+, MoP 5.5.4+).
+    --
+    -- This is why the party border stayed golden while every other unit frame
+    -- went dark: the loop below walks PartyMemberFrame1..4, and on these clients
+    -- those globals do not exist - the frames come out of
+    -- PartyFrame.PartyMemberFramePool. The loop found nothing and failed quietly.
+    -- Version.API knows this as DF.Caps.HasPooledParty.
+    --
+    -- The border texture is not on the frame either, so Party.mixin hands out an
+    -- iterator rather than the table it keeps them in.
+    if f and f.ForEachPartyBorder then
+        f.ForEachPartyBorder(function(border)
+            border:SetDesaturated(state.unitframeDesaturate)
+            border:SetVertexColor(c:GetRGB())
+        end)
+    end
+
+    -- Older clients, where the four member frames are real globals.
     for i = 1, 4 do
         local pf = _G['PartyMemberFrame' .. i]
 
         if pf and pf.PartyFrameBorder then
-            -- print('yes')
             pf.PartyFrameBorder:SetDesaturated(state.unitframeDesaturate)
             pf.PartyFrameBorder:SetVertexColor(c:GetRGB())
-        else
-            -- print('not')
         end
     end
 
