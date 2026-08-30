@@ -60,47 +60,80 @@ end
 
 -- Rotate Minimap.
 --
--- The rotateMinimap CVar is real and the minimap does read it, but it is not
--- where the setting LIVES - the Edit Mode layout owns it and pushes its own
--- value back into the CVar on every layout application:
+-- The rotateMinimap CVar is real and the minimap reads it, but Blizzard treats
+-- the Edit Mode layout as the owner and pushes the layout's value back into the
+-- CVar whenever it applies a layout:
 --
 --   EditModeMinimapSystemMixin:UpdateSystemSettingRotateMinimap()
 --     self:SetRotateMinimap(self:GetSettingValueBool(
 --         Enum.EditModeMinimapSetting.RotateMinimap))
 --
---   MinimapClusterMixin:SetRotateMinimap(v)  ->  SetCVar("rotateMinimap", v)
+-- That is why writing only the CVar looked like it worked and then reverted on
+-- the next reload. The previous answer was to write the layout setting instead,
+-- which fixed persistence by handing the setting to Blizzard's server-side
+-- layout - and made Blizzard's Edit Mode and this addon two writers of one value.
 --
--- So writing the CVar worked, right up until the next layout application -
--- which a reload always performs - put the layout's value back over the top.
--- That is the whole of "doesn't persist after reload": it was never saved
--- anywhere that survives.
---
--- The TBC branch already wrote the layout setting and was right; the gate was
--- the mistake. Pick on what the client actually offers rather than on flavour.
+-- Now: our profile is the store, and ApplyRotateMinimap pushes it out. It runs on
+-- ApplySettings and again on EDIT_MODE_LAYOUTS_UPDATED, which is the one moment
+-- Blizzard would otherwise overwrite us. No layout write, no shared value.
 local function HasEditModeRotateSetting()
     return (MinimapCluster and Enum and Enum.EditModeMinimapSetting and
                Enum.EditModeMinimapSetting.RotateMinimap ~= nil) and true or false
 end
 
+local function GetStoredRotateMinimap()
+    local Module = DF:GetModule('Minimap')
+    local profile = Module and Module.db and Module.db.profile
+    local stored = profile and profile.minimap and profile.minimap.rotateMinimap
+    return stored
+end
+
 function SubModuleMixin.GetRotateMinimap()
-    if HasEditModeRotateSetting() and addonTable.GetBlizzEditmodeFrameSettingBool then
-        local ok, value = pcall(addonTable.GetBlizzEditmodeFrameSettingBool, addonTable, MinimapCluster,
-                                Enum.EditModeMinimapSetting.RotateMinimap)
-        if ok and value ~= nil then return value and true or false end
-    end
+    -- Unset means nobody has chosen here yet, so report the client's own state
+    -- rather than flipping it on upgrade.
+    local stored = GetStoredRotateMinimap()
+    if stored ~= nil then return stored and true or false end
 
     return C_CVar and C_CVar.GetCVarBool('rotateMinimap') or false
 end
 
-function SubModuleMixin.SetRotateMinimap(enabled)
-    if HasEditModeRotateSetting() and addonTable.SetBlizzEditmodeFrameSetting then
-        addonTable:SetBlizzEditmodeFrameSetting(MinimapCluster, Enum.EditModeMinimapSetting.RotateMinimap,
-                                                enabled and 1 or 0)
-        return
+-- Push our value onto the client. Preferred route is Blizzard's own setter,
+-- because it does whatever else the minimap needs besides the CVar; the CVar is
+-- the fallback for clients that do not have it.
+function SubModuleMixin.ApplyRotateMinimap()
+    local stored = GetStoredRotateMinimap()
+    if stored == nil then return end
+
+    local enabled = stored and true or false
+
+    if MinimapCluster and MinimapCluster.SetRotateMinimap then
+        local ok = pcall(MinimapCluster.SetRotateMinimap, MinimapCluster, enabled)
+        if ok then return end
     end
 
-    if C_CVar then C_CVar.SetCVar('rotateMinimap', enabled and 1 or 0) end
+    if C_CVar then pcall(C_CVar.SetCVar, 'rotateMinimap', enabled and 1 or 0) end
 end
+
+function SubModuleMixin.SetRotateMinimap(enabled)
+    local val = enabled and true or false
+
+    local Module = DF:GetModule('Minimap')
+    local profile = Module and Module.db and Module.db.profile
+    if profile and profile.minimap then profile.minimap.rotateMinimap = val end
+
+    SubModuleMixin.ApplyRotateMinimap()
+end
+
+-- The one point where Blizzard would put its layout value over ours. Not every
+-- flavour has the event and RegisterEvent throws on an unknown one, hence pcall.
+local rotateMinimapWatcher = CreateFrame('Frame')
+rotateMinimapWatcher:SetScript('OnEvent', function()
+    if not HasEditModeRotateSetting() then return end
+    Helper:RunOutOfCombat('minimap rotate reassert', function()
+        SubModuleMixin.ApplyRotateMinimap()
+    end)
+end)
+pcall(rotateMinimapWatcher.RegisterEvent, rotateMinimapWatcher, 'EDIT_MODE_LAYOUTS_UPDATED')
 
 function SubModuleMixin:SetupOptions()
     local Module = self.ModuleRef;
@@ -419,6 +452,13 @@ end
 function SubModuleMixin:Update()
     local state = self.state;
     if not state then return end
+
+    -- Our stored rotateMinimap, pushed onto the client on every settings pass.
+    -- See the comment above GetRotateMinimap: the value is ours, Blizzard's layout
+    -- is never consulted, and this is one of the two points that re-assert it. The
+    -- other is the EDIT_MODE_LAYOUTS_UPDATED watcher, for the moment Blizzard
+    -- would otherwise put its own layout value over the top.
+    SubModuleMixin.ApplyRotateMinimap()
 
     local parent;
     if DF.Settings.ValidateFrame(state.customAnchorFrame) then

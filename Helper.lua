@@ -266,133 +266,59 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
     end
 end
 
-function addonTable:SetBlizzEditmodeFrameSetting(frame, setting, value, apply)
-    if not (frame and setting) then return end
-
-    if frame == PartyFrame and Enum and Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames then
-        if addonTable.SubModuleMixins and addonTable.SubModuleMixins['Party'] and addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames then
-            addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value == 1)
-            return
-        end
-    end
-
-    if EditModeManagerFrame and EditModeManagerFrame.OnEditModeSystemSettingChange then
-        pcall(EditModeManagerFrame.OnEditModeSystemSettingChange, EditModeManagerFrame, frame, setting, value)
-    end
-
-    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then
-        return
-    end
-
-    local targetSystem = frame.system or (Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame)
-    local targetSystemIndex = frame.systemIndex
-
-    local layoutInfo = C_EditMode.GetLayouts()
-    if not layoutInfo or not layoutInfo.layouts then return end
-
-    for _, l in ipairs(layoutInfo.layouts) do
-        if l.systems then
-            for _, sys in ipairs(l.systems) do
-                if (not targetSystem or sys.system == targetSystem) and (not targetSystemIndex or sys.systemIndex == targetSystemIndex) then
-                    if sys.settings then
-                        local found = false
-                        for _, s in ipairs(sys.settings) do
-                            if s.setting == setting then
-                                s.value = value
-                                found = true
-                            end
-                        end
-                        if not found then
-                            table.insert(sys.settings, {setting = setting, value = value})
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    pcall(C_EditMode.SaveLayouts, layoutInfo)
-
-    -- Do NOT call EditModeManagerFrame:UpdateLayoutInfo() from here.
-    --
-    -- This is the line that broke Blizzard's Edit Mode for the whole session.
-    -- UpdateLayoutInfo is not a refresh - it is the setter behind
-    -- EDIT_MODE_LAYOUTS_UPDATED, and the layout table is its first argument:
-    --
-    --   function EditModeManagerFrameMixin:UpdateLayoutInfo(layoutInfo, reconcileLayouts)
-    --       self.layoutApplyInProgress = true;
-    --       self.layoutInfo = layoutInfo;          -- nil when called with no args
-    --       ...
-    --       local savedLayouts = self.layoutInfo.layouts;   -- throws here
-    --       ...
-    --       self.layoutApplyInProgress = false;             -- never reached
-    --
-    -- Called with no argument it set layoutInfo to nil, threw on the next line,
-    -- and left layoutApplyInProgress stuck at true. The pcall swallowed the
-    -- error, so nothing was reported. From that moment EditModeManagerFrame
-    -- had no layoutInfo, IsInitialized() answered false, and every Blizzard
-    -- caller that reads the active layout died on the nil - GetDefaultAnchor
-    -- via PlayerFrame_ResetPosition, and the system-anchor path via
-    -- UIParent_ManageFramePositions, which is the error spam on every reposition.
-    --
-    -- SaveLayouts above already makes the client fire EDIT_MODE_LAYOUTS_UPDATED,
-    -- and Blizzard's own OnEvent then calls UpdateLayoutInfo with the real
-    -- payload. There is nothing left to do here.
-
-    if UIParent_UpdateRaidAndPartyFrames then
-        pcall(UIParent_UpdateRaidAndPartyFrames)
-    end
-    if CompactRaidFrameManager_UpdateShown then
-        pcall(CompactRaidFrameManager_UpdateShown, CompactRaidFrameManager)
-    end
-    if CompactRaidFrameContainer_UpdateDisplayedUnits then
-        pcall(CompactRaidFrameContainer_UpdateDisplayedUnits, CompactRaidFrameContainer)
-    end
-    if PartyFrame and PartyFrame.UpdatePartyFrames then
-        pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
-    end
-
-    local fakeParty = _G['DragonflightUIEditModePartyFramePreview']
-    if fakeParty and fakeParty.Update then
-        pcall(fakeParty.Update, fakeParty)
-    end
-end
-
-function addonTable:GetBlizzEditmodeFrameSettingBool(frame, setting)
-    if frame == PartyFrame and Enum and Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames then
-        if addonTable.SubModuleMixins and addonTable.SubModuleMixins['Party'] and addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames then
-            return addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames()
-        end
-    end
-
-    if not (C_EditMode and C_EditMode.GetLayouts) then return false end
-    local layoutInfo = C_EditMode.GetLayouts()
-    if not layoutInfo or not layoutInfo.layouts then return false end
-
-    local targetSystem = frame and frame.system or (Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame)
-    local targetSystemIndex = frame and frame.systemIndex
-
-    local activeLayout = layoutInfo.activeLayout and layoutInfo.layouts[layoutInfo.activeLayout]
-    local searchLayouts = activeLayout and {activeLayout} or layoutInfo.layouts
-
-    for _, layout in ipairs(searchLayouts) do
-        if layout.systems then
-            for _, sys in ipairs(layout.systems) do
-                if (not targetSystem or sys.system == targetSystem) and (not targetSystemIndex or sys.systemIndex == targetSystemIndex) then
-                    if sys.settings then
-                        for _, s in ipairs(sys.settings) do
-                            if s.setting == setting then
-                                return s.value == 1
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    return false
-end
+-- SetBlizzEditmodeFrameSetting / GetBlizzEditmodeFrameSettingBool used to live
+-- here. Both are gone, and with them the last general-purpose route from this
+-- addon into Blizzard's Edit Mode layout.
+--
+-- They read and wrote Blizzard's server-side layout for five settings. For four
+-- of them the write bought nothing, because this addon already produces the
+-- effect itself and Blizzard's applier either does the same thing or has been
+-- stubbed out here:
+--
+--   AlwaysShowButtons  Blizzard applies it in UpdateShownButtons, which
+--                      Actionbar.Controller replaces with an empty function.
+--                      The effect comes from our showgrid attribute.
+--   FrameSize (pet)    Blizzard applies it as PetFrame:SetScale(); Pet.mixin
+--                      sets the scale directly one line earlier.
+--   BuffsOnTop         Blizzard sets self.buffsOnTop and refreshes auras;
+--                      Target.mixin does exactly that from its own profile.
+--   UseLargerFrame     Blizzard calls FocusFrame:SetSmallSize(not v);
+--                      Focus.mixin now makes that call itself.
+--
+-- RotateMinimap was the one where Blizzard would overwrite us, because it pushes
+-- the layout value into the rotateMinimap CVar on every layout application.
+-- Minimap.mixin keeps the value in our profile and re-asserts it on
+-- EDIT_MODE_LAYOUTS_UPDATED instead of handing it to the layout.
+--
+-- The one write that remains is SyncRaidStylePartyFrameToBlizzard above, and it
+-- is not optional: which party system is live is decided inside Blizzard's code,
+-- every path through it asks EditModeManagerFrame:UseRaidStylePartyFrames(), and
+-- that resolves out of the layout. A settings value there is fine - it stays
+-- meaningful with this addon disabled. An anchorInfo pointing at one of our
+-- frames is not, and is what SanitizeLegacyEditModeAnchors cleans up.
+--
+-- Standing rule, learned the expensive way: never call
+-- EditModeManagerFrame:UpdateLayoutInfo() from addon code.
+--
+--   function EditModeManagerFrameMixin:UpdateLayoutInfo(layoutInfo, reconcileLayouts)
+--       self.layoutApplyInProgress = true;
+--       self.layoutInfo = layoutInfo;          -- nil when called with no args
+--       ...
+--       local savedLayouts = self.layoutInfo.layouts;   -- throws here
+--       ...
+--       self.layoutApplyInProgress = false;             -- never reached
+--
+-- It is not a refresh, it is the setter behind EDIT_MODE_LAYOUTS_UPDATED, and the
+-- layout table is its first argument. Called with no argument it nil'd
+-- layoutInfo, threw on the next line, and left layoutApplyInProgress stuck true -
+-- inside a pcall, so nothing was reported. From that point EditModeManagerFrame
+-- had no layoutInfo, IsInitialized() answered false for the session, and every
+-- Blizzard caller that reads the active layout died on the nil: GetDefaultAnchor
+-- via PlayerFrame_ResetPosition, SetToLayoutAnchor via
+-- UIParent_ManageFramePositions. That was issues #26 and #28.
+--
+-- SaveLayouts already makes the client fire EDIT_MODE_LAYOUTS_UPDATED, and
+-- Blizzard's own OnEvent calls UpdateLayoutInfo with the real payload.
 
 function Helper:Benchmark(label, func, level, moduleRef)
     if level == nil or type(level) ~= 'number' then level = 1; end

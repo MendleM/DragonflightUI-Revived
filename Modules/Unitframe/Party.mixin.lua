@@ -147,10 +147,35 @@ end
 
 -- Use Raid-Style Party Frames.
 --
--- As per AGENTS.MD architecture rules:
--- DragonflightUI is decoupled from Blizzard Edit Mode layout mutations (C_EditMode.SaveLayouts).
--- DragonflightUI's database (Module.db.profile.party.useCompactPartyFrames) is the Single Source of Truth.
--- Blizzard's EditModeManagerFrame:UseRaidStylePartyFrames() is overridden to directly return the DragonflightUI setting.
+-- Module.db.profile.party.useCompactPartyFrames is the single source of truth,
+-- and the sync to Blizzard is one-way: DragonflightUI writes, Blizzard reads.
+--
+-- This is the one Blizzard setting that cannot be applied from here. Which party
+-- system is live is decided inside Blizzard's own code, and every path through
+-- it - UpdateRaidAndPartyFrames, CompactPartyFrame:ShouldShow,
+-- CompactRaidFrameManager - asks EditModeManagerFrame:UseRaidStylePartyFrames(),
+-- which resolves the value through GetRegisteredSystemFrame out of the layout.
+-- So the layout is where the value has to go, and SyncRaidStylePartyFrameToBlizzard
+-- puts it there through C_EditMode.GetLayouts/SaveLayouts. That is a settings
+-- value, self-contained and still meaningful with this addon disabled - unlike an
+-- anchorInfo pointing at a DragonflightUI frame, which is what must never be
+-- written and no longer is.
+--
+-- What used to be here instead was an assignment:
+--
+--     EditModeManagerFrame.UseRaidStylePartyFrames = QuerySetting
+--     EditModeManagerFrameMixin.UseRaidStylePartyFrames = QuerySetting
+--
+-- reinstalled on every ADDON_LOADED, with no backup, so Blizzard's own
+-- implementation was gone for the session. It was added as a workaround one
+-- commit after the argument-less UpdateLayoutInfo() call in Helper.lua nil'd
+-- layoutInfo and broke the real accessor - treating the symptom of a bug that is
+-- now fixed at the cause.
+--
+-- The cost was taint. Blizzard's ShouldShow for BOTH party systems ran an addon
+-- function, so both inherited taint on a protected path, and the blocked actions
+-- on the party frames followed from it. The taint analysis in DebugLog.lua had
+-- already narrowed the seed to this exact call and was right.
 
 function SubModuleMixin.GetRaidStylePartyFrames(self)
     local Module = (self and type(self) == 'table' and self.ModuleRef) or DF:GetModule('Unitframe')
@@ -224,28 +249,6 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
         end)
     end)
 end
-
-local function InstallEditModeOverride()
-    local function QuerySetting()
-        return SubModuleMixin.GetRaidStylePartyFrames()
-    end
-
-    if EditModeManagerFrame then
-        EditModeManagerFrame.UseRaidStylePartyFrames = QuerySetting
-    end
-    if EditModeManagerFrameMixin and EditModeManagerFrameMixin.UseRaidStylePartyFrames then
-        EditModeManagerFrameMixin.UseRaidStylePartyFrames = QuerySetting
-    end
-end
-InstallEditModeOverride()
-
-local editModeWatcher = CreateFrame('Frame')
-editModeWatcher:RegisterEvent('ADDON_LOADED')
-editModeWatcher:SetScript('OnEvent', function(_, _, addon)
-    if addon == 'Blizzard_EditMode' or EditModeManagerFrame ~= nil then
-        InstallEditModeOverride()
-    end
-end)
 
 function SubModuleMixin:SetupOptions()
     local Module = self.ModuleRef;

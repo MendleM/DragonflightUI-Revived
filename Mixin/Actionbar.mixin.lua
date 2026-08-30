@@ -380,8 +380,6 @@ function DragonflightUIActionbarMixin:Update()
     end
     self:ShowHighlight(false)
 
-    if self.BlizzEditmodeFrame then self:UpdateBlizzEditmodeState(); end
-
     -- Apply the alwaysShow decision immediately (login and live toggles) -
     -- the attribute writes above are invisible until something re-evaluates.
     self:UpdateGridState()
@@ -446,33 +444,22 @@ function DragonflightUIActionbarMixin:Update()
     if self.StylePetButton and PetActionBar_Update then PetActionBar_Update() end
 end
 
-function DragonflightUIActionbarMixin:UpdateBlizzEditmodeState()
-    -- print('UpdateBlizzEditmodeState')
-    local state = self.state;
-    if not state then return end
-
-    local buttonTable = self.buttonTable
-    local btnCount = #buttonTable
-    if btnCount < 1 then return end
-
-    if not self.BlizzEditmodeFrame then return end
-
-    if Enum and Enum.EditModeActionBarSetting and addonTable.GetBlizzEditmodeFrameSettingBool then
-        local editmodeAlwaysShow = addonTable:GetBlizzEditmodeFrameSettingBool(self.BlizzEditmodeFrame,
-                                                                               Enum.EditModeActionBarSetting
-                                                                                   .AlwaysShowButtons)
-        if editmodeAlwaysShow ~= state.alwaysShow then
-            if state.alwaysShow then
-                addonTable:SetBlizzEditmodeFrameSetting(self.BlizzEditmodeFrame,
-                                                        Enum.EditModeActionBarSetting.AlwaysShowButtons, 1, true)
-            else
-                addonTable:SetBlizzEditmodeFrameSetting(self.BlizzEditmodeFrame,
-                                                        Enum.EditModeActionBarSetting.AlwaysShowButtons, 0, true)
-            end
-        end
-    end
-end
-
+-- UpdateBlizzEditmodeState() used to sit here and has been removed.
+--
+-- It mirrored state.alwaysShow into Blizzard's AlwaysShowButtons layout setting,
+-- and read that setting back to decide whether a write was needed. Both halves
+-- were pointless:
+--
+--   * state.alwaysShow was already the source of truth - the write only pushed
+--     it outwards, it never fed anything back in.
+--   * the value had no effect. Blizzard applies AlwaysShowButtons through
+--     EditModeActionBarSystemMixin:UpdateShownButtons, and Actionbar.Controller
+--     stubs that to an empty function on every MultiBar. So the setting was
+--     written to Blizzard's server-side layout on every ApplySettings and then
+--     read by nobody.
+--
+-- The actual effect comes from UpdateGridState below, which writes the showgrid
+-- attribute on this addon's own buttons.
 function DragonflightUIActionbarMixin:UpdateGridState()
     local state = self.state;
     if not state then return end
@@ -499,8 +486,6 @@ function DragonflightUIActionbarMixin:UpdateGridState()
             if btn:IsShown() ~= show then btn:SetShown(show) end
         end
     end
-
-    if self.BlizzEditmodeFrame then self:UpdateBlizzEditmodeState(); end
 end
 
 function DragonflightUIActionbarMixin:HookQuickbindMode()

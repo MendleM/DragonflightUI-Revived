@@ -1552,8 +1552,13 @@ function DF:LogPartyTaint(tag)
     -- file. Whatever taints them is therefore upstream of both, and the one term
     -- both ShouldShow paths run through is
     -- EditModeManagerFrame:UseRaidStylePartyFrames(), which reads the Edit Mode
-    -- layout. This addon writes that layout through LibEditModeOverride on every
-    -- OverrideBlizzEditmode and SetBlizzEditmodeFrameSetting.
+    -- layout.
+    --
+    -- The original note here blamed LibEditModeOverride. That was wrong - the
+    -- library was loaded but never called. The real seed was this addon
+    -- REPLACING UseRaidStylePartyFrames outright, so that Blizzard's own
+    -- ShouldShow ran our function and picked up the taint from it. That
+    -- assignment is gone, along with every write to Blizzard's layout.
     --
     -- taintLog cannot see any of this: it records tainted globals, and these are
     -- fields. That is why this was once "ruled out" and should not have been.

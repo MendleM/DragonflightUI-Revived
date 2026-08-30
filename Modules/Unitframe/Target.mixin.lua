@@ -492,12 +492,16 @@ function SubModuleMixin:SetupOptions()
                     return false
                 end
             elseif sub == 'buffsOnTop' then
-                if Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.BuffsOnTop and addonTable.GetBlizzEditmodeFrameSettingBool then
-                    return addonTable:GetBlizzEditmodeFrameSettingBool(TargetFrame,
-                                                                       Enum.EditModeUnitFrameSetting.BuffsOnTop);
-                else
-                    return TARGET_FRAME_BUFFS_ON_TOP and true or false
-                end
+                -- Our own profile, not Blizzard's Edit Mode layout.
+                --
+                -- Deliberately unset by default: as long as nobody has touched
+                -- this here, report whatever the client currently has, so an
+                -- upgrade never flips a choice the player made in Blizzard's UI.
+                -- The first toggle writes our profile and we own it from then on.
+                local stored = Module.db and Module.db.profile and Module.db.profile.target and
+                                   Module.db.profile.target.buffsOnTop
+                if stored ~= nil then return stored and true or false end
+                return TARGET_FRAME_BUFFS_ON_TOP and true or false
             else
                 return getOption(info)
             end
@@ -514,16 +518,19 @@ function SubModuleMixin:SetupOptions()
                     SetCVar("showTargetOfTarget", "0");
                 end
             elseif sub == 'buffsOnTop' then
-                if value then
-                    TARGET_FRAME_BUFFS_ON_TOP = true
-                    TargetFrame.buffsOnTop = true
-                else
-                    TARGET_FRAME_BUFFS_ON_TOP = false
-                    TargetFrame.buffsOnTop = false
+                local val = value and true or false
+
+                -- Store in our profile, then apply. Blizzard's applier for this
+                -- setting is UpdateSystemSettingBuffsOnTop, and all it does is
+                -- set self.buffsOnTop and refresh the auras - which is what the
+                -- next three lines do. The layout write that used to be here
+                -- bought nothing but a round trip to Blizzard's server.
+                if Module.db and Module.db.profile and Module.db.profile.target then
+                    Module.db.profile.target.buffsOnTop = val
                 end
-                if Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.BuffsOnTop and addonTable.SetBlizzEditmodeFrameSetting then
-                    addonTable:SetBlizzEditmodeFrameSetting(TargetFrame, Enum.EditModeUnitFrameSetting.BuffsOnTop, value and 1 or 0, true);
-                end
+
+                TARGET_FRAME_BUFFS_ON_TOP = val
+                TargetFrame.buffsOnTop = val
                 -- Not TargetFrame_UpdateAuras directly: driving it from here
                 -- can make Blizzard create a TargetFrameDebuffN global inside
                 -- our tainted execution, which taints that global for the
@@ -728,6 +735,23 @@ function SubModuleMixin:Update()
     TextStatusBar_UpdateTextString(TargetFrameHealthBar)
     self:UpdateComboFrameState(state)
     TargetFrameNameBackground:SetShown(not state.hideNameBackground)
+
+    -- buffsOnTop is ours now, so this is where it gets re-asserted.
+    --
+    -- Blizzard drives its copy of this setting off the Edit Mode layout at login
+    -- (UpdateSystemSettingBuffsOnTop). Keeping the value in the layout - which is
+    -- what this addon used to do - was only ever a way of making that login pass
+    -- produce the right answer. Applying it here does the same thing without a
+    -- server-side copy, and it also survives Blizzard re-applying its layout.
+    --
+    -- nil means the player has never set it here, so Blizzard's value stands.
+    if state.buffsOnTop ~= nil then
+        local buffsOnTop = state.buffsOnTop and true or false
+        TARGET_FRAME_BUFFS_ON_TOP = buffsOnTop
+        TargetFrame.buffsOnTop = buffsOnTop
+        Helper:RefreshUnitAuras(TargetFrame)
+    end
+
     if AuraDurations and AuraDurations.frame then
         AuraDurations.frame:SetState(state)
     end

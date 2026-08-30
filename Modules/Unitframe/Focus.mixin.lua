@@ -370,8 +370,21 @@ function SubModuleMixin:Setup()
 
     if addonTable.OverrideBlizzEditmode and FocusFrame then
         addonTable:OverrideBlizzEditmode(FocusFrame, 'CENTER', f, 'CENTER', 0, 0)
-        if Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.UseLargerFrame and addonTable.SetBlizzEditmodeFrameSetting then
-            addonTable:SetBlizzEditmodeFrameSetting(FocusFrame, Enum.EditModeUnitFrameSetting.UseLargerFrame, 1)
+
+        -- The focus frame has to be the large variant, not the small one.
+        --
+        -- This used to be written into Blizzard's layout as UseLargerFrame = 1.
+        -- Blizzard's applier for that setting is a single call:
+        --
+        --   EditModeUnitFrameSystemMixin:UpdateSystemSettingUseLargerFrame()
+        --     FocusFrame:SetSmallSize(not value)
+        --
+        -- so we make that call ourselves and leave the layout alone. Same result,
+        -- no write to a server-side layout, and it still holds with this addon
+        -- disabled because nothing was persisted on Blizzard's side to undo.
+        if FocusFrame.SetSmallSize and not Helper:IsCombatLocked() then
+            local ok, err = pcall(FocusFrame.SetSmallSize, FocusFrame, false)
+            if not ok then geterrorhandler()('DFUI FocusFrame:SetSmallSize: ' .. tostring(err)) end
         end
     end
 

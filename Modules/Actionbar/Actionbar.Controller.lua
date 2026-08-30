@@ -403,6 +403,27 @@ function Module.DisableBlizzardBarGridUpdates()
         _G['StanceBar'],
         _G['PossessActionBar'],
     }
+    -- These two assignments stay, and they are the one deliberate exception to
+    -- "never replace a Blizzard function". Read before touching them.
+    --
+    -- They exist because Blizzard's own UpdateShownButtons and SetShowGrid on
+    -- these background bars produced ADDON BLOCKED errors when the spellbook was
+    -- opened and when a pet ability was cast - the bars are secure, this addon
+    -- owns their button visibility, and the two implementations fought. Stubbing
+    -- them fixed that, and it is in the changelog as such.
+    --
+    -- The trade is understood: an assignment on a secure frame taints that field.
+    -- It is kept narrow on purpose - per instance, never on the shared mixin - so
+    -- it cannot reach a bar this addon does not own. A post-hook is not an option,
+    -- because the point is to stop Blizzard's implementation from running at all,
+    -- and hooksecurefunc cannot prevent anything.
+    --
+    -- The clean fix is not a smaller change here, it is for these bars to stop
+    -- being Blizzard Edit Mode systems, which would mean this addon taking over
+    -- their registration. That is a separate piece of work.
+    --
+    -- Button visibility is driven instead by DragonflightUIActionbarMixin's
+    -- UpdateGridState, through the showgrid attribute on our own buttons.
     for _, bBar in ipairs(multiBars) do
         if bBar then
             bBar:EnableMouse(false)
