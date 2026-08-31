@@ -682,6 +682,22 @@ function SubModuleMixin:SetupOptions()
                 end
 
                 addonTable:SetRaidEditModeSettingBySetting(blizz.setting, stored)
+
+                -- Both panels read the same setting but keep their own widgets, so the
+                -- one that was not touched still shows the old value. Position changes
+                -- get this for free because OnDragStop calls it; these do not, because
+                -- they never go through the profile at all.
+                --
+                -- Two refreshes because there are two panels: Unitframe's own refreshes
+                -- the config window's Raid page, and the Editmode module refreshes its
+                -- selection dialog.
+                if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
+
+                local editmode = DF.GetModule and DF:GetModule('Editmode')
+                if editmode and editmode.RefreshOptionScreens then
+                    pcall(editmode.RefreshOptionScreens, editmode)
+                end
+
                 return
             end
 
@@ -928,6 +944,14 @@ function SubModuleMixin:EnsureRaidMoveFrame()
     moveFrame:SetFrameLevel(2)
     moveFrame:EnableMouse(false)
     moveFrame:SetSize(200, 200)
+
+    -- Without this a drag moves nothing and commits nothing.
+    -- DFEditModeSystemSelectionBaseMixin:OnDragStop is what writes anchor, x and y back
+    -- into the profile and then calls ApplySettings and RefreshOptionScreens - but it
+    -- never runs on a frame the client will not move. Every other unit frame holder
+    -- here sets this in its own Setup; the raid one was the omission.
+    moveFrame:SetMovable(true)
+
     self.RaidMoveFrame = moveFrame
 
     return moveFrame
