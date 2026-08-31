@@ -1683,8 +1683,14 @@ function DF:LogBagRowState(tag)
             -- IsProtected answers whether the combat guard is actually required on
             -- these buttons, rather than us assuming it is.
             local protected, explicit = btn:IsProtected()
-            DF:Log(tag, '%s: shown=%s protected=%s(explicit=%s) %s', name, tostring(btn:IsShown()),
-                   tostring(protected), tostring(explicit), BagTracePoint(btn))
+
+            -- Size matters as much as the anchor here. Blizzard's Layout calls
+            -- KeyringMixin:UpdateOrientation, which resets the keyring to the
+            -- dimensions captured before we restyled it, and a frame narrower than its
+            -- own artwork looks like a spacing bug rather than a sizing one.
+            DF:Log(tag, '%s: shown=%s %.0fx%.0f scale=%.2f protected=%s(explicit=%s) %s', name,
+                   tostring(btn:IsShown()), btn:GetWidth() or 0, btn:GetHeight() or 0,
+                   (btn.GetScale and btn:GetScale()) or 1, tostring(protected), tostring(explicit), BagTracePoint(btn))
         else
             DF:Log(tag, '%s: absent', name)
         end

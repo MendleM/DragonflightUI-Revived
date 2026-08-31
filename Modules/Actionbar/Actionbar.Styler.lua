@@ -357,6 +357,10 @@ function Module.ChangeBackpack()
     Module.HookBagBarLayout()
 end
 
+-- The size the bag buttons are styled to, and the size the keyring has to be put back
+-- to after Blizzard's layout resets it. Kept next to the code that has to reassert it.
+local BAG_BUTTON_SIZE = 30
+
 -- Anchor one button, unless the client would refuse it at this moment.
 --
 -- Only protected frames are off limits mid-fight, and these buttons are not
@@ -401,6 +405,22 @@ function Module.AnchorBagSlots()
 
     local hasKeyring = not (DF.Cata or DF.MoP) and KeyRingButton
     if hasKeyring then
+        -- Put the frame size back before anchoring.
+        --
+        -- Blizzard's Layout runs UpdateOrientation on every registered bag button, and
+        -- for the keyring that is:
+        --
+        --   self:SetSize(self.initialWidth, self.initialHeight)
+        --
+        -- Those two were captured in KeyringMixin:OnLoad, long before we restyled the
+        -- button into a 30x30 disc, so they are the original narrow strip - /df log
+        -- watch measured 18x39 against the bags' 30x30. Our artwork is 30.5px and
+        -- centred on the frame, so on an 18px frame it overhangs about six pixels each
+        -- side and crowds the bag next to it. Anchors alone never fixed that.
+        if not (locked and KeyRingButton:IsProtected()) then
+            KeyRingButton:SetSize(BAG_BUTTON_SIZE, BAG_BUTTON_SIZE)
+        end
+
         done = AnchorButton(KeyRingButton, locked, 'RIGHT', _G['CharacterBag3Slot'], 'LEFT', 0, 0) and done
     elseif KeyRingButton then
         KeyRingButton:Hide()
