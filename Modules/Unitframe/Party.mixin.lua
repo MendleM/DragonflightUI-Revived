@@ -177,6 +177,66 @@ end
 -- on the party frames followed from it. The taint analysis in DebugLog.lua had
 -- already narrowed the seed to this exact call and was right.
 
+-- Told once, when the setting is switched on, because this is where the addon stops
+-- being able to help.
+--
+-- DragonflightUI decides WHICH party system is shown, and nothing more. Everything
+-- about how the compact frames then look - height and width, groups together,
+-- horizontal groups, sort order, class colours, health text - is Blizzard's, and
+-- writing those from addon code taints the raid frame update path and produces
+-- blocked actions. Raid.mixin.lua carries a whole block of exactly those options,
+-- commented out, under a header saying so. That verdict stands.
+--
+-- So the honest thing is to say where the settings live and offer the way there,
+-- rather than letting the player hunt for a panel this addon does not own.
+local raidStyleNoticeShown = false
+
+StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
+    text = 'DragonflightUI has switched your party frames to the raid-style (compact) frames.\n\n' ..
+        'Their appearance is not configurable from DragonflightUI. Frame size, keeping groups together, ' ..
+        'horizontal groups, sort order, class colours and health text all belong to Blizzard\'s own raid frame ' ..
+        'settings - setting them from an addon taints the interface and causes blocked actions in combat.\n\n' ..
+        'Use Blizzard\'s Raid Frames panel for those. DragonflightUI only decides which party system is shown.',
+    button1 = 'Open raid frame settings',
+    button2 = 'Do not show again',
+    showAlert = true,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+    OnAccept = function()
+        -- The same entry point the Raid options already use for its "Open" button.
+        if Settings and Settings.OpenToCategory and RAID_FRAMES_LABEL then
+            Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL)
+            if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_MAINMENU_OPTION) end
+        else
+            DF:Print('Raid frame settings: Escape, Options, Interface, Raid Frames.')
+        end
+    end,
+    -- Only button2 silences it, matching the leftover-layout notice: closing it by
+    -- accident should not cost the player the information for good.
+    OnCancel = function()
+        local db = DF.db and DF.db.global
+        if db then db.raidStyleNoticeDismissed = true end
+        DF:Print('Notice about raid-style party frames will not be shown again. ' ..
+                     'Type /df raidnotice to bring it back.')
+    end
+}
+
+function addonTable:ShowRaidStylePartyNotice(force)
+    if not force then
+        if raidStyleNoticeShown then return false end
+
+        local db = DF.db and DF.db.global
+        if db and db.raidStyleNoticeDismissed then return true end
+    end
+
+    raidStyleNoticeShown = true
+    StaticPopup_Show('DragonflightUIRaidStylePartyNotice')
+
+    return false
+end
+
 function SubModuleMixin.GetRaidStylePartyFrames(self)
     local Module = (self and type(self) == 'table' and self.ModuleRef) or DF:GetModule('Unitframe')
     if Module and Module.db and Module.db.profile and Module.db.profile.party and Module.db.profile.party.useCompactPartyFrames ~= nil then
@@ -213,6 +273,12 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
 
     if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
         addonTable:SyncRaidStylePartyFrameToBlizzard(val)
+    end
+
+    -- Only when switching on, and only once per session. Switching back to the
+    -- portrait frames needs no explanation - those this addon does configure.
+    if val and addonTable and addonTable.ShowRaidStylePartyNotice then
+        addonTable:ShowRaidStylePartyNotice()
     end
 
     -- Update preview in Edit Mode

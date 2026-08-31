@@ -544,6 +544,20 @@ function Module:SlashCommand(input)
         return
     end
 
+    -- /df raidnotice - bring back the explanation of where raid-style party frame
+    -- appearance is configured. Same force semantics as layoutnotice: the player
+    -- asking overrides both the dismissed flag and the once-per-session guard.
+    -- See Party.mixin.lua:ShowRaidStylePartyNotice.
+    if cmd == 'raidnotice' then
+        if addonTable.ShowRaidStylePartyNotice then
+            addonTable:ShowRaidStylePartyNotice(true)
+
+            local db = DF.db and DF.db.global
+            if db then db.raidStyleNoticeDismissed = false end
+        end
+        return
+    end
+
     Module:ToggleConfigFrame()
 end
 
