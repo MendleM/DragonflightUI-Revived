@@ -2695,48 +2695,84 @@ DragonflightUIStancebarMixinCode = {}
 
 local NUM_STANCE_SLOTS = NUM_STANCE_SLOTS or 10;
 
+function DragonflightUIStancebarMixinCode:Init()
+    DragonflightUIActionbarMixin.Init(self)
+    self.stanceBar = true
+
+    self:RegisterEvent('UPDATE_SHAPESHIFT_FORMS')
+    self:RegisterEvent('UPDATE_SHAPESHIFT_FORM')
+    self:RegisterEvent('UPDATE_SHAPESHIFT_USABLE')
+    self:RegisterEvent('UPDATE_SHAPESHIFT_COOLDOWN')
+
+    self:HookScript('OnEvent', function(_, event)
+        if event == 'UPDATE_SHAPESHIFT_FORMS' or event == 'UPDATE_SHAPESHIFT_FORM' or
+            event == 'UPDATE_SHAPESHIFT_USABLE' or event == 'UPDATE_SHAPESHIFT_COOLDOWN' then
+            if not InCombatLockdown() then
+                self:UpdateButtonState(true)
+            else
+                self:UpdateButtonState(false)
+            end
+        end
+    end)
+end
+
+function DragonflightUIStancebarMixinCode:UpdateGridState()
+    if not InCombatLockdown() then
+        self:UpdateButtonState(true)
+    else
+        self:UpdateButtonState(false)
+    end
+end
+
 function DragonflightUIStancebarMixinCode:UpdateButtonState(showHide)
+    if not self.buttonTable then return end
     local numForms = GetNumShapeshiftForms();
     local texture, isActive, isCastable;
     local button, icon, cooldown;
     local start, duration, enable;
     for i = 1, NUM_STANCE_SLOTS do
         button = self.buttonTable[i];
-        icon = button.icon;
-        if (i <= numForms) then
-            texture, isActive, isCastable = GetShapeshiftFormInfo(i);
-            icon:SetTexture(texture);
+        if button then
+            icon = button.icon;
+            if (i <= numForms) then
+                texture, isActive, isCastable = GetShapeshiftFormInfo(i);
+                if icon then icon:SetTexture(texture); end
 
-            -- Cooldown stuffs
-            cooldown = button.cooldown;
-            if (texture) then
-                cooldown:Show();
+                -- Cooldown stuffs
+                cooldown = button.cooldown;
+                if cooldown then
+                    if (texture) then
+                        cooldown:Show();
+                    else
+                        cooldown:Hide();
+                    end
+                    start, duration, enable = GetShapeshiftFormCooldown(i);
+                    CooldownFrame_Set(cooldown, start, duration, enable);
+                end
+
+                if (isActive) then
+                    self.lastSelected = button:GetID();
+                    button:SetChecked(true);
+                else
+                    button:SetChecked(false);
+                end
+
+                if (isCastable) then
+                    if icon then icon:SetVertexColor(1.0, 1.0, 1.0); end
+                else
+                    if icon then icon:SetVertexColor(0.4, 0.4, 0.4); end
+                end
+
+                if self.state then
+                    button.buttonType = 'SHAPESHIFTBUTTON'
+                    if button.UpdateHotkeyDisplayText then
+                        button:UpdateHotkeyDisplayText(self.state.shortenKeybind)
+                    end
+                end
+                if showHide and not InCombatLockdown() then button:Show(); end
             else
-                cooldown:Hide();
+                if showHide and not InCombatLockdown() then button:Hide(); end
             end
-            start, duration, enable = GetShapeshiftFormCooldown(i);
-            CooldownFrame_Set(cooldown, start, duration, enable);
-
-            if (isActive) then
-                self.lastSelected = button:GetID();
-                button:SetChecked(true);
-            else
-                button:SetChecked(false);
-            end
-
-            if (isCastable) then
-                icon:SetVertexColor(1.0, 1.0, 1.0);
-            else
-                icon:SetVertexColor(0.4, 0.4, 0.4);
-            end
-
-            if self.state then
-                button.buttonType = 'SHAPESHIFTBUTTON'
-                button:UpdateHotkeyDisplayText(self.state.shortenKeybind)
-            end
-            if showHide then button:Show(); end
-        else
-            if showHide then button:Hide(); end
         end
     end
 end

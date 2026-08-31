@@ -177,7 +177,7 @@ function Module:GetSetupActionbarSteps()
         end
 
         bar:Init()
-        bar:SetButtons(buttons, 420)
+        bar:SetButtons(buttons, 42)
         bar:StyleButtons()
         Module['stancebar'] = bar
     end}
@@ -334,20 +334,18 @@ function Module.ChangeActionbar()
     if MultiBarLeft then MultiBarLeft.ignoreFramePositionManager = true end
     if MultiBarRight then MultiBarRight.ignoreFramePositionManager = true end
 
-    if StanceButton1 then
-        StanceButton1:ClearAllPoints()
-        if MultiBarBottomLeft then
-            StanceButton1:SetPoint('LEFT', MultiBarBottomLeft, 'LEFT', 1, 77)
-        end
-        StanceButton1.ignoreFramePositionManager = true
-    end
-
     Module.ChangeGryphon()
 
     if _G['StatusTrackingBarManager'] then _G['StatusTrackingBarManager']:Hide() end
 
     local stancebar = _G['StanceBar'];
     if stancebar then
+        stancebar:UnregisterAllEvents()
+        if not InCombatLockdown() then
+            stancebar:SetSize(1, 1)
+            stancebar:ClearAllPoints()
+            stancebar:Hide()
+        end
         local t = {'BackgroundArtLeft', 'BackgroundArtMiddle', 'BackgroundArtRight'}
         for k, v in ipairs(t) do
             if stancebar[v] then
