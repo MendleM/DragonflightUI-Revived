@@ -176,6 +176,15 @@ function SubModuleMixin:SetupOptions()
     --
     -- HasSetting on the registered system frame decides what appears, so a flavour
     -- without a given setting simply does not show it.
+    -- Which option key maps to which Edit Mode setting.
+    --
+    -- Needed because SettingsList builds every row with the GROUP's get and set -
+    -- SettingsList.mixin.lua:859 does "get = data.options.get" - and ignores whatever
+    -- an individual option defines. So the group handlers below have to recognise
+    -- these keys, and this is how they do it. Per-option get/set are still set for
+    -- correctness, they simply are not what runs.
+    local blizzRaidSettings = {}
+
     -- Returns how many entries it added, so the caller can tell "not ready yet" from
     -- "nothing to offer" and stop retrying once it has worked.
     local function BuildRaidEditModeArgs(args)
@@ -261,7 +270,9 @@ function SubModuleMixin:SetupOptions()
 
                 -- Only the branches that produced something usable set a type.
                 if option.type then
-                    args['blizzRaid' .. tostring(setting)] = option
+                    local key = 'blizzRaid' .. tostring(setting)
+                    args[key] = option
+                    blizzRaidSettings[key] = {setting = setting, info = info, kind = option.type}
                     added = added + 1
                 end
             end
@@ -565,6 +576,19 @@ function SubModuleMixin:SetupOptions()
             local key = info[1]
             local sub = info[2]
 
+            -- The Edit Mode settings, read from Blizzard's registered raid system.
+            -- Sliders show the converted value; dropdowns and checkboxes compare
+            -- against the stored one, which is what the enum values are.
+            local blizz = blizzRaidSettings[sub]
+            if blizz then
+                local stored = addonTable:GetRaidEditModeSettingBySetting(blizz.setting)
+
+                if blizz.kind == 'toggle' then return (stored or 0) ~= 0 end
+                if blizz.kind == 'range' then return ConvertSettingValue(blizz.info, stored or 0, true) end
+
+                return stored
+            end
+
             -- Same setting as the party page's copy, and on 1.15.9 it lives in
             -- the Edit Mode layout rather than in the dead useCompactPartyFrames
             -- CVar. One implementation, in Party.mixin.lua.
@@ -586,6 +610,21 @@ function SubModuleMixin:SetupOptions()
         optionsRaid.set = function(info, value)
             local key = info[1]
             local sub = info[2]
+
+            -- Converted back to Blizzard's stored form before writing: the slider
+            -- shows 72 to 144, the layout holds the difference from the minimum.
+            local blizz = blizzRaidSettings[sub]
+            if blizz then
+                local stored = value
+                if blizz.kind == 'toggle' then
+                    stored = value and 1 or 0
+                elseif blizz.kind == 'range' then
+                    stored = ConvertSettingValue(blizz.info, value, false)
+                end
+
+                addonTable:SetRaidEditModeSettingBySetting(blizz.setting, stored)
+                return
+            end
 
             if sub == 'useCompactPartyFrames' then
                 addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value)
