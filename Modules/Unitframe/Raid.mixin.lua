@@ -607,6 +607,9 @@ function SubModuleMixin:Setup()
                         CompactRaidFrameManager_SetSetting('IsShown', true)
                     end
 
+                    -- Group mode and sort function first, or TryUpdate below is a no-op.
+                    if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
+
                     local c = _G['CompactRaidFrameContainer']
                     if c and c.ApplyToFrames and CompactRaidGroup_UpdateUnits then
                         c:ApplyToFrames('group', CompactRaidGroup_UpdateUnits)
@@ -719,6 +722,28 @@ function SubModuleMixin:Setup()
             C_Timer.After(0, function()
                 initRaidTracked()
                 if addonTable.RaidInitDiag.initRan then watcherSelf:UnregisterAllEvents() end
+            end)
+        end)
+    end
+
+    -- The real raid frames need the same flow prerequisites the edit mode preview does,
+    -- and nothing was establishing them outside it: joining a raid without ever opening
+    -- our edit mode left the container shown and empty. Blizzard would have done this
+    -- from its own Edit Mode, which this addon locks out.
+    if not self.RaidFlowWatcher then
+        local watcher = CreateFrame('Frame')
+        self.RaidFlowWatcher = watcher
+
+        watcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+        watcher:RegisterEvent('GROUP_ROSTER_UPDATE')
+        watcher:SetScript('OnEvent', function()
+            -- One frame later, for the same reason initRaid waits above: the settings can
+            -- still be unreadable while the event is being handled.
+            C_Timer.After(0, function()
+                if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
+
+                local c = _G['CompactRaidFrameContainer']
+                if c and c.TryUpdate then pcall(c.TryUpdate, c) end
             end)
         end)
     end

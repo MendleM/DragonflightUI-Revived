@@ -501,6 +501,40 @@ function addonTable:GetRaidSystemFrameForOptions()
     return GetRaidSystemFrame()
 end
 
+-- Establish what the raid container needs before it will lay anything out.
+--
+-- Only Blizzard's Edit Mode ever does this, and this addon locks that Edit Mode out:
+--
+--   EditModeUnitFrameSystemMixin:UpdateSystemSettingRaidGroupDisplayType()
+--     CompactRaidFrameContainer:SetGroupMode(UseCombinedGroups() and "flush" or "discrete")
+--   EditModeUnitFrameSystemMixin:UpdateSystemSettingSortPlayersBy()
+--     CompactRaidFrameContainer:SetFlowSortFunction(sortFunc)
+--
+-- CompactRaidFrameContainerMixin:ReadyToUpdate returns false with no group mode, and
+-- again with mode "flush" and no sort function, so LayoutFrames is skipped and TryUpdate
+-- does nothing whatsoever. The result is a container that is shown, on screen, roughly
+-- one member wide and empty, with no error to show for it - a raid with no frames.
+--
+-- The manager sets the two filter functions itself in its OnLoad, so those are not
+-- missing; only the group mode and the sort function come from the appliers.
+--
+-- Calling Blizzard's own appliers is the same approach Focus.mixin takes with
+-- FocusFrame:SetSmallSize: run the applier, write nothing extra to the layout. Both read
+-- their values back through GetSettingValue, which is already fed by
+-- SyncUnitFrameEditModeSetting.
+function addonTable:ApplyRaidFlowPrereqs()
+    local frame = GetRaidSystemFrame()
+    if not frame then return false, 'no registered raid system frame' end
+
+    local ok, err = pcall(function()
+        if frame.UpdateSystemSettingRaidGroupDisplayType then frame:UpdateSystemSettingRaidGroupDisplayType() end
+        if frame.UpdateSystemSettingSortPlayersBy then frame:UpdateSystemSettingSortPlayersBy() end
+    end)
+    if not ok then return false, err end
+
+    return true
+end
+
 -- One raid frame Edit Mode setting, by setting id.
 --
 -- Ids rather than Enum key names, because the caller now walks Blizzard's display
