@@ -581,16 +581,21 @@ function SubModuleMixin:SetupOptions()
         --
         -- AceConfig reads the args table when the panel opens rather than caching it,
         -- so filling it later is enough; no re-registration needed.
-        if BuildRaidEditModeArgs(optionsRaid.args) == 0 then
+        -- Exposed so Setup can build these BEFORE it registers the edit mode selection.
+        -- RegisterOptions copies options.args into its own filtered table once
+        -- (Editmode.mixin.lua:994) and never looks again, so anything added later shows
+        -- up in the config window - which reads the table lazily - but never in the edit
+        -- mode panel. That is the difference the report describes.
+        self.BuildEditModeArgs = function() return BuildRaidEditModeArgs(optionsRaid.args) end
+
+        if self.BuildEditModeArgs() == 0 then
             local optsWatcher = CreateFrame('Frame')
             optsWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
             optsWatcher:SetScript('OnEvent', function(watcherSelf)
                 -- One frame later: PLAYER_ENTERING_WORLD fires before some systems
                 -- finish registering themselves with the Edit Mode manager.
                 C_Timer.After(0, function()
-                    if BuildRaidEditModeArgs(optionsRaid.args) > 0 then
-                        watcherSelf:UnregisterAllEvents()
-                    end
+                    if self.BuildEditModeArgs() > 0 then watcherSelf:UnregisterAllEvents() end
                 end)
             end)
         end
@@ -851,6 +856,16 @@ function SubModuleMixin:Setup()
     -- UpdateState. Report it and let the rest set itself up.
     local function initRaidTracked()
         if addonTable.RaidInitDiag.initRan then return end
+
+        -- Deliberately gated on the settings existing first. RegisterOptions snapshots
+        -- options.args, so registering before Blizzard's Edit Mode data is readable
+        -- produces a panel with only scale, position and visibility in it - exactly what
+        -- the report showed, while the config window had all ten.
+        local built = (self.BuildEditModeArgs and self.BuildEditModeArgs()) or 0
+        addonTable.RaidInitDiag.settingsBuilt = built
+
+        if built == 0 then return end
+
         addonTable.RaidInitDiag.initRan = true
 
         local ok, err = pcall(initRaid)
@@ -882,8 +897,13 @@ function SubModuleMixin:Setup()
         local waitFrame = CreateFrame('Frame')
         waitFrame:RegisterEvent('PLAYER_ENTERING_WORLD')
         waitFrame:SetScript('OnEvent', function(watcherSelf)
-            watcherSelf:UnregisterAllEvents()
-            initRaidTracked()
+            -- Kept registered until it actually works: the settings can be unreadable at
+            -- the first PLAYER_ENTERING_WORLD, and unregistering there would leave the
+            -- selection unbuilt for the session.
+            C_Timer.After(0, function()
+                initRaidTracked()
+                if addonTable.RaidInitDiag.initRan then watcherSelf:UnregisterAllEvents() end
+            end)
         end)
     end
 end
