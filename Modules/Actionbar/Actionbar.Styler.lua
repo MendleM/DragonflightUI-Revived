@@ -357,11 +357,31 @@ function Module.ChangeBackpack()
     Module.HookBagBarLayout()
 end
 
--- Returns true when the row was actually anchored, false when it had to be skipped,
--- so callers can tell a refusal from a success instead of assuming it worked.
+-- Anchor one button, unless the client would refuse it at this moment.
+--
+-- Only protected frames are off limits mid-fight, and these buttons are not
+-- protected: the bagtrace showed Show and Hide going through in combat, which is
+-- also why Blizzard's Layout ran there. So ask each button instead of standing back
+-- from the whole row - the blanket combat guard that used to sit in AnchorBagSlots
+-- was what left the row scrambled after a mid-fight collapse.
+--
+-- Returns false only when it actually had to give up, so the caller can retry.
+local function AnchorButton(frame, locked, point, relativeTo, relativePoint, x, y)
+    if not (frame and relativeTo) then return true end
+    if locked and frame.IsProtected and frame:IsProtected() then return false end
+
+    frame:ClearAllPoints()
+    frame:SetPoint(point, relativeTo, relativePoint, x, y)
+    return true
+end
+
+-- Returns true when the row was actually anchored, false when any of it had to be
+-- skipped, so callers can tell a refusal from a success instead of assuming it worked.
 function Module.AnchorBagSlots()
     if not (MainMenuBarBackpackButton and _G['CharacterBag0Slot']) then return false end
-    if Helper:IsCombatLocked() then return false end
+
+    local locked = Helper:IsCombatLocked()
+    local done = true
 
     -- The backpack goes back onto our own holder first.
     --
@@ -369,34 +389,24 @@ function Module.AnchorBagSlots()
     -- up anchored to BagsBar RIGHT even though UpdateBagState anchors it to
     -- DragonflightUIBagBar. Everything below hangs off the backpack, so if it is
     -- left where Blizzard put it the whole row follows.
-    local holder = _G['DragonflightUIBagBar']
-    if holder then
-        MainMenuBarBackpackButton:ClearAllPoints()
-        MainMenuBarBackpackButton:SetPoint('RIGHT', holder, 'RIGHT', 0, 0)
-    end
+    done = AnchorButton(MainMenuBarBackpackButton, locked, 'RIGHT', _G['DragonflightUIBagBar'], 'RIGHT', 0, 0) and done
 
-    _G['CharacterBag0Slot']:ClearAllPoints()
-    _G['CharacterBag0Slot']:SetPoint('RIGHT', MainMenuBarBackpackButton, 'LEFT', -12, 0)
+    -- The gap is where our own expand arrow sits.
+    done = AnchorButton(_G['CharacterBag0Slot'], locked, 'RIGHT', MainMenuBarBackpackButton, 'LEFT', -12, 0) and done
 
     for i = 1, 3 do
-        local slot = _G['CharacterBag' .. i .. 'Slot']
-        local previous = _G['CharacterBag' .. (i - 1) .. 'Slot']
-        if slot and previous then
-            local gap = 0
-            slot:ClearAllPoints()
-            slot:SetPoint('RIGHT', previous, 'LEFT', -gap, 0)
-        end
+        done = AnchorButton(_G['CharacterBag' .. i .. 'Slot'], locked, 'RIGHT', _G['CharacterBag' .. (i - 1) .. 'Slot'],
+                            'LEFT', 0, 0) and done
     end
 
     local hasKeyring = not (DF.Cata or DF.MoP) and KeyRingButton
-    if hasKeyring and _G['CharacterBag3Slot'] then
-        KeyRingButton:ClearAllPoints()
-        KeyRingButton:SetPoint('RIGHT', _G['CharacterBag3Slot'], 'LEFT', 0, 0)
+    if hasKeyring then
+        done = AnchorButton(KeyRingButton, locked, 'RIGHT', _G['CharacterBag3Slot'], 'LEFT', 0, 0) and done
     elseif KeyRingButton then
         KeyRingButton:Hide()
     end
 
-    return true
+    return done
 end
 
 -- Re-assert our bag row after Blizzard has laid its own out.
@@ -447,15 +457,12 @@ end
 -- cannot spin forever, and single-chained so several triggers firing at once do
 -- not stack timers on each other.
 --
--- Anchoring is not the only thing the client refuses. Collapsing and expanding is
--- Show and Hide on the same protected buttons, so a mid-fight toggle is refused too,
--- and re-anchoring alone would not repair it - the row would end up correctly spaced
--- but in the wrong state. The retried work is therefore both: apply the saved
--- collapsed or expanded state, then anchor.
---
--- The combat check sits out here rather than only inside AnchorBagSlots, because
--- calling Show or Hide on a protected frame mid-fight raises ADDON_ACTION_BLOCKED.
--- Better not to reach for it at all until the fight is over.
+-- The retry is driven by what AnchorBagSlots reports, not by a combat check of its
+-- own. An earlier version gated this on Helper:IsCombatLocked and that was a bug in
+-- its own right: it refused to touch anything mid-fight, including the Show and Hide
+-- calls that collapse the row, even though the trace showed those going through
+-- perfectly well in combat. AnchorButton now asks each button whether it is
+-- protected, so the only reason left to retry is a button that genuinely said no.
 --
 -- Deliberately not Helper:RunOutOfCombat: that queues into the post-combat
 -- RefreshConfig pass and announces itself in chat, far too much machinery here, and
@@ -470,13 +477,12 @@ local restoreRetryQueued = false
 -- that is exactly the situation at the first PLAYER_ENTERING_WORLD.
 local function ApplyBagRow()
     Module.RefreshBagBarToggle()
-    Module.AnchorBagSlots()
+    return Module.AnchorBagSlots()
 end
 
 local function RestoreBagRowAttempt()
-    if not Helper:IsCombatLocked() then
+    if ApplyBagRow() then
         restoreRetries = 0
-        ApplyBagRow()
         return
     end
 
@@ -658,12 +664,11 @@ function Module.CreateBagExpandButton()
     f:SetScript('OnClick', function()
         local bags = Module.db.profile.bags
         bags.expanded = not bags.expanded
-        Module.BagBarExpandToggled(bags.expanded)
 
-        -- The new state is saved either way, but mid-fight the client refuses the
-        -- Show, Hide and SetPoint calls it needs. Queue it so the click is honoured
-        -- once the fight ends instead of being silently lost.
-        if Helper:IsCombatLocked() then Module.QueueBagRowRestore() end
+        -- Only queue a retry if the anchoring genuinely did not land, which now means
+        -- a button reported itself protected. The saved state is written either way,
+        -- so the retry has something to restore from.
+        if not Module.BagBarExpandToggled(bags.expanded) then Module.QueueBagRowRestore() end
 
         Module:RefreshOptionScreens()
     end)
@@ -700,21 +705,34 @@ function Module.BagBarExpandToggled(expanded)
 
     local hasKeyring = not (DF.Cata or DF.MoP) and KeyRingButton
 
+    -- Bags first, keyring afterwards, and never from inside the loop.
+    --
+    -- KeyringMixin:OnShow is one line, and it is the whole reason the row came back
+    -- scrambled:
+    --
+    --   function KeyringMixin:OnShow() self:GetParent():Layout() end
+    --
+    -- So showing the keyring makes Blizzard lay out the entire row, and Layout only
+    -- chains the buttons that are visible at that instant. Showing it from inside the
+    -- loop fired it on the very first pass, with bag 0 up and bags 1 to 3 still
+    -- hidden, so Blizzard built keyring -> bag 0 -> backpack and left the other three
+    -- on stale anchors. That is the row with the keyring stranded in the middle.
+    --
+    -- Showing it last means Layout sees the full row, and AnchorBagSlots below then
+    -- only has to correct the spacing.
     for i = 0, 3 do
         local bag = _G['CharacterBag' .. i .. 'Slot']
         if bag then
-            if (expanded) then
-                bag:Show()
-                if hasKeyring then KeyRingButton:Show() end
-            else
-                bag:Hide()
-                if hasKeyring then KeyRingButton:Hide() end
-            end
+            if expanded then bag:Show() else bag:Hide() end
         end
     end
 
-    if not hasKeyring and KeyRingButton then
-        KeyRingButton:Hide()
+    if KeyRingButton then
+        if hasKeyring and expanded then
+            KeyRingButton:Show()
+        else
+            KeyRingButton:Hide()
+        end
     end
 
     -- Re-anchor, because this function only changed visibility.
@@ -731,13 +749,18 @@ function Module.BagBarExpandToggled(expanded)
     --
     -- AnchorBagSlots directly, not QueueBagRowRestore: that retries by way of
     -- RefreshBagBarToggle, which calls straight back into this function.
-    Module.AnchorBagSlots()
+    --
+    -- The result is passed up so callers know whether it landed, rather than having to
+    -- assume it did.
+    return Module.AnchorBagSlots()
 end
 
 function Module.RefreshBagBarToggle()
     if Module.db and Module.db.profile and Module.db.profile.bags then
-        Module.BagBarExpandToggled(Module.db.profile.bags.expanded)
+        return Module.BagBarExpandToggled(Module.db.profile.bags.expanded)
     end
+
+    return false
 end
 
 function Module.ChangeFramerate()
