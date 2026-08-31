@@ -357,8 +357,8 @@ function Module.ChangeBackpack()
     Module.HookBagBarLayout()
 end
 
--- Returns true when the row was actually anchored, false when it had to be skipped.
--- ReanchorBagRow uses that to retry, so a skip is never the end of the story.
+-- Returns true when the row was actually anchored, false when it had to be skipped,
+-- so callers can tell a refusal from a success instead of assuming it worked.
 function Module.AnchorBagSlots()
     if not (MainMenuBarBackpackButton and _G['CharacterBag0Slot']) then return false end
     if Helper:IsCombatLocked() then return false end
@@ -447,38 +447,56 @@ end
 -- cannot spin forever, and single-chained so several triggers firing at once do
 -- not stack timers on each other.
 --
+-- Anchoring is not the only thing the client refuses. Collapsing and expanding is
+-- Show and Hide on the same protected buttons, so a mid-fight toggle is refused too,
+-- and re-anchoring alone would not repair it - the row would end up correctly spaced
+-- but in the wrong state. The retried work is therefore both: apply the saved
+-- collapsed or expanded state, then anchor.
+--
+-- The combat check sits out here rather than only inside AnchorBagSlots, because
+-- calling Show or Hide on a protected frame mid-fight raises ADDON_ACTION_BLOCKED.
+-- Better not to reach for it at all until the fight is over.
+--
 -- Deliberately not Helper:RunOutOfCombat: that queues into the post-combat
--- RefreshConfig pass and announces itself in chat, far too much machinery for six
--- SetPoint calls, and BagBarExpandToggled runs off BAG_UPDATE_DELAYED, so it fires
--- while looting mid-fight.
-local REANCHOR_RETRY_DELAY = 0.5
-local REANCHOR_MAX_RETRIES = 20 -- ten seconds, enough for the combat flag to clear
-local reanchorRetries = 0
-local reanchorRetryQueued = false
+-- RefreshConfig pass and announces itself in chat, far too much machinery here, and
+-- BagBarExpandToggled runs off BAG_UPDATE_DELAYED, so it fires while looting.
+local RESTORE_RETRY_DELAY = 0.5
+local RESTORE_MAX_RETRIES = 20 -- ten seconds, enough for the combat flag to clear
+local restoreRetries = 0
+local restoreRetryQueued = false
 
-local function ReanchorAttempt()
-    if Module.AnchorBagSlots() then
-        reanchorRetries = 0
+-- RefreshBagBarToggle re-applies the saved state and anchors on its own tail, but it
+-- does nothing until the database exists. Anchor unconditionally as well, because
+-- that is exactly the situation at the first PLAYER_ENTERING_WORLD.
+local function ApplyBagRow()
+    Module.RefreshBagBarToggle()
+    Module.AnchorBagSlots()
+end
+
+local function RestoreBagRowAttempt()
+    if not Helper:IsCombatLocked() then
+        restoreRetries = 0
+        ApplyBagRow()
         return
     end
 
-    if reanchorRetryQueued or reanchorRetries >= REANCHOR_MAX_RETRIES then return end
+    if restoreRetryQueued or restoreRetries >= RESTORE_MAX_RETRIES then return end
 
-    reanchorRetries = reanchorRetries + 1
-    reanchorRetryQueued = true
+    restoreRetries = restoreRetries + 1
+    restoreRetryQueued = true
 
-    C_Timer.After(REANCHOR_RETRY_DELAY, function()
-        reanchorRetryQueued = false
-        ReanchorAttempt()
+    C_Timer.After(RESTORE_RETRY_DELAY, function()
+        restoreRetryQueued = false
+        RestoreBagRowAttempt()
     end)
 end
 
 -- The entry point every hook and event uses. Each fresh trigger gets a fresh
 -- budget, otherwise one exhausted run would make every later trigger give up
 -- immediately for the rest of the session.
-local function ReanchorBagRow()
-    reanchorRetries = 0
-    ReanchorAttempt()
+function Module.QueueBagRowRestore()
+    restoreRetries = 0
+    RestoreBagRowAttempt()
 end
 
 function Module.HookBagBarLayout()
@@ -488,7 +506,7 @@ function Module.HookBagBarLayout()
     if not (mgr and mgr.OnExpandBarChanged) then return end
 
     Module.BagBarLayoutHooked = true
-    hooksecurefunc(mgr, 'OnExpandBarChanged', ReanchorBagRow)
+    hooksecurefunc(mgr, 'OnExpandBarChanged', Module.QueueBagRowRestore)
 
     -- Blizzard lays the row out from a second place, and the hook above cannot see
     -- it either. BagsBarMixin:OnLoad does this:
@@ -505,13 +523,13 @@ function Module.HookBagBarLayout()
     -- and it also covers zoning, and the one-frame delay keeps us behind anything
     -- else still running in the same batch.
     --
-    -- PLAYER_REGEN_ENABLED is the other half of the combat guard in AnchorBagSlots:
-    -- anything Blizzard re-anchored mid-fight, which we had to let stand, gets put
-    -- back the moment the fight ends.
+    -- PLAYER_REGEN_ENABLED is the other half of the combat guard: everything the
+    -- client refused mid-fight, both Blizzard's re-anchoring that we had to let stand
+    -- and any collapse or expand of our own that never took, is settled here.
     local watcher = CreateFrame('Frame')
     watcher:RegisterEvent('PLAYER_ENTERING_WORLD')
     watcher:RegisterEvent('PLAYER_REGEN_ENABLED')
-    watcher:SetScript('OnEvent', function() C_Timer.After(0, ReanchorBagRow) end)
+    watcher:SetScript('OnEvent', function() C_Timer.After(0, Module.QueueBagRowRestore) end)
 end
 
 function Module.UpdateBagSlotIcons()
@@ -641,6 +659,12 @@ function Module.CreateBagExpandButton()
         local bags = Module.db.profile.bags
         bags.expanded = not bags.expanded
         Module.BagBarExpandToggled(bags.expanded)
+
+        -- The new state is saved either way, but mid-fight the client refuses the
+        -- Show, Hide and SetPoint calls it needs. Queue it so the click is honoured
+        -- once the fight ends instead of being silently lost.
+        if Helper:IsCombatLocked() then Module.QueueBagRowRestore() end
+
         Module:RefreshOptionScreens()
     end)
     f:RegisterEvent('BAG_UPDATE_DELAYED')
@@ -704,7 +728,10 @@ function Module.BagBarExpandToggled(expanded)
     -- Collapsing and expanding is our own toggle, not Blizzard's, so nothing here
     -- goes through OnExpandBarChanged and the hook on it never fires. This is the
     -- one path that has to re-anchor by itself.
-    ReanchorBagRow()
+    --
+    -- AnchorBagSlots directly, not QueueBagRowRestore: that retries by way of
+    -- RefreshBagBarToggle, which calls straight back into this function.
+    Module.AnchorBagSlots()
 end
 
 function Module.RefreshBagBarToggle()
