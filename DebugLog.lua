@@ -1909,6 +1909,32 @@ function DF:LogRaidOptions(tag)
         DF:Log(tag, 'DragonflightUIRaidMoveFrame: ABSENT - Load.xml did not create it')
     end
 
+    -- Which layout is active, and can it even hold a changed setting?
+    --
+    -- EditModeManagerFrameMixin:SaveLayoutChanges refuses to save into a preset and opens
+    -- the new-layout dialog instead, so a preset cannot keep an edited value. Anything
+    -- written there is back to the preset's own number on the next login, which looks
+    -- exactly like a broken save.
+    if C_EditMode and C_EditMode.GetLayouts then
+        local gotLayouts, layoutInfo = pcall(C_EditMode.GetLayouts)
+        if gotLayouts and layoutInfo and layoutInfo.layouts then
+            local active = layoutInfo.layouts[layoutInfo.activeLayout]
+            local isPreset = (active and Enum and Enum.EditModeLayoutType and active.layoutType ==
+                                 Enum.EditModeLayoutType.Preset) and true or false
+
+            DF:Log(tag, 'edit mode layout: active=%s name="%s" type=%s preset=%s of %d layouts',
+                   tostring(layoutInfo.activeLayout), tostring(active and active.layoutName or '?'),
+                   tostring(active and active.layoutType), tostring(isPreset), #layoutInfo.layouts)
+
+            if isPreset then
+                DF:Log(tag, 'VERDICT: the active layout is a preset - Blizzard will not save settings into it, ' ..
+                           'so every edited value reverts on reload')
+            end
+        else
+            DF:Log(tag, 'edit mode layout: C_EditMode.GetLayouts returned nothing usable')
+        end
+    end
+
     local container = _G['CompactRaidFrameContainer']
     if container then
         local parentName = (container:GetParent() and container:GetParent().GetName and container:GetParent():GetName()) or
