@@ -436,6 +436,11 @@ function SubModuleMixin:SetupOptions()
 
                 addonTable:SetRaidEditModeSettingBySetting(blizz.setting, stored)
 
+                -- Re-applied so the preview follows. Frame width, height, row size and
+                -- the group display type all change how it has to be laid out, and
+                -- UpdateRaidPreview reads them straight back out of the system frame.
+                if Module.ApplySettings then Module:ApplySettings('raid') end
+
                 -- Both panels read the same setting but keep their own widgets, so the
                 -- one that was not touched still shows the old value. Position changes
                 -- get this for free because OnDragStop calls it; these do not, because
@@ -717,6 +722,141 @@ end
 function SubModuleMixin:OnEvent(event, ...)
 end
 
+-- The preview inside the edit mode placeholder.
+--
+-- Built from DFEditModePreviewRaidTemplate, the same template the party frame's preview
+-- uses for its raid-style variant, which is why this needs nothing new: the per-frame
+-- DragonflightUIEditModePreviewRaidMixin:UpdateState is a pure function of a state table
+-- and reads only frameWidth, frameHeight, keepGroupsTogether, horizontalGroups,
+-- displayBorder, displayPowerBar and useClassColors.
+--
+-- The dead raid profile API was never in that mixin. It sat one level up, in the
+-- container's own UpdateState, which fetched GetRaidProfileFlattenedOptions and fed the
+-- children from it. So the fix is to build that state table from Blizzard's Edit Mode
+-- settings instead - the same values UpdateRaidContainerFlow uses.
+local RAID_PREVIEW_MAX = 10
+
+-- How many member frames per line, and which way the rows run.
+--
+-- Mirrors EditModeManagerFrameMixin:UpdateRaidContainerFlow: separate groups always run
+-- five to a line, combined groups take RowSize, and the display type decides whether the
+-- flow is vertical or horizontal.
+local function GetRaidPreviewLayout()
+    local function setting(key)
+        if not (Enum and Enum.EditModeUnitFrameSetting) then return nil end
+        return addonTable:GetRaidEditModeSettingBySetting(Enum.EditModeUnitFrameSetting[key])
+    end
+
+    local displayType = setting('RaidGroupDisplayType')
+    local rowSize = setting('RowSize') or 5
+
+    local combined, horizontal = false, false
+
+    if Enum and Enum.RaidGroupDisplayType then
+        local t = Enum.RaidGroupDisplayType
+        horizontal = (displayType == t.SeparateGroupsHorizontal) or (displayType == t.CombineGroupsHorizontal)
+        combined = (displayType == t.CombineGroupsVertical) or (displayType == t.CombineGroupsHorizontal)
+    end
+
+    return {
+        frameWidth = setting('FrameWidth') or 72,
+        frameHeight = setting('FrameHeight') or 36,
+        perLine = combined and math.max(rowSize, 1) or 5,
+        horizontal = horizontal,
+        combined = combined,
+        displayBorder = (setting('DisplayBorder') or 0) ~= 0
+    }
+end
+
+function SubModuleMixin:EnsureRaidPreview(holder)
+    if self.PreviewFrames then return self.PreviewFrames end
+    if not holder then return nil end
+
+    self.PreviewFrames = {}
+
+    for i = 1, RAID_PREVIEW_MAX do
+        local ok, frame = pcall(CreateFrame, 'Frame', 'DragonflightUIEditModeRaidPreview' .. i, holder,
+                                'DFEditModePreviewRaidTemplate')
+        if not (ok and frame) then break end
+
+        -- OnLoad sizes itself and picks a random unit for the fake name and class
+        -- colour. Guarded because a throw here would leave a half-built preview.
+        pcall(frame.OnLoad, frame)
+        frame:Hide()
+
+        self.PreviewFrames[i] = frame
+    end
+
+    if #self.PreviewFrames == 0 then self.PreviewFrames = nil end
+
+    return self.PreviewFrames
+end
+
+-- Lay the preview out, and report the extent it needs.
+function SubModuleMixin:UpdateRaidPreview(holder)
+    local frames = self:EnsureRaidPreview(holder)
+    if not frames then return 0, 0 end
+
+    local layout = GetRaidPreviewLayout()
+
+    -- Only while our edit mode is open, and only when the real frames are not already
+    -- there.
+    --
+    -- The selection's showFunction asks Blizzard to force the raid frames on screen, so
+    -- in a group there is something real to look at and stacking fakes on top of it would
+    -- just be two sets of frames in the same place. Alone, the container stays empty at
+    -- about a pixel wide, and that is when the preview earns its keep.
+    local editmode = DF.GetModule and DF:GetModule('Editmode')
+    local container = _G['CompactRaidFrameContainer']
+    local realFramesUp = container and container:IsShown() and (container:GetWidth() or 0) > 2
+
+    if not (editmode and editmode.IsEditMode) or realFramesUp then
+        for _, frame in ipairs(frames) do frame:Hide() end
+        return 0, 0
+    end
+
+    -- Blizzard's own state shape, so the template's UpdateState needs no changes.
+    local state = {
+        frameWidth = layout.frameWidth,
+        frameHeight = layout.frameHeight,
+        keepGroupsTogether = layout.combined,
+        horizontalGroups = layout.horizontal,
+        displayBorder = layout.displayBorder,
+        displayPowerBar = true,
+        useClassColors = true
+    }
+
+    local maxX, maxY = 0, 0
+
+    for i, frame in ipairs(frames) do
+        pcall(frame.UpdateState, frame, state)
+
+        -- Column and row, flowing the way UpdateRaidContainerFlow would.
+        local index = i - 1
+        local major = index % layout.perLine
+        local minor = math.floor(index / layout.perLine)
+
+        local col, row
+        if layout.horizontal then
+            col, row = major, minor
+        else
+            col, row = minor, major
+        end
+
+        local x = col * layout.frameWidth
+        local y = row * layout.frameHeight
+
+        frame:ClearAllPoints()
+        frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', x, -y)
+        frame:Show()
+
+        maxX = math.max(maxX, x + layout.frameWidth)
+        maxY = math.max(maxY, y + layout.frameHeight)
+    end
+
+    return maxX, maxY
+end
+
 -- The anchor the raid container is parked on.
 --
 -- From XML, never CreateFrame. CompactRaidFrameContainer is protected and gets
@@ -788,9 +928,14 @@ function SubModuleMixin:Update()
     --
     -- A floor rather than a threshold: the holder grows with the container when there is
     -- one, and stays usable when there is not.
+    -- The preview is laid out first, because while edit mode is open it is what defines
+    -- how big the placeholder has to be. Outside edit mode it reports nothing and the
+    -- real container decides.
+    local previewW, previewH = self:UpdateRaidPreview(holder)
+
     local MIN_HOLDER_SIZE = 200
-    local w = (container and container:GetWidth()) or 0
-    local h = (container and container:GetHeight()) or 0
+    local w = math.max((container and container:GetWidth()) or 0, previewW)
+    local h = math.max((container and container:GetHeight()) or 0, previewH)
     holder:SetSize(math.max(w, MIN_HOLDER_SIZE), math.max(h, MIN_HOLDER_SIZE))
 
     -- Helper resolves the anchor frame and rejects a chain that would close a loop,
