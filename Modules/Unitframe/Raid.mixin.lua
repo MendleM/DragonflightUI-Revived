@@ -436,24 +436,28 @@ function SubModuleMixin:SetupOptions()
 
                 addonTable:SetRaidEditModeSettingBySetting(blizz.setting, stored)
 
-                -- Re-applied so the preview follows. Frame width, height, row size and
-                -- the group display type all change how it has to be laid out, and
-                -- UpdateRaidPreview reads them straight back out of the system frame.
+                -- Re-applied so the preview follows. Frame width, height, row size, the
+                -- group display type and the raid size all change how it has to be laid
+                -- out, and UpdateRaidPreview reads them straight back out of the system
+                -- frame.
                 if Module.ApplySettings then Module:ApplySettings('raid') end
 
-                -- Both panels read the same setting but keep their own widgets, so the
-                -- one that was not touched still shows the old value. Position changes
-                -- get this for free because OnDragStop calls it; these do not, because
-                -- they never go through the profile at all.
+                -- Deliberately NOT for sliders.
                 --
-                -- Two refreshes because there are two panels: Unitframe's own refreshes
-                -- the config window's Raid page, and the Editmode module refreshes its
-                -- selection dialog.
-                if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
+                -- Refreshing an option panel rebuilds its rows, which replaces the very
+                -- widget the mouse is holding - so a slider could only ever be nudged by
+                -- clicking, never dragged. Dropdowns and checkboxes fire once per change
+                -- and are safe.
+                --
+                -- The slider being dragged already shows its own value; the other panel
+                -- catches up when it is next opened.
+                if blizz.kind ~= 'range' then
+                    if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
 
-                local editmode = DF.GetModule and DF:GetModule('Editmode')
-                if editmode and editmode.RefreshOptionScreens then
-                    pcall(editmode.RefreshOptionScreens, editmode)
+                    local editmode = DF.GetModule and DF:GetModule('Editmode')
+                    if editmode and editmode.RefreshOptionScreens then
+                        pcall(editmode.RefreshOptionScreens, editmode)
+                    end
                 end
 
                 return
@@ -734,7 +738,25 @@ end
 -- container's own UpdateState, which fetched GetRaidProfileFlattenedOptions and fed the
 -- children from it. So the fix is to build that state table from Blizzard's Edit Mode
 -- settings instead - the same values UpdateRaidContainerFlow uses.
-local RAID_PREVIEW_MAX = 10
+-- Forty, because that is the largest raid ViewRaidSize offers. Frames are created once
+-- and the surplus stays hidden.
+local RAID_PREVIEW_MAX = 40
+
+-- How many member frames the chosen raid size shows.
+--
+-- Blizzard's numbers, from EditModeManagerFrameMixin:GetNumRaidMembersForcedShown - Ten
+-- gives 10, TwentyFive 25, Forty 40. The first version of this ignored ViewRaidSize
+-- entirely and always drew ten, which is why switching to 25 or 40 did nothing.
+local function GetRaidPreviewMemberCount()
+    if not (Enum and Enum.EditModeUnitFrameSetting and Enum.ViewRaidSize) then return 10 end
+
+    local size = addonTable:GetRaidEditModeSettingBySetting(Enum.EditModeUnitFrameSetting.ViewRaidSize)
+
+    if size == Enum.ViewRaidSize.Forty then return 40 end
+    if size == Enum.ViewRaidSize.TwentyFive then return 25 end
+
+    return 10
+end
 
 -- How many member frames per line, and which way the rows run.
 --
@@ -827,31 +849,37 @@ function SubModuleMixin:UpdateRaidPreview(holder)
     }
 
     local maxX, maxY = 0, 0
+    local wanted = GetRaidPreviewMemberCount()
 
     for i, frame in ipairs(frames) do
-        pcall(frame.UpdateState, frame, state)
-
-        -- Column and row, flowing the way UpdateRaidContainerFlow would.
-        local index = i - 1
-        local major = index % layout.perLine
-        local minor = math.floor(index / layout.perLine)
-
-        local col, row
-        if layout.horizontal then
-            col, row = major, minor
+        if i > wanted then
+            frame:Hide()
         else
-            col, row = minor, major
+            pcall(frame.UpdateState, frame, state)
+
+            -- Column and row, flowing the way UpdateRaidContainerFlow would.
+            local index = i - 1
+            local major = index % layout.perLine
+            local minor = math.floor(index / layout.perLine)
+
+            local col, row
+            if layout.horizontal then
+                col, row = major, minor
+            else
+                col, row = minor, major
+            end
+
+            local x = col * layout.frameWidth
+            local y = row * layout.frameHeight
+
+            frame:ClearAllPoints()
+            frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', x, -y)
+            frame:SetSize(layout.frameWidth, layout.frameHeight)
+            frame:Show()
+
+            maxX = math.max(maxX, x + layout.frameWidth)
+            maxY = math.max(maxY, y + layout.frameHeight)
         end
-
-        local x = col * layout.frameWidth
-        local y = row * layout.frameHeight
-
-        frame:ClearAllPoints()
-        frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', x, -y)
-        frame:Show()
-
-        maxX = math.max(maxX, x + layout.frameWidth)
-        maxY = math.max(maxY, y + layout.frameHeight)
     end
 
     return maxX, maxY
