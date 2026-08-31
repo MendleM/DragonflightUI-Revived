@@ -180,42 +180,39 @@ end
 -- Told once, when the setting is switched on, because this is where the addon stops
 -- being able to help.
 --
--- DragonflightUI decides WHICH party system is shown, and nothing more. Everything
--- about how the compact frames then look - height and width, groups together,
--- horizontal groups, sort order, class colours, health text - is Blizzard's, and
--- writing those from addon code taints the raid frame update path and produces
--- blocked actions. Raid.mixin.lua carries a whole block of exactly those options,
--- commented out, under a header saying so. That verdict stands.
+-- DragonflightUI decides WHICH party system is shown. How the compact frames then
+-- look - raid size, frame width and height, group split, border, template - are
+-- settings on Blizzard's Edit Mode "Raid Frames" system, reached through Escape,
+-- Edit Mode, Raid Frames. Not Blizzard's Interface options, which is a different
+-- panel with different settings.
 --
--- So the honest thing is to say where the settings live and offer the way there,
--- rather than letting the player hunt for a panel this addon does not own.
+-- And Editmode.lua deliberately blocks Blizzard's Edit Mode through Blizzard's own
+-- BlockEnteringEditMode gate, so that dialog is out of reach while this addon is
+-- enabled. Hence the steps in the popup, and hence they end with re-enabling it.
+--
+-- Sending people to the wrong panel is worse than sending them nowhere, so the
+-- popup names the real place and the real cost of getting there.
 local raidStyleNoticeShown = false
 
 StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
     text = 'DragonflightUI has switched your party frames to the raid-style (compact) frames.\n\n' ..
-        'Their appearance is not configurable from DragonflightUI. Frame size, keeping groups together, ' ..
-        'horizontal groups, sort order, class colours and health text all belong to Blizzard\'s own raid frame ' ..
-        'settings - setting them from an addon taints the interface and causes blocked actions in combat.\n\n' ..
-        'Use Blizzard\'s Raid Frames panel for those. DragonflightUI only decides which party system is shown.',
-    button1 = 'Open raid frame settings',
-    button2 = 'Do not show again',
+        'It can position them, but it cannot yet configure them. Raid size, frame width and height, how groups are ' ..
+        'split, the border and the template all live in Blizzard\'s Edit Mode, under Raid Frames - not in Blizzard\'s ' ..
+        'Interface options.\n\n' ..
+        'DragonflightUI blocks Blizzard\'s Edit Mode, so reaching that dialog currently takes:\n' ..
+        '1. Disable DragonflightUI and reload\n' .. '2. Escape, then Edit Mode, then Raid Frames\n' ..
+        '3. Adjust and save\n' .. '4. Enable DragonflightUI again\n\n' ..
+        'Those settings are stored by Blizzard, so they survive step 4.',
+    -- button1 silences it for good, button2 just closes - the same way round as the
+    -- leftover-layout notice, so the two behave alike.
+    button1 = 'Do not show again',
+    button2 = CLOSE or 'Close',
     showAlert = true,
     timeout = 0,
     whileDead = true,
     hideOnEscape = true,
     preferredIndex = 3,
     OnAccept = function()
-        -- The same entry point the Raid options already use for its "Open" button.
-        if Settings and Settings.OpenToCategory and RAID_FRAMES_LABEL then
-            Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL)
-            if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_MAINMENU_OPTION) end
-        else
-            DF:Print('Raid frame settings: Escape, Options, Interface, Raid Frames.')
-        end
-    end,
-    -- Only button2 silences it, matching the leftover-layout notice: closing it by
-    -- accident should not cost the player the information for good.
-    OnCancel = function()
         local db = DF.db and DF.db.global
         if db then db.raidStyleNoticeDismissed = true end
         DF:Print('Notice about raid-style party frames will not be shown again. ' ..
