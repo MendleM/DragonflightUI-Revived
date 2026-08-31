@@ -535,6 +535,58 @@ function addonTable:ApplyRaidFlowPrereqs()
     return true
 end
 
+-- Which frame did Blizzard register for the party unit frame system?
+--
+-- Asked rather than assumed, the same way the raid one is, and for the same reason: a
+-- wrong guess here writes a setting nothing ever reads.
+local function GetPartySystemFrame()
+    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSystemIndices) then return nil end
+
+    if EditModeManagerFrame and EditModeManagerFrame.GetRegisteredSystemFrame then
+        local ok, frame = pcall(EditModeManagerFrame.GetRegisteredSystemFrame, EditModeManagerFrame,
+                                Enum.EditModeSystem.UnitFrame, Enum.EditModeUnitFrameSystemIndices.Party)
+        if ok and frame then return frame end
+    end
+
+    return _G['PartyFrame']
+end
+
+-- Mirror one raid frame setting onto the party system, for raid-style party frames.
+--
+-- Raid and party are separate Edit Mode systems and Blizzard keeps their settings apart,
+-- so the raid page cannot reach the party frames by itself. It does not need to, because
+-- every compact unit frame reads its own system's value:
+--
+--   local frameWidth = EditModeManagerFrame:GetRaidFrameWidth(frame.groupType, NATIVE_UNIT_FRAME_WIDTH)
+--     -> GetSettingValue(Enum.EditModeSystem.UnitFrame, systemIndex, ...FrameWidth)
+--
+-- and groupType is that system index. Writing the same number to the party system is all
+-- "show party as raid" needs to follow the raid page.
+--
+-- Only where the party system admits to having the setting. The raid-only layout ones -
+-- raid size, group split, row size - are not in that set, and are skipped rather than
+-- forced onto a system that would ignore them anyway.
+function addonTable:MirrorRaidSettingToParty(setting, value)
+    if setting == nil or value == nil then return false end
+    if not (Enum and Enum.EditModeUnitFrameSystemIndices) then return false end
+
+    local frame = GetPartySystemFrame()
+    if not (frame and frame.HasSetting) then return false end
+
+    local hasIt, has = pcall(frame.HasSetting, frame, setting)
+    if not (hasIt and has) then return false end
+
+    addonTable:SyncUnitFrameEditModeSetting(Enum.EditModeUnitFrameSystemIndices.Party, setting, value, frame,
+                                            'party frame setting ' .. tostring(setting))
+    return true
+end
+
+-- Exposed so the diagnostics can report which settings the party system actually shares
+-- with the raid one, rather than leaving the intersection to guesswork.
+function addonTable:GetPartySystemFrameForOptions()
+    return GetPartySystemFrame()
+end
+
 -- One raid frame Edit Mode setting, by setting id.
 --
 -- Ids rather than Enum key names, because the caller now walks Blizzard's display

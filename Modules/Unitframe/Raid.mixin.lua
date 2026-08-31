@@ -210,6 +210,11 @@ function SubModuleMixin:SetupOptions()
         if saved then saved[tostring(setting)] = value end
 
         addonTable:SetRaidEditModeSettingBySetting(setting, value)
+
+        -- Raid-style party frames are their own Edit Mode system reading their own values,
+        -- so the same number has to land there too or this page has no effect on them.
+        -- Helper skips the settings the party system does not have.
+        if addonTable.MirrorRaidSettingToParty then addonTable:MirrorRaidSettingToParty(setting, value) end
     end
 
     self.GetBlizzRaidStored = GetBlizzRaidStored
@@ -797,6 +802,12 @@ function SubModuleMixin:Setup()
                         local setting = tonumber(key)
                         if setting and value ~= nil then
                             addonTable:SetRaidEditModeSettingBySetting(setting, value)
+
+                            -- Same mirror as the setter, or raid-style party frames come
+                            -- back at the party system's own numbers after a reload.
+                            if addonTable.MirrorRaidSettingToParty then
+                                addonTable:MirrorRaidSettingToParty(setting, value)
+                            end
                         end
                     end
                 end
