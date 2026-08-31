@@ -594,6 +594,16 @@ function SubModuleMixin:Setup()
 
                 local ok, err = pcall(function()
                     if CompactRaidFrameManager_SetSetting then
+                        -- Remember what the player had first. IsShown is their own
+                        -- setting, not a preview flag: container.enabled hangs off it,
+                        -- and that is the second term in
+                        -- CompactRaidFrameManager_UpdateContainerVisibility. Only
+                        -- capture it once, so reopening the selection cannot overwrite
+                        -- the real value with the one we forced.
+                        if self.RaidFramesWereShown == nil and CompactRaidFrameManager_GetSetting then
+                            self.RaidFramesWereShown = CompactRaidFrameManager_GetSetting('IsShown')
+                        end
+
                         CompactRaidFrameManager_SetSetting('IsShown', true)
                     end
 
@@ -614,11 +624,24 @@ function SubModuleMixin:Setup()
                 C_Timer.After(0, function() self:Update() end)
             end,
             hideFunction = function()
-                -- Only what we turned on. TryUpdate afterwards so the container shrinks
-                -- back rather than keeping the forced-open extent.
+                -- Put back what the player had. TryUpdate afterwards so the container
+                -- shrinks back rather than keeping the forced-open extent.
+                --
+                -- This used to hardcode false, which is not "only what we turned on":
+                -- IsShown is the setting that decides whether raid frames appear at
+                -- all, so closing the selection left a raid with no frames and no
+                -- error for the rest of the session. It lives in cachedSettings with
+                -- no CVar behind it, which is why a reload appeared to fix it.
                 local ok, err = pcall(function()
                     if CompactRaidFrameManager_SetSetting then
-                        CompactRaidFrameManager_SetSetting('IsShown', false)
+                        -- Blizzard's own CompactRaidFrameManager_GetSettingBeforeLoad
+                        -- answers true for IsShown, so treat unknown as shown -
+                        -- guessing false is exactly what hid them.
+                        local restore = self.RaidFramesWereShown
+                        if restore == nil then restore = true end
+
+                        CompactRaidFrameManager_SetSetting('IsShown', restore)
+                        self.RaidFramesWereShown = nil
                     end
 
                     local c = _G['CompactRaidFrameContainer']
