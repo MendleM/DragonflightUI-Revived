@@ -442,6 +442,24 @@ function Module.HookBagBarLayout()
 
     Module.BagBarLayoutHooked = true
     hooksecurefunc(mgr, 'OnExpandBarChanged', ReanchorBagRow)
+
+    -- Blizzard lays the row out from a second place, and the hook above cannot see
+    -- it either. BagsBarMixin:OnLoad does this:
+    --
+    --   EventUtil.ContinueOnVariablesLoaded(GenerateClosure(self.Layout, self))
+    --
+    -- so Layout runs once at VARIABLES_LOADED without going through
+    -- OnExpandBarChanged, and it lands after our styling pass. That is why the row
+    -- came up spread out after a reload and only snapped into place on the first
+    -- cursor change, when the hook above finally fired.
+    --
+    -- PLAYER_ENTERING_WORLD is always after VARIABLES_LOADED, so re-anchoring there
+    -- closes the gap. Every PEW rather than just the first: it costs six SetPoints
+    -- and it also covers zoning, and the one-frame delay keeps us behind anything
+    -- else still running in the same batch.
+    local pew = CreateFrame('Frame')
+    pew:RegisterEvent('PLAYER_ENTERING_WORLD')
+    pew:SetScript('OnEvent', function() C_Timer.After(0, ReanchorBagRow) end)
 end
 
 function Module.UpdateBagSlotIcons()
