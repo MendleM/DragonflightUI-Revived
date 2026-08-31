@@ -389,19 +389,19 @@ function Module.ChangeActionbar()
 end
 
 function Module.DisableBlizzardBarGridUpdates()
-    local multiBars = {
-        _G['MainActionBar'],
-        _G['MultiBarBottomLeft'],
-        _G['MultiBarBottomRight'],
-        _G['MultiBarLeft'],
-        _G['MultiBarRight'],
-        _G['MultiBar5'],
-        _G['MultiBar6'],
-        _G['MultiBar7'],
-        _G['PetActionBar'],
-        _G['PetActionBarFrame'],
-        _G['StanceBar'],
-        _G['PossessActionBar'],
+    -- Names, not frames, and iterated by name below.
+    --
+    -- This used to be a table of _G lookups walked with ipairs, which silently skipped
+    -- everything after the first bar that does not exist on the current flavour. Half
+    -- of these are absent somewhere: MultiBar5 to MultiBar7 come from the modern bar
+    -- system, PetActionBarFrame is the older name, PossessActionBar is not everywhere.
+    -- With MultiBar5 missing the walk stopped at index five, so PetActionBar,
+    -- StanceBar and PossessActionBar never got here at all - which is exactly the set
+    -- that still reports blocked actions. The block right above this one, building
+    -- actionbarToBlizzEditmodeFrame, avoids the same trap by indexing explicitly.
+    local multiBarNames = {
+        'MainActionBar', 'MultiBarBottomLeft', 'MultiBarBottomRight', 'MultiBarLeft', 'MultiBarRight', 'MultiBar5',
+        'MultiBar6', 'MultiBar7', 'PetActionBar', 'PetActionBarFrame', 'StanceBar', 'PossessActionBar'
     }
     -- These two assignments stay, and they are the one deliberate exception to
     -- "never replace a Blizzard function". Read before touching them.
@@ -424,7 +424,10 @@ function Module.DisableBlizzardBarGridUpdates()
     --
     -- Button visibility is driven instead by DragonflightUIActionbarMixin's
     -- UpdateGridState, through the showgrid attribute on our own buttons.
-    for _, bBar in ipairs(multiBars) do
+    local stubbed, absent = {}, {}
+
+    for _, name in ipairs(multiBarNames) do
+        local bBar = _G[name]
         if bBar then
             bBar:EnableMouse(false)
             if bBar.UpdateShownButtons then
@@ -433,7 +436,18 @@ function Module.DisableBlizzardBarGridUpdates()
             if bBar.SetShowGrid then
                 bBar.SetShowGrid = function() end
             end
+            table.insert(stubbed, name)
+        else
+            table.insert(absent, name)
         end
+    end
+
+    -- Logged because the failure mode is silent: a bar that misses this keeps
+    -- Blizzard's implementation and starts refusing SetShown on buttons this addon
+    -- owns. Read it back with /df log actionbar.
+    if DF.Log then
+        DF:Log('actionbar', 'blizzard bar implementations stubbed: %s', table.concat(stubbed, ', '))
+        if #absent > 0 then DF:Log('actionbar', 'not present on this flavour: %s', table.concat(absent, ', ')) end
     end
 end
 
