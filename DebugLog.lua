@@ -32,7 +32,9 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          and works with no target, since a hidden frame keeps
 --                          its anchors
 --     /df log tot          every term of the client's target-of-target show
---                          condition, plus the frame's own state, and a verdict
+--                          condition, for the target and the focus frame both,
+--                          plus each frame's own state and a verdict
+--     /df log tot focus    only the focus frame's target-of-target
 --     /df log tot watch    toggle a watcher that logs each time that changes
 --     /df log party        every party/raid frame field that is tainted, and
 --                          the addon that dirtied it. issecurevariable sees
@@ -482,12 +484,17 @@ end
 -- every frame, so a missing ToT means either one of those terms is false or
 -- something is hiding, unanchoring or blanking the frame after the fact. This
 -- prints both halves so the answer is in the paste rather than in a guess.
-function DF:LogToT(tag)
+-- which: 'focus' for the focus frame's target-of-target, anything else for the
+-- target frame's. Both run the same mixin, so the same terms decide both.
+function DF:LogToT(tag, which)
+    local isFocus = (which == 'focus')
     tag = tag or 'tot'
 
-    local tot = (TargetFrame and TargetFrame.totFrame) or _G['TargetFrameToT']
+    local ownerName = isFocus and 'FocusFrame' or 'TargetFrame'
+    local owner = _G[ownerName]
+    local tot = (owner and owner.totFrame) or _G[ownerName .. 'ToT']
     if not tot then
-        DF:Log(tag, 'no ToT frame exists at all (TargetFrame.totFrame is nil)')
+        DF:Log(tag, 'no ToT frame exists at all (%s.totFrame is nil)', ownerName)
         return
     end
 
@@ -501,31 +508,44 @@ function DF:LogToT(tag)
     -- catches a cache that has gone stale behind it
     local rawCVar = GetCVar('showTargetOfTarget')
 
-    local unit = tot.unit or 'targettarget'
-    local targetExists = UnitExists('target') and true or false
+    -- Blizzard's TargetOfTargetMixin:Update does not read the owner frame - it
+    -- reads self:GetParent(). Reparenting the frame onto a holder makes
+    -- parent.unit nil, every term below collapses, and the client hides it with
+    -- no error at all. So report the parent's unit, not the owner's.
+    local parent = tot:GetParent()
+    local parentName = (parent and parent.GetName and (parent:GetName() or '<anonymous>')) or 'none'
+    local ownerUnit = parent and parent.unit or nil
+
+    local unit = tot.unit or (isFocus and 'focustarget' or 'targettarget')
+    local ownerExists = (ownerUnit and UnitExists(ownerUnit)) and true or false
     local totExists = UnitExists(unit) and true or false
-    local targetIsPlayer = (PlayerFrame and PlayerFrame.unit and UnitIsUnit(PlayerFrame.unit, 'target')) and true or false
-    local alive = (UnitHealth('target') or 0) > 0
+    local ownerIsPlayer = (ownerUnit and PlayerFrame and PlayerFrame.unit and UnitIsUnit(PlayerFrame.unit, ownerUnit)) and
+                              true or false
+    local alive = (ownerUnit and (UnitHealth(ownerUnit) or 0) > 0) and true or false
 
-    local expected = (cvar and targetExists and totExists and not targetIsPlayer and alive) and true or false
+    local expected = (cvar and ownerExists and totExists and not ownerIsPlayer and alive) and true or false
 
-    DF:Log(tag, '=== target-of-target ===')
-    DF:Log(tag, 'cvar=%s (raw "%s")  targetExists=%s  totExists=%s (unit=%s, name=%s)  targetIsSelf=%s  targetAlive=%s',
-           tostring(cvar), tostring(rawCVar), tostring(targetExists), tostring(totExists), tostring(unit),
-           tostring(UnitName(unit)), tostring(targetIsPlayer), tostring(alive))
+    DF:Log(tag, '=== %s target-of-target ===', isFocus and 'focus' or 'target')
+    DF:Log(tag, 'parent=%s  parent.unit=%s  parent is %s=%s  parent:UpdateAuras=%s', parentName, tostring(ownerUnit),
+           ownerName, tostring(parent == owner), tostring(parent and parent.UpdateAuras ~= nil))
+    DF:Log(tag, 'cvar=%s (raw "%s")  ownerExists=%s  totExists=%s (unit=%s, name=%s)  ownerIsSelf=%s  ownerAlive=%s',
+           tostring(cvar), tostring(rawCVar), tostring(ownerExists), tostring(totExists), tostring(unit),
+           tostring(UnitName(unit)), tostring(ownerIsPlayer), tostring(alive))
     DF:Log(tag, 'client should show it: %s   frame shown=%s visible=%s', tostring(expected), tostring(tot:IsShown()),
            tostring(tot:IsVisible()))
 
     -- is the safety net still installed? TargetFrameMixin:OnUpdate is what
     -- re-shows the ToT every frame; if something replaced that script rather
     -- than hooking it, nothing self-heals
-    DF:Log(tag, 'TargetFrame OnUpdate installed=%s   ToT OnUpdate installed=%s',
-           tostring((TargetFrame and TargetFrame:GetScript('OnUpdate')) ~= nil),
-           tostring(tot:GetScript('OnUpdate') ~= nil))
+    DF:Log(tag, '%s OnUpdate installed=%s   ToT OnUpdate installed=%s', ownerName,
+           tostring((owner and owner:GetScript('OnUpdate')) ~= nil), tostring(tot:GetScript('OnUpdate') ~= nil))
 
     DF:LogFrame(tot, tag)
 
-    if not expected then
+    if ownerUnit == nil then
+        DF:Log(tag, 'VERDICT: the parent carries no .unit, so TargetOfTargetMixin:Update hides it every frame - ' ..
+                   'the frame has been reparented off %s onto %s', ownerName, parentName)
+    elseif not expected then
         DF:Log(tag, 'VERDICT: the client is deliberately hiding it - see which term above is false')
     elseif not tot:IsShown() then
         DF:Log(tag, 'VERDICT: should be shown and is not. Something hid it, or Update() is erroring - check /df log error')
@@ -1953,11 +1973,18 @@ function DF:HandleLogCommand(rest)
         DF:LogBlockers(arg ~= '' and arg or nil, 'blockers')
         DF:LogDump('blockers', 60)
     elseif sub == 'tot' then
-        if arg:lower() == 'watch' then
+        local a = arg:lower()
+        if a == 'watch' then
             DF:LogToTWatch(not totWatcher)
-        else
-            DF:LogToT('totdump')
+        elseif a == 'focus' then
+            DF:LogToT('totdump', 'focus')
             DF:LogDump('totdump', 40)
+        else
+            -- both by default: the two run the same mixin, and having the pair
+            -- side by side is what shows which of them lost its parent
+            DF:LogToT('totdump')
+            DF:LogToT('totdump', 'focus')
+            DF:LogDump('totdump', 60)
         end
     elseif sub == 'bagtrace' then
         local a = arg:lower()
