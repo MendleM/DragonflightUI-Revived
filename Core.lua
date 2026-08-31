@@ -11,7 +11,16 @@ addonTable.SubModuleMixins = {}
 
 -- global, not profile: "have I already seen the notes for this version" is a
 -- fact about the installation, not about a layout the player can switch between
-local defaults = {profile = {bestnumber = 42}, global = {lastSeenVersion = ''}}
+--
+-- char, not global, for the edit mode anchor migration: C_EditMode.GetLayouts()
+-- only returns the layouts that apply to the character you are on, so a
+-- character-scoped layout with a stale anchor cannot be seen until that
+-- character logs in. See Helper.lua:SanitizeLegacyEditModeAnchors.
+local defaults = {
+    profile = {bestnumber = 42},
+    global = {lastSeenVersion = '', editModeLayoutNoticeDismissed = false},
+    char = {editModeAnchorMigration = 0}
+}
 
 -- Lua errors and taint blocks are captured into the debug log; see DebugLog.lua.
 

@@ -380,8 +380,6 @@ function DragonflightUIActionbarMixin:Update()
     end
     self:ShowHighlight(false)
 
-    if self.BlizzEditmodeFrame then self:UpdateBlizzEditmodeState(); end
-
     -- Apply the alwaysShow decision immediately (login and live toggles) -
     -- the attribute writes above are invisible until something re-evaluates.
     self:UpdateGridState()
@@ -446,33 +444,22 @@ function DragonflightUIActionbarMixin:Update()
     if self.StylePetButton and PetActionBar_Update then PetActionBar_Update() end
 end
 
-function DragonflightUIActionbarMixin:UpdateBlizzEditmodeState()
-    -- print('UpdateBlizzEditmodeState')
-    local state = self.state;
-    if not state then return end
-
-    local buttonTable = self.buttonTable
-    local btnCount = #buttonTable
-    if btnCount < 1 then return end
-
-    if not self.BlizzEditmodeFrame then return end
-
-    if Enum and Enum.EditModeActionBarSetting and addonTable.GetBlizzEditmodeFrameSettingBool then
-        local editmodeAlwaysShow = addonTable:GetBlizzEditmodeFrameSettingBool(self.BlizzEditmodeFrame,
-                                                                               Enum.EditModeActionBarSetting
-                                                                                   .AlwaysShowButtons)
-        if editmodeAlwaysShow ~= state.alwaysShow then
-            if state.alwaysShow then
-                addonTable:SetBlizzEditmodeFrameSetting(self.BlizzEditmodeFrame,
-                                                        Enum.EditModeActionBarSetting.AlwaysShowButtons, 1, true)
-            else
-                addonTable:SetBlizzEditmodeFrameSetting(self.BlizzEditmodeFrame,
-                                                        Enum.EditModeActionBarSetting.AlwaysShowButtons, 0, true)
-            end
-        end
-    end
-end
-
+-- UpdateBlizzEditmodeState() used to sit here and has been removed.
+--
+-- It mirrored state.alwaysShow into Blizzard's AlwaysShowButtons layout setting,
+-- and read that setting back to decide whether a write was needed. Both halves
+-- were pointless:
+--
+--   * state.alwaysShow was already the source of truth - the write only pushed
+--     it outwards, it never fed anything back in.
+--   * the value had no effect. Blizzard applies AlwaysShowButtons through
+--     EditModeActionBarSystemMixin:UpdateShownButtons, and Actionbar.Controller
+--     stubs that to an empty function on every MultiBar. So the setting was
+--     written to Blizzard's server-side layout on every ApplySettings and then
+--     read by nobody.
+--
+-- The actual effect comes from UpdateGridState below, which writes the showgrid
+-- attribute on this addon's own buttons.
 function DragonflightUIActionbarMixin:UpdateGridState()
     local state = self.state;
     if not state then return end
@@ -499,8 +486,6 @@ function DragonflightUIActionbarMixin:UpdateGridState()
             if btn:IsShown() ~= show then btn:SetShown(show) end
         end
     end
-
-    if self.BlizzEditmodeFrame then self:UpdateBlizzEditmodeState(); end
 end
 
 function DragonflightUIActionbarMixin:HookQuickbindMode()
@@ -2707,97 +2692,6 @@ function DragonflightUIPetbarMixin:StylePetButton()
 end
 
 DragonflightUIStancebarMixinCode = {}
-
-function DragonflightUIStancebarMixinCode:CreateCustomStanceBarButtons()
-    local extraParent = CreateFrame('FRAME', 'DragonflightUIStanceBarVisParent', UIParent)
-    extraParent:SetFrameLevel(0)
-
-    local function customOnEnter(f)
-        if (GetCVarBool("UberTooltips")) then
-            GameTooltip_SetDefaultAnchor(GameTooltip, f);
-        else
-            GameTooltip:SetOwner(f, "ANCHOR_RIGHT");
-        end
-
-        GameTooltip:SetShapeshift(f:GetID());
-        f.UpdateTooltip = customOnEnter;
-    end
-
-    local btns = {}
-    for i = 1, 10 do
-        --
-        local btn =
-            CreateFrame("CheckButton", "DragonflightUIStanceButton" .. i, extraParent, "StanceButtonTemplate", i)
-        btn:SetSize(64, 64)
-        btn:SetPoint("CENTER", UIParent, "CENTER", 64 * i, 0)
-        -- btn:SetAttribute("type", "action")
-        -- btn:SetAttribute("action", 144 + (n - 6) * 12 + i) -- Action slot 1
-        btn:SetFrameLevel(3)
-
-        btn.command = "SHAPESHIFTBUTTON" .. i
-        btn.commandHuman = "Stance Bar Button " .. i
-
-        btn:SetScript('OnEnter', customOnEnter)
-
-        btns[i] = btn;
-
-        local orig = _G['StanceButton' .. i]
-        orig:ClearAllPoints()
-        orig:Hide()
-        orig:SetPoint('TOP', UIParent, 'BOTTOM', 0, -666)
-    end
-
-    self:SetButtons(btns, 42)
-    self:StyleButtons()
-    self:ReplaceNormalTexture2()
-
-    self:RegisterEvent("PLAYER_ENTERING_WORLD")
-    self:RegisterEvent("UPDATE_BONUS_ACTIONBAR")
-    self:RegisterEvent("ACTIONBAR_PAGE_CHANGED")
-    self:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
-    self:RegisterEvent("UPDATE_SHAPESHIFT_FORMS")
-    self:RegisterEvent("UPDATE_SHAPESHIFT_USABLE")
-    self:RegisterEvent("UPDATE_SHAPESHIFT_COOLDOWN")
-    self:RegisterEvent("PLAYER_REGEN_ENABLED")
-
-    self:RegisterEvent("UPDATE_VEHICLE_ACTIONBAR")
-    self:RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR")
-    self:RegisterEvent("UPDATE_POSSESS_BAR")
-
-    self:RegisterEvent("UPDATE_BINDINGS", "ReassignBindings")
-    self:SetScript('OnEvent', function(_, event, arg1)
-        -- print(self:GetName(), event, arg1)
-        self:UpdateButtonState(not InCombatLockdown())
-
-        -- if event == 'UPDATE_SHAPESHIFT_COOLDOWN' then
-        --     self:UpdateButtonState(false)
-        -- elseif event == 'PLAYER_REGEN_ENABLED' then
-        --     if InCombatLockdown() then return end
-        --     self:UpdateButtonState(true)
-        -- else
-        --     if InCombatLockdown() then
-        --         self:UpdateButtonState(false)
-        --     else
-        --         self:UpdateButtonState(true)
-        --     end
-        -- end
-        -- self:Update()
-        -- self:UpdateGridState()
-    end)
-
-    self:UpdateButtonState(true)
-
-    -- hooksecurefunc('StanceBar_Select', function(id)
-    --     print('StanceBar_Select')
-    --     self:UpdateButtonState(false)
-    -- end)
-
-    -- hooksecurefunc('CastShapeshiftForm', function()
-    --     print('CastShapeshiftForm')
-    --     self:UpdateButtonState(false)
-    -- end)
-
-end
 
 local NUM_STANCE_SLOTS = NUM_STANCE_SLOTS or 10;
 

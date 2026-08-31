@@ -7,6 +7,20 @@ local subModuleName = 'RaidFrame';
 local SubModuleMixin = {};
 addonTable.SubModuleMixins[subModuleName] = SubModuleMixin;
 
+
+-- Blizzard's own description of the unit frame settings, read straight from
+-- EditModeSettingDisplayInfoManager.systemSettingDisplayInfo. It is an array per
+-- system, each entry carrying setting, name, type, and either minValue/maxValue/
+-- stepSize or an options list of {value, text}. Reading it does not taint it.
+local function GetUnitFrameDisplayInfo()
+    if not (Enum and Enum.EditModeSystem) then return nil end
+
+    local mgr = _G['EditModeSettingDisplayInfoManager']
+    if not (mgr and mgr.systemSettingDisplayInfo) then return nil end
+
+    return mgr.systemSettingDisplayInfo[Enum.EditModeSystem.UnitFrame]
+end
+
 function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
@@ -15,32 +29,59 @@ function SubModuleMixin:Init()
 end
 
 function SubModuleMixin:SetDefaults()
+    -- Position, scale and visibility are live now, so they are no longer commented out.
+    --
+    -- The anchor default is deliberately UIParent TOPLEFT at a zero offset rather than
+    -- invented coordinates: Update() calibrates once from wherever the raid container
+    -- already sits and writes that into the profile, so the first run does not teleport
+    -- anybody's raid frames to a spot this file guessed at.
+    --
+    -- The commented block that used to trail this table is gone. Ten of its keys were
+    -- duplicates of the visibility defaults above, and the other five - breakUpLarge-
+    -- Numbers, enableThreatGlow, hideStatusbarText, offset, hideIndicator - belong to
+    -- the focus, target and pet frames and were never read here. 'override' went with
+    -- them: nothing in the addon reads it, on any frame.
     local defaults = {
-        -- breakUpLargeNumbers = true,
-        -- enableThreatGlow = true,
-        -- scale = 1.0,
-        -- override = false,
-        -- anchorFrame = 'PlayerFrame',
-        -- customAnchorFrame = '',
-        -- anchor = 'TOPRIGHT',
-        -- anchorParent = 'BOTTOMRIGHT',
-        -- x = 4,
-        -- y = 28,
-        -- hideStatusbarText = false,
-        -- offset = false,
-        -- hideIndicator = false,
-        -- -- Visibility
-        -- showMouseover = false,
-        -- hideAlways = false,
-        -- hideCombat = false,
-        -- hideOutOfCombat = false,
-        -- hidePet = false,
-        -- hideNoPet = false,
-        -- hideStance = false,
-        -- hideStealth = false,
-        -- hideNoStealth = false,
-        -- hideCustom = false,
-        -- hideCustomCond = ''
+        scale = 1.0,
+        anchorFrame = 'UIParent',
+        customAnchorFrame = '',
+        anchor = 'TOPLEFT',
+        anchorParent = 'TOPLEFT',
+        x = 0,
+        y = 0,
+        calibrated = false,
+        anchorNormalised = false,
+        -- Visibility, and every key AddStateTable offers has to be here.
+        --
+        -- A missing default means getOption returns nil, and the settings list feeds
+        -- that straight into Slider:SetValue - which is the "bad argument #1 to
+        -- SetValue" the alpha rows threw. Same list as the party frame's.
+        alphaNormal = 1.0,
+        alphaCombat = 1.0,
+        showMouseover = false,
+        hideAlways = false,
+        hideCombat = false,
+        hideOutOfCombat = false,
+        hideVehicle = false,
+        hidePet = false,
+        hideNoPet = false,
+        hideStance = false,
+        hideStealth = false,
+        hideNoStealth = false,
+        hideBattlePet = false,
+        hideCustom = false,
+        hideCustomCond = '',
+
+        -- Blizzard's own raid Edit Mode settings, keyed by setting id as a string.
+        --
+        -- Held here because Blizzard's layout cannot hold them. C_EditMode.GetLayouts
+        -- returns the player's own layouts only, so an account that never built one
+        -- hands back an empty list and the write loop in SyncUnitFrameEditModeSetting
+        -- runs zero times. And even with a layout present, SaveLayoutChanges refuses to
+        -- save into a preset, which is what a default account is on. Both were true on
+        -- the report: preset "Classic", zero saved layouts, frame width applied live at
+        -- 112 and back to the preset's 98 after a reload.
+        blizzSettings = {}
     };
     self.Defaults = defaults;
 end
@@ -110,6 +151,200 @@ function SubModuleMixin:SetupOptions()
         return newTable
     end
 
+    -- The raid frame Edit Mode settings, offered here instead of sending people out
+    -- to Blizzard's Edit Mode - which this addon blocks, so reaching it meant
+    -- disabling the addon and reloading twice.
+    --
+    -- These cannot be applied to the frames directly. Every applier in
+    -- EditModeUnitFrameSystemMixin reads its value back through GetSettingValue ->
+    -- GetRegisteredSystemFrame, so the value has to reach the registered system
+    -- frame and the layout. Helper's SetRaidEditModeSetting does both, the same way
+    -- the party raid-style switch already did.
+    --
+    -- Bounds and choices are taken from Blizzard's own display info rather than
+    -- invented here, because inventing them is how you ship a slider that lets
+    -- people set a value the client then rejects. Anything Blizzard does not
+    -- describe is left out.
+
+    -- One AceConfig entry per setting the raid system actually has.
+    --
+    -- Driven entirely off Blizzard's table: the label is Blizzard's localised name,
+    -- the slider bounds are Blizzard's, the dropdown values are Blizzard's enums. The
+    -- earlier version of this hardcoded English labels and a guessed value scheme,
+    -- and produced an empty panel because none of the guesses matched.
+    --
+    -- HasSetting on the registered system frame decides what appears, so a flavour
+    -- without a given setting simply does not show it.
+    -- Which option key maps to which Edit Mode setting.
+    --
+    -- Needed because SettingsList builds every row with the GROUP's get and set -
+    -- SettingsList.mixin.lua:859 does "get = data.options.get" - and ignores whatever
+    -- an individual option defines. So the group handlers below have to recognise
+    -- these keys, and this is how they do it. Per-option get/set are still set for
+    -- correctness, they simply are not what runs.
+    local blizzRaidSettings = {}
+
+    -- Our profile is the source of truth for these; Blizzard's system frame is only where
+    -- the value is pushed so it takes effect.
+    --
+    -- Blizzard's layout cannot keep them, which the defaults table above explains, so the
+    -- value has to live here or not at all. Reading Blizzard's live value while nothing is
+    -- stored seeds the first read, so upgrading moves nobody's frames.
+    --
+    -- Defined next to blizzRaidSettings because the GROUP handlers are what the widgets
+    -- call, and they are the only ones that must not miss this.
+    local function BlizzRaidProfileTable()
+        local profile = Module.db and Module.db.profile
+        return profile and profile.raid and profile.raid.blizzSettings
+    end
+
+    local function GetBlizzRaidStored(setting)
+        local saved = BlizzRaidProfileTable()
+        local key = tostring(setting)
+        if saved and saved[key] ~= nil then return saved[key] end
+
+        return addonTable:GetRaidEditModeSettingBySetting(setting)
+    end
+
+    local function SetBlizzRaidStored(setting, value)
+        local saved = BlizzRaidProfileTable()
+        if saved then saved[tostring(setting)] = value end
+
+        addonTable:SetRaidEditModeSettingBySetting(setting, value)
+
+        -- Raid-style party frames are their own Edit Mode system reading their own values,
+        -- so the same number has to land there too or this page has no effect on them.
+        -- Helper skips the settings the party system does not have.
+        if addonTable.MirrorRaidSettingToParty then addonTable:MirrorRaidSettingToParty(setting, value) end
+    end
+
+    self.GetBlizzRaidStored = GetBlizzRaidStored
+    self.SetBlizzRaidStored = SetBlizzRaidStored
+
+    -- Returns how many entries it added, so the caller can tell "not ready yet" from
+    -- "nothing to offer" and stop retrying once it has worked.
+    local function BuildRaidEditModeArgs(args)
+        addonTable.RaidEditModeOptionCount = addonTable.RaidEditModeOptionCount or 0
+
+        if not (addonTable.SetRaidEditModeSetting and Enum and Enum.EditModeSettingDisplayType) then return 0 end
+
+        local displayInfo = GetUnitFrameDisplayInfo()
+        if not displayInfo then return 0 end
+
+        local raidFrame = addonTable.GetRaidSystemFrameForOptions and addonTable:GetRaidSystemFrameForOptions()
+        if not (raidFrame and raidFrame.HasSetting) then return 0 end
+
+        local added = 0
+
+        local types = Enum.EditModeSettingDisplayType
+        local order = 20
+
+        for _, info in ipairs(displayInfo) do
+            local setting = info.setting
+
+            -- Both return values checked: a failed pcall hands back an error string,
+            -- which is truthy, so testing only the second one would treat every
+            -- failure as "yes, it has this setting".
+            local hasIt = false
+            if setting ~= nil then
+                local ok, has = pcall(raidFrame.HasSetting, raidFrame, setting)
+                hasIt = ok and has and true or false
+            end
+
+            if hasIt then
+                order = order + 0.01
+
+                -- Said out loud, per setting, where it does and does not show up.
+                --
+                -- The preview is built from DFEditModePreviewRaidTemplate, whose UpdateState
+                -- reads seven fields. Sort order, the profile template and icon size are
+                -- not among them, and row size is fixed at five unless the groups are
+                -- combined - that last one is Blizzard's own rule, mirrored from
+                -- UpdateRaidContainerFlow. All of them still apply to the real raid frames.
+                --
+                -- Blizzard hides settings that do not apply through ShouldShowSetting, but
+                -- this settings list has no dynamic hidden support, so saying it is the
+                -- honest option: a control that silently does nothing is worse than one
+                -- that explains itself.
+                local NOTES = {
+                    RowSize = ' Only applies when Groups is set to one of the combined options.',
+                    SortPlayersBy = ' Affects the real raid frames; the preview does not reorder.',
+                    IconSize = ' Affects the real raid frames; not shown in the preview.'
+                }
+
+                local note = ''
+                if Enum and Enum.EditModeUnitFrameSetting then
+                    for key, text in pairs(NOTES) do
+                        if Enum.EditModeUnitFrameSetting[key] == setting then note = text end
+                    end
+                end
+
+                local option = {
+                    name = info.name or tostring(setting),
+                    desc = 'Blizzard Edit Mode setting. Applied at once and kept in this addon\'s profile.' .. note,
+                    order = order,
+                    editmode = true
+                }
+
+                -- Same two helpers the group handlers use. These per-option ones are not
+                -- what the widgets call, but they must not disagree with the ones that are.
+                local function GetStored() return GetBlizzRaidStored(setting) end
+                local function SetStored(value) SetBlizzRaidStored(setting, value) end
+
+                if info.type == types.Checkbox then
+                    option.type = 'toggle'
+                    option.get = function() return (GetStored() or 0) ~= 0 end
+                    option.set = function(_, value) SetStored(value and 1 or 0) end
+                elseif info.type == types.Slider then
+                    -- bigStep, not step. DFSettingsList's slider does
+                    -- SetValueStep(args.bigStep), so a step field it does not read
+                    -- leaves the slider with no increment and no usable handle.
+                    option.type = 'range'
+                    option.min = info.minValue or 0
+                    option.max = info.maxValue or 100
+                    option.bigStep = info.stepSize or 1
+                    option.get = GetStored
+                    option.set = function(_, value) SetStored(value) end
+                elseif info.type == types.Dropdown then
+                    -- dropdownValues, an ARRAY of {value, text}, walked with ipairs by
+                    -- DFSettingsListDropdownContainerMixin:Init. Not AceConfig's
+                    -- values map keyed by value - that field is never read here, which
+                    -- is why the dropdowns came up empty.
+                    --
+                    -- Blizzard's own options list is already in exactly that shape, so
+                    -- it is copied rather than reshaped, dropping only malformed
+                    -- entries.
+                    local choices = {}
+                    for _, choice in ipairs(info.options or {}) do
+                        if choice.value ~= nil then
+                            table.insert(choices, {value = choice.value, text = choice.text or tostring(choice.value)})
+                        end
+                    end
+
+                    -- Guard rather than a goto: this is Lua 5.1, which has neither
+                    -- goto nor labels.
+                    if #choices > 0 then
+                        option.type = 'select'
+                        option.dropdownValues = choices
+                        option.get = GetStored
+                        option.set = function(_, value) SetStored(value) end
+                    end
+                end
+
+                -- Only the branches that produced something usable set a type.
+                if option.type then
+                    local key = 'blizzRaid' .. tostring(setting)
+                    args[key] = option
+                    blizzRaidSettings[key] = {setting = setting, info = info, kind = option.type}
+                    added = added + 1
+                end
+            end
+        end
+
+        addonTable.RaidEditModeOptionCount = added
+        return added
+    end
+
     local optionsRaid = {
         name = L["RaidFrameName"],
         advancedName = 'RaidFrame',
@@ -118,95 +353,16 @@ function SubModuleMixin:SetupOptions()
         set = setOption,
         type = 'group',
         args = {
-            -- scale = {
-            --     type = 'range',
-            --     name = 'Scale',
-            --     desc = '' .. getDefaultStr('scale', 'party'),
-            --     min = 0.1,
-            --     max = 5,
-            --     bigStep = 0.1,
-            --     order = 1,
-            --     editmode = true
-            -- },
-            -- anchorFrame = {
-            --     type = 'select',
-            --     name = 'Anchorframe',
-            --     desc = 'Anchor' .. getDefaultStr('anchorFrame', 'party'),
-            --     values = frameTable,
-            --     order = 4,
-            --     editmode = true
-            -- },
-            -- anchor = {
-            --     type = 'select',
-            --     name = 'Anchor',
-            --     desc = 'Anchor' .. getDefaultStr('anchor', 'party'),
-            --     values = {
-            --         ['TOP'] = 'TOP',
-            --         ['RIGHT'] = 'RIGHT',
-            --         ['BOTTOM'] = 'BOTTOM',
-            --         ['LEFT'] = 'LEFT',
-            --         ['TOPRIGHT'] = 'TOPRIGHT',
-            --         ['TOPLEFT'] = 'TOPLEFT',
-            --         ['BOTTOMLEFT'] = 'BOTTOMLEFT',
-            --         ['BOTTOMRIGHT'] = 'BOTTOMRIGHT',
-            --         ['CENTER'] = 'CENTER'
-            --     },
-            --     order = 2,
-            --     editmode = true
-            -- },
-            -- anchorParent = {
-            --     type = 'select',
-            --     name = 'AnchorParent',
-            --     desc = 'AnchorParent' .. getDefaultStr('anchorParent', 'party'),
-            --     values = {
-            --         ['TOP'] = 'TOP',
-            --         ['RIGHT'] = 'RIGHT',
-            --         ['BOTTOM'] = 'BOTTOM',
-            --         ['LEFT'] = 'LEFT',
-            --         ['TOPRIGHT'] = 'TOPRIGHT',
-            --         ['TOPLEFT'] = 'TOPLEFT',
-            --         ['BOTTOMLEFT'] = 'BOTTOMLEFT',
-            --         ['BOTTOMRIGHT'] = 'BOTTOMRIGHT',
-            --         ['CENTER'] = 'CENTER'
-            --     },
-            --     order = 3,
-            --     editmode = true
-            -- },
-            -- x = {
-            --     type = 'range',
-            --     name = 'X',
-            --     desc = 'X relative to *ANCHOR*' .. getDefaultStr('x', 'party'),
-            --     min = -2500,
-            --     max = 2500,
-            --     bigStep = 1,
-            --     order = 5,
-            --     editmode = true
-            -- },
-            -- y = {
-            --     type = 'range',
-            --     name = 'Y',
-            --     desc = 'Y relative to *ANCHOR*' .. getDefaultStr('y', 'party'),
-            --     min = -2500,
-            --     max = 2500,
-            --     bigStep = 1,
-            --     order = 6,
-            --     editmode = true
-            -- }     
         }
     }
     if true then
         local moreOptions = {
-            -- useCompactPartyFrames = {
-            --     type = 'toggle',
-            --     name = USE_RAID_STYLE_PARTY_FRAMES,
-            --     desc = OPTION_TOOLTIP_USE_RAID_STYLE_PARTY_FRAMES,
-            --     order = 15,
-            --     blizzard = true,
-            --     editmode = false
-            -- },
+            -- Blizzard's Interface options panel, not the Edit Mode dialog.
             raidFrameBtn = {
                 type = 'execute',
-                name = 'Raid Frame Settings',
+                name = 'Blizzard raid profile options',
+                desc = 'Opens Blizzard\'s own Interface options for raid frames - health text, class colours and ' ..
+                    'the like. The Edit Mode settings, frame size and group layout, are above.',
                 btnName = 'Open',
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
@@ -215,172 +371,62 @@ function SubModuleMixin:SetupOptions()
                 order = 5,
                 blizzard = true,
                 editmode = false
-            },
-            headerTaint = {
-                type = 'header',
-                name = 'Use the blizzard settings, as setting them through addons taints the UI.',
-                desc = '',
-                order = 1,
-                editmode = false
             }
-            -- headerTaint = {type = 'header', name = 'May Cause Taint Issues - /reload after setup', desc = '', order = 10},
-            -- keepGroupsTogether = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_KEEPGROUPSTOGETHER,
-            --     desc = OPTION_TOOLTIP_KEEP_GROUPS_TOGETHER,
-            --     proxy = 'PROXY_RAID_FRAME_KEEP_GROUPS_TOGETHER',
-            --     order = 20.1,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- horizontalGroups = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_HORIZONTALGROUPS,
-            --     desc = '',
-            --     proxy = 'PROXY_RAID_FRAME_KEEP_HORIZONTAL_GROUPS',
-            --     order = 20.2,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- sortBy = {
-            --     type = 'select',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_SORTBY,
-            --     desc = '',
-            --     values = {['role'] = 'role', ['group'] = 'group', ['alphabetical'] = 'alphabetical'},
-            --     proxy = 'PROXY_RAID_FRAME_SORT_BY',
-            --     order = 20.21,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayPowerBar = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYPOWERBAR,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYPOWERBAR,
-            --     proxy = 'PROXY_RAID_FRAME_POWER_BAR',
-            --     order = 20.3,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- useClassColors = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_USECLASSCOLORS,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_USECLASSCOLORS,
-            --     proxy = 'PROXY_RAID_FRAME_CLASS_COLORS',
-            --     order = 20.4,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayPets = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYPETS,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYPETS,
-            --     proxy = 'PROXY_RAID_FRAME_PETS',
-            --     order = 20.5,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayMainTankAndAssist = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYMAINTANKANDASSIST,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYMAINTANKANDASSIST,
-            --     proxy = 'PROXY_RAID_FRAME_TANK_ASSIST',
-            --     order = 20.6,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayBorder = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYBORDER,
-            --     desc = '',
-            --     proxy = 'PROXY_RAID_FRAME_BORDER',
-            --     order = 20.7,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayNonBossDebuffs = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYNONBOSSDEBUFFS,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYNONBOSSDEBUFFS,
-            --     proxy = 'PROXY_RAID_FRAME_SHOW_DEBUFFS',
-            --     order = 20.8,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayOnlyDispellableDebuffs = {
-            --     type = 'toggle',
-            --     name = DISPLAY_ONLY_DISPELLABLE_DEBUFFS,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYONLYDISPELLABLEDEBUFFS,
-            --     proxy = 'PROXY_RAID_FRAME_DISPELLABLE_DEBUFFS',
-            --     order = 21.1,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- healthText = {
-            --     type = 'select',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_HEALTHTEXT,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_HEALTHTEXT,
-            --     values = {['none'] = 'none', ['health'] = 'health', ['losthealth'] = 'losthealth', ['perc'] = 'perc'},
-            --     proxy = 'PROXY_RAID_HEALTH_TEXT',
-            --     order = 21.2,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- frameHeight = {
-            --     type = 'range',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_FRAMEHEIGHT,
-            --     desc = '',
-            --     proxy = 'PROXY_RAID_FRAME_HEIGHT',
-            --     min = 20,
-            --     max = 128,
-            --     bigStep = 1,
-            --     order = 22.1,
-            --     editmode = true,
-            --     blizzard = true
-            -- },
-            -- frameWidth = {
-            --     type = 'range',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_FRAMEWIDTH,
-            --     desc = '',
-            --     proxy = 'PROXY_RAID_FRAME_WIDTH',
-            --     min = 20,
-            --     max = 256,
-            --     bigStep = 1,
-            --     order = 22.2,
-            --     editmode = true,
-            --     blizzard = true
-            -- }
         }
 
         for k, v in pairs(moreOptions) do optionsRaid.args[k] = v end
 
-        local defaultFuncs = {}
+        -- After moreOptions, so a hand-written entry can still override one of these
+        -- if a flavour ever needs it.
+        --
+        -- And again after login, because this attempt usually fails. /df log raidopts
+        -- showed everything present at runtime - Blizzard_EditMode loaded, the display
+        -- info there, CompactRaidFrameContainer answering HasSetting for eleven
+        -- settings - while the panel stayed empty. Options are built during our init,
+        -- which happens before Blizzard's Edit Mode data and the raid container exist,
+        -- so the first pass has nothing to read.
+        --
+        -- AceConfig reads the args table when the panel opens rather than caching it,
+        -- so filling it later is enough; no re-registration needed.
+        -- Exposed so Setup can build these BEFORE it registers the edit mode selection.
+        -- RegisterOptions copies options.args into its own filtered table once
+        -- (Editmode.mixin.lua:994) and never looks again, so anything added later shows
+        -- up in the config window - which reads the table lazily - but never in the edit
+        -- mode panel. That is the difference the report describes.
+        self.BuildEditModeArgs = function() return BuildRaidEditModeArgs(optionsRaid.args) end
 
-        -- Proxy
-        -- RevertSetting("PROXY_RAID_FRAME_CLASS_COLORS");
-        -- RevertSetting("PROXY_RAID_FRAME_PETS");
-        -- RevertSetting("PROXY_RAID_FRAME_TANK_ASSIST");
-        -- RevertSetting("PROXY_RAID_FRAME_BORDER");
-        -- RevertSetting("PROXY_RAID_FRAME_SHOW_DEBUFFS");
-        -- RevertSetting("PROXY_RAID_FRAME_KEEP_GROUPS_TOGETHER");
-        -- RevertSetting("PROXY_RAID_FRAME_KEEP_HORIZONTAL_GROUPS");
-        -- RevertSetting("PROXY_RAID_FRAME_SORT_BY");
-        -- RevertSetting("PROXY_RAID_FRAME_POWER_BAR");
-        -- RevertSetting("PROXY_RAID_FRAME_DISPELLABLE_DEBUFFS");
-        -- RevertSetting("PROXY_RAID_HEALTH_TEXT");
-        -- RevertSetting("PROXY_RAID_FRAME_HEIGHT");
-        -- RevertSetting("PROXY_RAID_FRAME_WIDTH");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_2");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_3");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_5");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_10");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_15");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_20");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_40");
+        if self.BuildEditModeArgs() == 0 then
+            local optsWatcher = CreateFrame('Frame')
+            optsWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+            optsWatcher:SetScript('OnEvent', function(watcherSelf)
+                -- One frame later: PLAYER_ENTERING_WORLD fires before some systems
+                -- finish registering themselves with the Edit Mode manager.
+                C_Timer.After(0, function()
+                    if self.BuildEditModeArgs() > 0 then watcherSelf:UnregisterAllEvents() end
+                end)
+            end)
+        end
 
         optionsRaid.get = function(info)
             local key = info[1]
             local sub = info[2]
+
+            -- The Edit Mode settings, read from Blizzard's registered raid system.
+            --
+            -- No conversion here, in either direction. GetSettingValue takes a useRawValue
+            -- flag and without it already hands back the DISPLAY value, and
+            -- OnSystemSettingChange likewise expects the display value and converts to raw
+            -- itself. Converting on top of that was what pinned the sliders at their
+            -- maximum. The one place the raw form is needed is the layout, and Helper reads
+            -- it back off the system frame rather than computing it.
+            local blizz = blizzRaidSettings[sub]
+            if blizz then
+                local stored = GetBlizzRaidStored(blizz.setting)
+
+                if blizz.kind == 'toggle' then return (stored or 0) ~= 0 end
+
+                return stored
+            end
 
             -- Same setting as the party page's copy, and on 1.15.9 it lives in
             -- the Edit Mode layout rather than in the dead useCompactPartyFrames
@@ -389,28 +435,72 @@ function SubModuleMixin:SetupOptions()
                 return addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames()
             end
 
-            if moreOptions[sub].proxy then
-                -- proxy
-                local value = Settings.GetValue(moreOptions[sub].proxy);
-                return value;
-            end
+            -- The Settings.GetValue branch for proxy CVars is gone with the options that
+            -- used it. Fourteen of them were commented out here under a header warning
+            -- that setting them from an addon taints the UI - keepGroupsTogether,
+            -- horizontalGroups, sortBy, class colours, frame height and width and the
+            -- rest. They are all Edit Mode settings now, read from the registered system
+            -- frame above, so nothing declares a proxy any more. Re-add the branch along
+            -- with the option if one ever needs it.
+
+            -- Everything else out of our own profile. Party's copy of this has always
+            -- ended in getOption; Raid's did not, and returned nil for anything it did
+            -- not recognise - which would have silently broken the position, scale and
+            -- visibility options the moment they were registered.
+            return getOption(info)
         end
 
         optionsRaid.set = function(info, value)
             local key = info[1]
             local sub = info[2]
 
-            if sub == 'useCompactPartyFrames' then
-                addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value)
+            -- Converted back to Blizzard's stored form before writing: the slider
+            -- shows 72 to 144, the layout holds the difference from the minimum.
+            local blizz = blizzRaidSettings[sub]
+            if blizz then
+                local stored = value
+                if blizz.kind == 'toggle' then
+                    stored = value and 1 or 0
+                end
+
+                SetBlizzRaidStored(blizz.setting, stored)
+
+                -- Re-applied so the preview follows. Frame width, height, row size, the
+                -- group display type and the raid size all change how it has to be laid
+                -- out, and UpdateRaidPreview reads them straight back out of the system
+                -- frame.
+                if Module.ApplySettings then Module:ApplySettings('raid') end
+
+                -- Deliberately NOT for sliders.
+                --
+                -- Refreshing an option panel rebuilds its rows, which replaces the very
+                -- widget the mouse is holding - so a slider could only ever be nudged by
+                -- clicking, never dragged. Dropdowns and checkboxes fire once per change
+                -- and are safe.
+                --
+                -- The slider being dragged already shows its own value; the other panel
+                -- catches up when it is next opened.
+                if blizz.kind ~= 'range' then
+                    if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
+
+                    local editmode = DF.GetModule and DF:GetModule('Editmode')
+                    if editmode and editmode.RefreshOptionScreens then
+                        pcall(editmode.RefreshOptionScreens, editmode)
+                    end
+                end
+
+                return
             end
 
-            if moreOptions[sub].proxy then
-                -- proxy
-                Settings.SetValue(moreOptions[sub].proxy, value);
-                -- InterfaceOverrides.SetRaidProfileOption(sub, value);
-                -- local isSecure, taint = issecurevariable('CompactRaidGroup1Member1')
-                -- print('SECURE? ', isSecure, ', TAINT? ', taint)       
+            if sub == 'useCompactPartyFrames' then
+                addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value)
+                return
             end
+
+            -- Same as the getter: no option here declares a proxy any more.
+
+            -- Same fallback as the getter, and for the same reason.
+            setOption(info, value)
         end
     end
     local optionsRaidEditmode = {
@@ -435,6 +525,12 @@ function SubModuleMixin:SetupOptions()
         }
     }
 
+    -- Position, scale and visibility, the same tables every other unit frame here
+    -- registers. Raid was the only one without them, which is why its edit mode entry
+    -- offered nothing to change even once the selection was reachable.
+    DF.Settings:AddPositionTable(Module, optionsRaid, 'raid', 'Raid', getDefaultStr, frameTable)
+    DragonflightUIStateHandlerMixin:AddStateTable(Module, optionsRaid, 'raid', 'Raid', getDefaultStr)
+
     self.Options = optionsRaid;
     self.OptionsEditmode = optionsRaidEditmode;
 end
@@ -457,28 +553,70 @@ function SubModuleMixin:Setup()
     local EditModeModule = DF:GetModule('Editmode');
     local initRaid = function()
         --         
-        local f = _G['CompactRaidFrameManagerContainerResizeFrame']
-        _G['CompactRaidFrameManagerContainerResizeFrameResizer']:SetFrameLevel(15)
+        -- Our own holder, not Blizzard's resize frame.
+        --
+        -- This used to be CompactRaidFrameManagerContainerResizeFrame. That frame
+        -- lives under CompactRaidFrameManager, which the client keeps hidden now that
+        -- raid frames are an Edit Mode system, and it has no anchor points - /df log
+        -- frame reported "shown=true visible=false points=0". So the selection existed
+        -- but could never be seen or dragged, which is why the raid entry in our edit
+        -- mode did nothing while the party one worked.
+        local f = self:EnsureRaidMoveFrame()
+        if not f then return end
 
-        local fakeRaid = CreateFrame('Frame', 'DragonflightUIEditModeRaidFramePreview', f,
-                                     'DFEditModePreviewRaidFrameTemplate')
-        fakeRaid:OnLoad()
-        fakeRaid:SetPoint('TOPLEFT', f, 'TOPLEFT', 4, -7)
-        fakeRaid:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 0)
+        local resizer = _G['CompactRaidFrameManagerContainerResizeFrameResizer']
+        if resizer then resizer:SetFrameLevel(15) end
 
-        -- fakeRaid:ClearAllPoints()
-        -- fakeRaid:SetPoint('TOPLEFT', UIParent, 'CENTER', -50, 50)
-        -- fakeRaid:SetParent(UIParent)
+        -- The fake raid preview is optional, and on this client it cannot work.
+        --
+        -- DragonflightUIEditModePreviewRaidFrameMixin:UpdateState opens with
+        --
+        --   local settings = GetRaidProfileFlattenedOptions(GetActiveRaidProfile())
+        --   local managerSize = CompactRaidFrameManager.container:GetHeight()
+        --
+        -- which is the pre-Edit-Mode raid profile API. None of it exists now that raid
+        -- frames are an Edit Mode system, so OnLoad threw "attempt to call a nil value"
+        -- - and because this runs inside SetupSubmodules, it took every submodule after
+        -- the raid one with it. That is the broken edit mode in the report.
+        --
+        -- The CompactUnitFrameProfiles gate that used to sit in front of all this was
+        -- what kept it unreachable. Removing that gate is what finally produced a
+        -- selection, so the preview is what has to become conditional: it is decoration
+        -- inside the placeholder, while the selection is the thing being fixed.
+        local hasRaidProfileApi = type(GetRaidProfileFlattenedOptions) == 'function' and
+                                      type(GetActiveRaidProfile) == 'function' and CompactRaidFrameManager ~= nil and
+                                      CompactRaidFrameManager.container ~= nil
 
-        fakeRaid:Show()
+        if hasRaidProfileApi then
+            local ok, err = pcall(function()
+                local fakeRaid = CreateFrame('Frame', 'DragonflightUIEditModeRaidFramePreview', f,
+                                             'DFEditModePreviewRaidFrameTemplate')
+                fakeRaid:OnLoad()
+                fakeRaid:SetPoint('TOPLEFT', f, 'TOPLEFT', 4, -7)
+                fakeRaid:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 0)
+                fakeRaid:Show()
 
-        self.PreviewRaid = fakeRaid;
+                self.PreviewRaid = fakeRaid
+            end)
+
+            -- Reported, not swallowed, but never fatal: a missing preview must not cost
+            -- the selection or the submodules that come after this one.
+            if not ok then geterrorhandler()('DFUI raid edit mode preview: ' .. tostring(err)) end
+        end
 
         EditModeModule:AddEditModeToFrame(f)
 
         f.DFEditModeSelection:SetGetLabelTextFunction(function()
             return self.Options.name
         end)
+
+        -- Commit drags by the top left corner, not by the middle.
+        --
+        -- CalcSnapParentToGrid returns CENTER for every other frame, and for a frame of
+        -- fixed size that is fine. This holder is exactly as large as the raid, so a CENTER
+        -- anchor would grow it in all four directions and push half the raid off screen
+        -- from a position near an edge.
+        f.DFEditModeSelection.DFAnchorPoint = 'TOPLEFT'
 
         f.DFEditModeSelection:ClearAllPoints()
         f.DFEditModeSelection:SetPoint('TOPLEFT', f, 'TOPLEFT', 0, -7)
@@ -492,57 +630,202 @@ function SubModuleMixin:Setup()
                 -- setDefaultSubValues('focus')
             end,
             moduleRef = self.ModuleRef,
+            -- Blizzard's own way of putting raid frames on screen for editing, copied
+            -- from EditModeAccountSettingsMixin:RefreshRaidFrames:
+            --
+            --   CompactRaidFrameManager_SetSetting("IsShown", true)
+            --   CompactRaidFrameContainer:ApplyToFrames("group", CompactRaidGroup_UpdateUnits)
+            --   CompactRaidFrameContainer:TryUpdate()
+            --   EditModeManagerFrame:UpdateRaidContainerFlow()
+            --   UpdateRaidAndPartyFrames()
+            --
+            -- That is what fills the container and gives it a real size, which is also
+            -- what the placeholder needs - so there is no reason to rebuild a preview of
+            -- our own. UpdateRaidContainerFlow derives the layout from the same settings
+            -- this panel now edits: RaidGroupDisplayType picks the orientation, RowSize
+            -- the frames per line.
+            --
+            -- The old ResizeFrame_SavePosition call and the
+            -- CompactRaidFrameManager_UpdateContainerVisibility hook are gone: they drove
+            -- the pre-Edit-Mode raid manager, and position now lives in our profile.
             showFunction = function()
-                --  
                 f:Show()
-                CompactRaidFrameManager_SetSetting('Locked', false)
-                f:Show()
+
+                local ok, err = pcall(function()
+                    if CompactRaidFrameManager_SetSetting then
+                        -- Remember what the player had first. IsShown is their own
+                        -- setting, not a preview flag: container.enabled hangs off it,
+                        -- and that is the second term in
+                        -- CompactRaidFrameManager_UpdateContainerVisibility. Only
+                        -- capture it once, so reopening the selection cannot overwrite
+                        -- the real value with the one we forced.
+                        if self.RaidFramesWereShown == nil and CompactRaidFrameManager_GetSetting then
+                            self.RaidFramesWereShown = CompactRaidFrameManager_GetSetting('IsShown')
+                        end
+
+                        CompactRaidFrameManager_SetSetting('IsShown', true)
+                    end
+
+                    -- Group mode and sort function first, or TryUpdate below is a no-op.
+                    if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
+
+                    local c = _G['CompactRaidFrameContainer']
+                    if c and c.ApplyToFrames and CompactRaidGroup_UpdateUnits then
+                        c:ApplyToFrames('group', CompactRaidGroup_UpdateUnits)
+                    end
+                    if c and c.TryUpdate then c:TryUpdate() end
+
+                    if EditModeManagerFrame and EditModeManagerFrame.UpdateRaidContainerFlow then
+                        EditModeManagerFrame:UpdateRaidContainerFlow()
+                    end
+                    if UpdateRaidAndPartyFrames then UpdateRaidAndPartyFrames() end
+                end)
+                if not ok then geterrorhandler()('DFUI raid preview show: ' .. tostring(err)) end
+
+                -- Re-measure once the container has content, so the selection covers it.
+                C_Timer.After(0, function() self:Update() end)
             end,
             hideFunction = function()
-                --      
-                CompactRaidFrameManager_SetSetting('Locked', true)
-                if CompactRaidFrameManager_ResizeFrame_SavePosition then
-                    if CompactRaidFrameManager_ResizeFrame_SavePosition then
-                    CompactRaidFrameManager_ResizeFrame_SavePosition(CompactRaidFrameManager)
-                end
-                end
+                -- Put back what the player had. TryUpdate afterwards so the container
+                -- shrinks back rather than keeping the forced-open extent.
+                --
+                -- This used to hardcode false, which is not "only what we turned on":
+                -- IsShown is the setting that decides whether raid frames appear at
+                -- all, so closing the selection left a raid with no frames and no
+                -- error for the rest of the session. It lives in cachedSettings with
+                -- no CVar behind it, which is why a reload appeared to fix it.
+                local ok, err = pcall(function()
+                    if CompactRaidFrameManager_SetSetting then
+                        -- Blizzard's own CompactRaidFrameManager_GetSettingBeforeLoad
+                        -- answers true for IsShown, so treat unknown as shown -
+                        -- guessing false is exactly what hid them.
+                        local restore = self.RaidFramesWereShown
+                        if restore == nil then restore = true end
+
+                        CompactRaidFrameManager_SetSetting('IsShown', restore)
+                        self.RaidFramesWereShown = nil
+                    end
+
+                    local c = _G['CompactRaidFrameContainer']
+                    if c and c.TryUpdate then c:TryUpdate() end
+                    if UpdateRaidAndPartyFrames then UpdateRaidAndPartyFrames() end
+                end)
+                if not ok then geterrorhandler()('DFUI raid preview hide: ' .. tostring(err)) end
             end
         });
 
-        fakeRaid:UpdateState(nil)
+        if self.PreviewRaid then pcall(self.PreviewRaid.UpdateState, self.PreviewRaid, nil) end
+    end
 
-        hooksecurefunc('CompactRaidFrameManager_UpdateContainerVisibility', function()
-            -- print('CompactRaidFrameManager_UpdateContainerVisibility')
-            if EditModeModule.IsEditMode then
-                --             
-                -- CompactRaidFrameManager_SetSetting('Locked', false)
-                C_Timer.After(0, function()
-                    --
-                    CompactRaidFrameManager_SetSetting('Locked', false)
-                end)
-            end
-        end)
+    -- Recorded so /df log raidopts can say whether the edit mode selection was ever
+    -- built, and if not, which half of this gate stopped it. HasLoadedCUFProfiles is a
+    -- Blizzard global and CompactUnitFrameProfiles is the pre-Edit-Mode profile system,
+    -- neither of which is guaranteed to be there now that raid frames are a system.
+    addonTable.RaidInitDiag = {
+        hasLoadedCUFProfilesFn = type(HasLoadedCUFProfiles),
+        profilesTable = CompactUnitFrameProfiles ~= nil,
+        variablesLoaded = CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded or false,
+        initRan = false
+    }
 
-        f.DFEditModeSelection:HookScript('OnDragStop', function()
-            --
-            CompactRaidFrameManager_ResizeFrame_SavePosition(CompactRaidFrameManager)
+    -- Isolated, because this runs inside SetupSubmodules. An error thrown from here
+    -- used to abort the whole chain, so the raid frame took the submodules after it
+    -- down as well - the same reasoning Unitframe.lua's updateSub already applies to
+    -- UpdateState. Report it and let the rest set itself up.
+    local function initRaidTracked()
+        if addonTable.RaidInitDiag.initRan then return end
+
+        -- Deliberately gated on the settings existing first. RegisterOptions snapshots
+        -- options.args, so registering before Blizzard's Edit Mode data is readable
+        -- produces a panel with only scale, position and visibility in it - exactly what
+        -- the report showed, while the config window had all ten.
+        local built = (self.BuildEditModeArgs and self.BuildEditModeArgs()) or 0
+        addonTable.RaidInitDiag.settingsBuilt = built
+
+        if built == 0 then return end
+
+        addonTable.RaidInitDiag.initRan = true
+
+        local ok, err = pcall(initRaid)
+        if not ok then
+            addonTable.RaidInitDiag.initError = tostring(err)
+            geterrorhandler()('DFUI raid edit mode setup: ' .. tostring(err))
+        end
+    end
+
+    -- The CompactUnitFrameProfiles gate that used to be here is gone.
+    --
+    -- It required HasLoadedCUFProfiles() and CompactUnitFrameProfiles.variablesLoaded,
+    -- and /df log raidopts showed why nothing ever appeared: on 1.15.9
+    -- CompactUnitFrameProfiles does not exist at all, so the condition could never
+    -- become true and the fallback sat waiting for COMPACT_UNIT_FRAME_PROFILES_LOADED,
+    -- an event that never fires. initRan stayed false and the selection was never built.
+    --
+    -- That gate also no longer guards anything. It was there for the
+    -- CompactRaidFrameManager_SetSetting and ResizeFrame_SavePosition calls, which
+    -- drove the pre-Edit-Mode raid manager and have been removed. What initRaid needs
+    -- now is our own XML holder and the Editmode module, both of which are already
+    -- there by the time Setup runs.
+    --
+    -- PLAYER_ENTERING_WORLD is still worth waiting on as a second attempt, because the
+    -- raid container registers itself with the Edit Mode manager during load.
+    initRaidTracked()
+
+    if not addonTable.RaidInitDiag.initRan then
+        local waitFrame = CreateFrame('Frame')
+        waitFrame:RegisterEvent('PLAYER_ENTERING_WORLD')
+        waitFrame:SetScript('OnEvent', function(watcherSelf)
+            -- Kept registered until it actually works: the settings can be unreadable at
+            -- the first PLAYER_ENTERING_WORLD, and unregistering there would leave the
+            -- selection unbuilt for the session.
+            C_Timer.After(0, function()
+                initRaidTracked()
+                if addonTable.RaidInitDiag.initRan then watcherSelf:UnregisterAllEvents() end
+            end)
         end)
     end
 
-    if HasLoadedCUFProfiles() and CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded then
-        initRaid()
-    else
-        local waitFrame = CreateFrame('Frame')
-        waitFrame:RegisterEvent("COMPACT_UNIT_FRAME_PROFILES_LOADED")
-        waitFrame:RegisterEvent("VARIABLES_LOADED")
-        waitFrame:SetScript("OnEvent", function(waitFrame, event, arg1)
-            --
-            -- print(event)
-            waitFrame:UnregisterEvent(event);
-            if (HasLoadedCUFProfiles() and CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded) then
-                --
-                initRaid()
-            end
+    -- The real raid frames need the same flow prerequisites the edit mode preview does,
+    -- and nothing was establishing them outside it: joining a raid without ever opening
+    -- our edit mode left the container shown and empty. Blizzard would have done this
+    -- from its own Edit Mode, which this addon locks out.
+    if not self.RaidFlowWatcher then
+        local watcher = CreateFrame('Frame')
+        self.RaidFlowWatcher = watcher
+
+        watcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+        watcher:RegisterEvent('GROUP_ROSTER_UPDATE')
+        watcher:SetScript('OnEvent', function()
+            -- One frame later, for the same reason initRaid waits above: the settings can
+            -- still be unreadable while the event is being handled.
+            C_Timer.After(0, function()
+                -- Push the stored settings back onto Blizzard's system frame first.
+                -- Nothing else does it: the layout the client applies at login is a
+                -- preset carrying its own numbers, so without this the profile is never
+                -- consulted and frame width and friends fall back on every reload.
+                local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile
+                local saved = profile and profile.raid and profile.raid.blizzSettings
+
+                if saved then
+                    for key, value in pairs(saved) do
+                        local setting = tonumber(key)
+                        if setting and value ~= nil then
+                            addonTable:SetRaidEditModeSettingBySetting(setting, value)
+
+                            -- Same mirror as the setter, or raid-style party frames come
+                            -- back at the party system's own numbers after a reload.
+                            if addonTable.MirrorRaidSettingToParty then
+                                addonTable:MirrorRaidSettingToParty(setting, value)
+                            end
+                        end
+                    end
+                end
+
+                if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
+
+                local c = _G['CompactRaidFrameContainer']
+                if c and c.TryUpdate then pcall(c.TryUpdate, c) end
+            end)
         end)
     end
 end
@@ -550,15 +833,339 @@ end
 function SubModuleMixin:OnEvent(event, ...)
 end
 
+-- The preview inside the edit mode placeholder.
+--
+-- Built from DFEditModePreviewRaidTemplate, the same template the party frame's preview
+-- uses for its raid-style variant, which is why this needs nothing new: the per-frame
+-- DragonflightUIEditModePreviewRaidMixin:UpdateState is a pure function of a state table
+-- and reads only frameWidth, frameHeight, keepGroupsTogether, horizontalGroups,
+-- displayBorder, displayPowerBar and useClassColors.
+--
+-- The dead raid profile API was never in that mixin. It sat one level up, in the
+-- container's own UpdateState, which fetched GetRaidProfileFlattenedOptions and fed the
+-- children from it. So the fix is to build that state table from Blizzard's Edit Mode
+-- settings instead - the same values UpdateRaidContainerFlow uses.
+-- Forty, because that is the largest raid ViewRaidSize offers. Frames are created once
+-- and the surplus stays hidden.
+local RAID_PREVIEW_MAX = 40
+
+-- How many member frames the chosen raid size shows.
+--
+-- Blizzard's numbers, from EditModeManagerFrameMixin:GetNumRaidMembersForcedShown - Ten
+-- gives 10, TwentyFive 25, Forty 40. The first version of this ignored ViewRaidSize
+-- entirely and always drew ten, which is why switching to 25 or 40 did nothing.
+local function GetRaidPreviewMemberCount()
+    if not (Enum and Enum.EditModeUnitFrameSetting and Enum.ViewRaidSize) then return 10 end
+
+    local size = addonTable:GetRaidEditModeSettingBySetting(Enum.EditModeUnitFrameSetting.ViewRaidSize)
+
+    if size == Enum.ViewRaidSize.Forty then return 40 end
+    if size == Enum.ViewRaidSize.TwentyFive then return 25 end
+
+    return 10
+end
+
+-- How many member frames per line, and which way the rows run.
+--
+-- Mirrors EditModeManagerFrameMixin:UpdateRaidContainerFlow: separate groups always run
+-- five to a line, combined groups take RowSize, and the display type decides whether the
+-- flow is vertical or horizontal.
+local function GetRaidPreviewLayout()
+    -- Straight off the system frame, no conversion.
+    --
+    -- GetSettingValue without its useRawValue flag already returns the display value, so
+    -- frame width really is a pixel width here. An earlier version converted it again and
+    -- the preview came out at the maximum size no matter what the slider said.
+    local function setting(key)
+        if not (Enum and Enum.EditModeUnitFrameSetting) then return nil end
+
+        return addonTable:GetRaidEditModeSettingBySetting(Enum.EditModeUnitFrameSetting[key])
+    end
+
+    local displayType = setting('RaidGroupDisplayType')
+    local rowSize = setting('RowSize') or 5
+
+    local combined, horizontal = false, false
+
+    if Enum and Enum.RaidGroupDisplayType then
+        local t = Enum.RaidGroupDisplayType
+        horizontal = (displayType == t.SeparateGroupsHorizontal) or (displayType == t.CombineGroupsHorizontal)
+        combined = (displayType == t.CombineGroupsVertical) or (displayType == t.CombineGroupsHorizontal)
+    end
+
+    return {
+        frameWidth = setting('FrameWidth') or 72,
+        frameHeight = setting('FrameHeight') or 36,
+        perLine = combined and math.max(rowSize, 1) or 5,
+        horizontal = horizontal,
+        combined = combined,
+        displayBorder = (setting('DisplayBorder') or 0) ~= 0,
+        opacity = setting('Opacity')
+    }
+end
+
+function SubModuleMixin:EnsureRaidPreview(holder)
+    if self.PreviewFrames then return self.PreviewFrames end
+    if not holder then return nil end
+
+    self.PreviewFrames = {}
+
+    for i = 1, RAID_PREVIEW_MAX do
+        local ok, frame = pcall(CreateFrame, 'Frame', 'DragonflightUIEditModeRaidPreview' .. i, holder,
+                                'DFEditModePreviewRaidTemplate')
+        if not (ok and frame) then break end
+
+        -- OnLoad sizes itself and picks a random unit for the fake name and class
+        -- colour. Guarded because a throw here would leave a half-built preview.
+        pcall(frame.OnLoad, frame)
+        frame:Hide()
+
+        self.PreviewFrames[i] = frame
+    end
+
+    if #self.PreviewFrames == 0 then self.PreviewFrames = nil end
+
+    return self.PreviewFrames
+end
+
+-- Lay the preview out, and report the extent it needs.
+function SubModuleMixin:UpdateRaidPreview(holder)
+    local frames = self:EnsureRaidPreview(holder)
+    if not frames then return 0, 0 end
+
+    local layout = GetRaidPreviewLayout()
+
+    -- Only while our edit mode is open, and only when the real frames are not already
+    -- there.
+    --
+    -- The selection's showFunction asks Blizzard to force the raid frames on screen, so
+    -- in a group there is something real to look at and stacking fakes on top of it would
+    -- just be two sets of frames in the same place. Alone, the container stays empty at
+    -- about a pixel wide, and that is when the preview earns its keep.
+    local editmode = DF.GetModule and DF:GetModule('Editmode')
+    local container = _G['CompactRaidFrameContainer']
+    local realFramesUp = container and container:IsShown() and (container:GetWidth() or 0) > 2
+
+    if not (editmode and editmode.IsEditMode) or realFramesUp then
+        for _, frame in ipairs(frames) do frame:Hide() end
+        return 0, 0
+    end
+
+    -- Blizzard's own state shape, so the template's UpdateState needs no changes.
+    local state = {
+        frameWidth = layout.frameWidth,
+        frameHeight = layout.frameHeight,
+        keepGroupsTogether = layout.combined,
+        horizontalGroups = layout.horizontal,
+        displayBorder = layout.displayBorder,
+        displayPowerBar = true,
+        useClassColors = true
+    }
+
+    local maxX, maxY = 0, 0
+    local wanted = GetRaidPreviewMemberCount()
+
+    for i, frame in ipairs(frames) do
+        if i > wanted then
+            frame:Hide()
+        else
+            pcall(frame.UpdateState, frame, state)
+
+            -- Column and row, flowing the way UpdateRaidContainerFlow would.
+            local index = i - 1
+            local major = index % layout.perLine
+            local minor = math.floor(index / layout.perLine)
+
+            local col, row
+            if layout.horizontal then
+                col, row = major, minor
+            else
+                col, row = minor, major
+            end
+
+            local x = col * layout.frameWidth
+            local y = row * layout.frameHeight
+
+            frame:ClearAllPoints()
+            frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', x, -y)
+            frame:SetSize(layout.frameWidth, layout.frameHeight)
+
+            -- Opacity is not one of the seven fields the template's UpdateState reads, but
+            -- it is the one remaining setting the preview can honour honestly: it is a
+            -- plain alpha on the frame.
+            if layout.opacity then frame:SetAlpha(math.max(layout.opacity, 1) / 100) end
+
+            frame:Show()
+
+            maxX = math.max(maxX, x + layout.frameWidth)
+            maxY = math.max(maxY, y + layout.frameHeight)
+        end
+    end
+
+    return maxX, maxY
+end
+
+-- The anchor the raid container is parked on.
+--
+-- From XML, never CreateFrame. CompactRaidFrameContainer is protected and gets
+-- reparented onto this frame; a Lua-created global would be insecure and Blizzard
+-- would taint itself updating the raid members, the same way the pooled party members
+-- broke. Load.xml carries the reasoning in full.
+function SubModuleMixin:EnsureRaidMoveFrame()
+    if self.RaidMoveFrame then return self.RaidMoveFrame end
+
+    local moveFrame = _G['DragonflightUIRaidMoveFrame']
+    if not moveFrame then return nil end
+
+    moveFrame:SetParent(UIParent)
+    moveFrame:SetFrameStrata('LOW')
+    moveFrame:SetFrameLevel(2)
+    moveFrame:EnableMouse(false)
+    moveFrame:SetSize(200, 200)
+
+    -- Without this a drag moves nothing and commits nothing.
+    -- DFEditModeSystemSelectionBaseMixin:OnDragStop is what writes anchor, x and y back
+    -- into the profile and then calls ApplySettings and RefreshOptionScreens - but it
+    -- never runs on a frame the client will not move. Every other unit frame holder
+    -- here sets this in its own Setup; the raid one was the omission.
+    moveFrame:SetMovable(true)
+
+    self.RaidMoveFrame = moveFrame
+
+    return moveFrame
+end
+
 function SubModuleMixin:UpdateState(state)
     self.state = state;
     self:Update();
-
 end
 
 function SubModuleMixin:Update()
     local state = self.state;
     if not state then return end
+
+    local holder = self:EnsureRaidMoveFrame()
+    if not holder then return end
+
+    local container = _G['CompactRaidFrameContainer']
+
+    -- One-time calibration, so enabling this feature does not move anybody's raid
+    -- frames. Whatever position the container already has becomes the stored default;
+    -- after that the profile is the source of truth.
+    if not state.calibrated and container and container:GetNumPoints() > 0 then
+        local point, relativeTo, relativePoint, x, y = container:GetPoint(1)
+        local relName = (relativeTo and relativeTo.GetName and relativeTo:GetName()) or 'UIParent'
+
+        state.anchor = point or state.anchor
+        state.anchorParent = relativePoint or state.anchorParent
+        state.anchorFrame = relName
+        state.x = x or 0
+        state.y = y or 0
+        state.calibrated = true
+    end
+
+    holder:SetScale(state.scale or 1.0)
+
+    -- Sized from the real container, but never below something a mouse can grab.
+    --
+    -- The previous version took the container's size whenever it was wider than one
+    -- pixel, and /df log raidopts caught the result: "DragonflightUIRaidMoveFrame 1x200".
+    -- An empty CompactRaidFrameContainer reports a width just over 1, so the holder came
+    -- out one pixel wide and there was nothing to drag - which is why moving the frame
+    -- did nothing, not the missing SetMovable.
+    --
+    -- The minimum applies only when there is nothing to measure, not as a floor under a
+    -- real measurement.
+    --
+    -- As a floor it made the placeholder disagree with the frames on every small raid.
+    -- CompactRaidFrameContainer is anchored TOPLEFT to TOPLEFT of this holder, so with a
+    -- 200x200 holder around an 80x94 container the frames sit in the holder's top left
+    -- corner rather than filling it. With the stored anchor being CENTER - which the
+    -- one-time calibration inherits from Blizzard's container, so it usually is - the
+    -- frames then hang 60 left and 53 above the point the profile calls their position.
+    -- /df log raidopts showed exactly that: holder 200x200 CENTER at (-563,199) with an
+    -- 80x94 container pinned to its corner.
+    --
+    -- It also only ever showed up on small raids, because a container past 200 wins the
+    -- max() and the two line up again by accident.
+    --
+    -- The preview is laid out first, because while edit mode is open it is what defines
+    -- how big the placeholder has to be. Outside edit mode it reports nothing and the
+    -- real container decides.
+    local previewW, previewH = self:UpdateRaidPreview(holder)
+
+    -- An empty CompactRaidFrameContainer reports a width just over 1, which is what made
+    -- an earlier version produce "DragonflightUIRaidMoveFrame 1x200" and a holder with
+    -- nothing to grab. That is what the minimum is for, and the only case it is for.
+    local MIN_HOLDER_SIZE = 200
+    local w = math.max((container and container:GetWidth()) or 0, previewW)
+    local h = math.max((container and container:GetHeight()) or 0, previewH)
+
+    if w > 2 and h > 2 then
+        holder:SetSize(w, h)
+    else
+        holder:SetSize(MIN_HOLDER_SIZE, MIN_HOLDER_SIZE)
+    end
+
+    -- Helper resolves the anchor frame and rejects a chain that would close a loop,
+    -- falling back to UIParent and reporting it once per session. The other unit
+    -- frames go through the same pair, so a bad anchor behaves the same everywhere.
+    local parent, legal, chain = Helper:ResolveAnchorParent(holder, state)
+    if not legal then Helper:WarnIllegalAnchor(holder, chain) end
+
+    -- The holder has to hang by a corner, not by its middle.
+    --
+    -- The calibration above adopts whatever anchor Blizzard's container carried, and that
+    -- is usually CENTER. Now that the holder is exactly as large as the raid, a CENTER
+    -- anchor means the raid grows in all four directions at once - park it at the left
+    -- edge and half of it goes off screen as people join. Anchored TOPLEFT the top left
+    -- corner stays put and the raid grows right and down, which is the only direction
+    -- there is room for.
+    --
+    -- Converted once per profile, keeping the frames exactly where they are: the offset of
+    -- the old anchor point from TOPLEFT is subtracted, so only the direction of growth
+    -- changes, never the current position.
+    if not state.anchorNormalised then
+        local w, h = holder:GetWidth() or 0, holder:GetHeight() or 0
+        local fromTopLeft = {
+            TOPLEFT = {0, 0},
+            TOP = {w / 2, 0},
+            TOPRIGHT = {w, 0},
+            LEFT = {0, -h / 2},
+            CENTER = {w / 2, -h / 2},
+            RIGHT = {w, -h / 2},
+            BOTTOMLEFT = {0, -h},
+            BOTTOM = {w / 2, -h},
+            BOTTOMRIGHT = {w, -h}
+        }
+
+        local delta = fromTopLeft[state.anchor or 'TOPLEFT']
+        if delta then
+            state.x = (state.x or 0) - delta[1]
+            state.y = (state.y or 0) - delta[2]
+            state.anchor = 'TOPLEFT'
+            state.anchorNormalised = true
+        end
+    end
+
+    holder:ClearAllPoints()
+    holder:SetPoint(state.anchor or 'TOPLEFT', parent, state.anchorParent or 'TOPLEFT', state.x or 0, state.y or 0)
+    holder:Show()
+
+    -- Park Blizzard's container on the holder, out of combat only.
+    --
+    -- Protected frame: the client refuses SetParent and SetPoint on it mid-fight, and
+    -- reparenting is why this holder has to come from XML. Blizzard's Edit Mode also
+    -- re-places the container from its layout at login, so this runs from Update,
+    -- which the module calls again on every settings apply.
+    if container and not Helper:IsCombatLocked() then
+        local ok, err = pcall(function()
+            if container:GetParent() ~= holder then container:SetParent(holder) end
+            container:ClearAllPoints()
+            container:SetPoint('TOPLEFT', holder, 'TOPLEFT', 0, 0)
+        end)
+        if not ok then geterrorhandler()('DFUI raid container anchor: ' .. tostring(err)) end
+    end
 end
 
 function SubModuleMixin:AddRaidframeRoleIcons()

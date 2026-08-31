@@ -406,9 +406,24 @@ function DFProfessionMixin:SetupFrameStyle()
         rankFrameBorder:SetSize(451, 29)
         rankFrameBorder:SetPoint('TOPLEFT', rankFrame, 'TOPLEFT', 0, 0)
 
-        local rankFrameText = rankFrame:CreateFontString('', 'ARTWORK', 'GameFontHighlightSmall')
+        -- The rank text belongs on the bar, not on rankFrame.
+        --
+        -- rankFrameBar is a child FRAME, so everything it draws sits above every
+        -- draw layer of rankFrame - OVERLAY included. A FontString created on
+        -- rankFrame therefore ended up behind the bar's fill texture, which is
+        -- opaque, and the skill number was invisible: a fully drawn bar with no
+        -- text on it. That was issue #29. On the bar itself, OVERLAY is above the
+        -- fill.
+        --
+        -- The name argument is nil rather than '' as well - a font string needs no
+        -- global, and '' put an entry under the empty-string key into _G.
+        local rankFrameText = rankFrameBar:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
         rankFrameText:SetPoint('CENTER', rankFrameBar, 'CENTER', 0, 0)
-        rankFrameText:SetText('69/100')
+
+        -- Blank until UpdateRankFrame runs. It used to read '69/100', which was a
+        -- placeholder next to the bar's own SetValue(69) and was harmless only for
+        -- as long as nobody could see it.
+        rankFrameText:SetText('')
 
         function rankFrame:UpdateRankFrame(value, minValue, maxValue)
             rankFrameBar:SetMinMaxValues(minValue, maxValue)
@@ -486,12 +501,12 @@ function DFProfessionMixin:SetupFrameStyle()
         trainingFrame:SetPoint('RIGHT', CraftCreateButton, 'LEFT', -12, 0)
         self.TrainingFrame = trainingFrame
 
-        local trainingLabel = trainingFrame:CreateFontString('', 'ARTWORK', 'GameFontNormalSmall')
+        local trainingLabel = trainingFrame:CreateFontString(nil, 'ARTWORK', 'GameFontNormalSmall')
         trainingLabel:SetPoint('LEFT', trainingFrame, 'LEFT', 10, 0)
         trainingLabel:SetText(TRAINING_POINTS)
         self.TrainingFrameLabel = trainingLabel
 
-        local trainingText = trainingFrame:CreateFontString('', 'ARTWORK', 'GameFontHighlightSmall')
+        local trainingText = trainingFrame:CreateFontString(nil, 'ARTWORK', 'GameFontHighlightSmall')
         trainingText:SetPoint('LEFT', trainingLabel, 'RIGHT', 6, 0)
         trainingText:SetText('69 TP')
         self.TrainingFrameText = trainingText

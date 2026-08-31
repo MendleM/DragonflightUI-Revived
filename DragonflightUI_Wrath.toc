@@ -6,7 +6,7 @@
 ## Author: MendleM, rakStar91, Karl-Heinz Schneider
 ## X-Website: https://github.com/MendleM/DragonflightUI-Revived
 ## X-Curse-Project-ID: 819757
-## Version: 0.44.0
+## Version: 0.44.1
 ## IconTexture: Interface\Icons\INV_Misc_Head_Dragon_01
 ## X-Date: @project-date-integer@
 ## Category: UI Overhaul
@@ -41,7 +41,6 @@ Libs\AceConfig-3.0\AceConfig-3.0.xml
 Libs\LibDeflate\lib.xml
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibDBIcon-1.0\lib.xml
-Libs\LibEditModeOverride\LibEditModeOverride.xml
 Libs\LibQuestXP\LibQuestXP-Classic.xml
 Libs\LibRangeCheck-3.0\LibRangeCheck-3.0.lua
 Libs\LibSharedMedia-3.0\lib.xml

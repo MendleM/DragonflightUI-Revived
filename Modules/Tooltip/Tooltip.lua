@@ -836,10 +836,7 @@ function Module:GameTooltipSetDefaultAnchor(self, parent)
             self:SetOwner(parent, 'ANCHOR_RIGHT');
             return;
         end
-        if string.match(parentName, "^DragonflightUIStanceButton") then
-            self:SetOwner(parent, 'ANCHOR_RIGHT');
-            return;
-        end
+
         -- print('ss', parent:GetName())
     end
 

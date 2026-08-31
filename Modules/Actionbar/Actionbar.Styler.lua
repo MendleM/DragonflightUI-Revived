@@ -349,42 +349,272 @@ function Module.ChangeBackpack()
             _G['BagsBar']:ClearAllPoints()
             _G['BagsBar']:SetPoint('RIGHT', f, 'RIGHT', 0, 0)
         end
-        Module.HookBagBarLayout()
     end
+
+    -- Outside the BagsBar check on purpose: the hook inside goes on
+    -- MainMenuBarBagManager, not on BagsBar, and it used to be skipped entirely on
+    -- flavours where BagsBar does not exist.
+    Module.HookBagBarLayout()
 end
 
-function Module.AnchorBagSlots()
-    if not (MainMenuBarBackpackButton and _G['CharacterBag0Slot']) then return end
+-- The size the bag buttons are styled to, and the size the keyring has to be put back
+-- to after Blizzard's layout resets it. Kept next to the code that has to reassert it.
+local BAG_BUTTON_SIZE = 30
 
-    _G['CharacterBag0Slot']:ClearAllPoints()
-    _G['CharacterBag0Slot']:SetPoint('RIGHT', MainMenuBarBackpackButton, 'LEFT', -12, 0)
+-- Anchor one button, unless the client would refuse it at this moment.
+--
+-- Only protected frames are off limits mid-fight, and these buttons are not
+-- protected: the bagtrace showed Show and Hide going through in combat, which is
+-- also why Blizzard's Layout ran there. So ask each button instead of standing back
+-- from the whole row - the blanket combat guard that used to sit in AnchorBagSlots
+-- was what left the row scrambled after a mid-fight collapse.
+--
+-- Returns false only when it actually had to give up, so the caller can retry.
+local function AnchorButton(frame, locked, point, relativeTo, relativePoint, x, y)
+    if not (frame and relativeTo) then return true end
+    if locked and frame.IsProtected and frame:IsProtected() then return false end
+
+    frame:ClearAllPoints()
+    frame:SetPoint(point, relativeTo, relativePoint, x, y)
+    return true
+end
+
+-- Returns true when the row was actually anchored, false when any of it had to be
+-- skipped, so callers can tell a refusal from a success instead of assuming it worked.
+function Module.AnchorBagSlots()
+    if not (MainMenuBarBackpackButton and _G['CharacterBag0Slot']) then return false end
+
+    local locked = Helper:IsCombatLocked()
+    local done = true
+
+    -- The backpack goes back onto our own holder first.
+    --
+    -- /df log watch showed Blizzard's bag bar layout claiming it: the button ends
+    -- up anchored to BagsBar RIGHT even though UpdateBagState anchors it to
+    -- DragonflightUIBagBar. Everything below hangs off the backpack, so if it is
+    -- left where Blizzard put it the whole row follows.
+    done = AnchorButton(MainMenuBarBackpackButton, locked, 'RIGHT', _G['DragonflightUIBagBar'], 'RIGHT', 0, 0) and done
+
+    -- The gap is where our own expand arrow sits.
+    done = AnchorButton(_G['CharacterBag0Slot'], locked, 'RIGHT', MainMenuBarBackpackButton, 'LEFT', -12, 0) and done
 
     for i = 1, 3 do
-        local slot = _G['CharacterBag' .. i .. 'Slot']
-        local previous = _G['CharacterBag' .. (i - 1) .. 'Slot']
-        if slot and previous then
-            local gap = 0
-            slot:ClearAllPoints()
-            slot:SetPoint('RIGHT', previous, 'LEFT', -gap, 0)
-        end
+        done = AnchorButton(_G['CharacterBag' .. i .. 'Slot'], locked, 'RIGHT', _G['CharacterBag' .. (i - 1) .. 'Slot'],
+                            'LEFT', 0, 0) and done
     end
 
     local hasKeyring = not (DF.Cata or DF.MoP) and KeyRingButton
-    if hasKeyring and _G['CharacterBag3Slot'] then
-        KeyRingButton:ClearAllPoints()
-        KeyRingButton:SetPoint('RIGHT', _G['CharacterBag3Slot'], 'LEFT', 0, 0)
+    if hasKeyring then
+        -- Put the frame size back before anchoring.
+        --
+        -- Blizzard's Layout runs UpdateOrientation on every registered bag button, and
+        -- for the keyring that is:
+        --
+        --   self:SetSize(self.initialWidth, self.initialHeight)
+        --
+        -- Those two were captured in KeyringMixin:OnLoad, long before we restyled the
+        -- button into a 30x30 disc, so they are the original narrow strip - /df log
+        -- watch measured 18x39 against the bags' 30x30. Our artwork is 30.5px and
+        -- centred on the frame, so on an 18px frame it overhangs about six pixels each
+        -- side and crowds the bag next to it. Anchors alone never fixed that.
+        if not (locked and KeyRingButton:IsProtected()) then
+            KeyRingButton:SetSize(BAG_BUTTON_SIZE, BAG_BUTTON_SIZE)
+        end
+
+        done = AnchorButton(KeyRingButton, locked, 'RIGHT', _G['CharacterBag3Slot'], 'LEFT', 0, 0) and done
     elseif KeyRingButton then
         KeyRingButton:Hide()
     end
+
+    return done
+end
+
+-- Re-assert our bag row after Blizzard has laid its own out.
+--
+-- BagsBarMixin:Layout re-anchors the whole row off self.bagPadding, which is 5, so
+-- every button ends up at -5 and bag 0 loses the -12 gap it needs for the expand
+-- arrow. /df log watch caught it exactly:
+--
+--   CharacterBag0Slot: RIGHT -> MainMenuBarBackpackButton LEFT (-12,0) => (-5,0)
+--   CharacterBag1Slot: RIGHT -> CharacterBag0Slot LEFT (-0,0) => (-5,0)
+--   KeyRingButton:     RIGHT -> CharacterBag3Slot LEFT (0,0) => (-5,0)
+--
+-- Hooking BagsBar.Layout does not work, and that is worth writing down because it
+-- cost three attempts. BagsBarMixin:OnLoad registers the callback like this:
+--
+--   EventRegistry:RegisterCallback("MainMenuBarManager.OnExpandChanged", self.Layout, self)
+--
+-- The registry stores the function VALUE at load time. hooksecurefunc replaces the
+-- table field BagsBar.Layout, so the registry keeps calling the original and the
+-- hook never fires. Same for the VARIABLES_LOADED pass, which goes through
+-- GenerateClosure(self.Layout, self) and captures it too.
+--
+-- What does work is MainMenuBarBagManager:OnExpandBarChanged. It is invoked as
+-- self:OnExpandBarChanged(), a live table lookup, so a hook on it fires - and it
+-- fires after TriggerEvent has returned, meaning after Layout has already run. No
+-- timer needed, so the row never draws in the wrong place.
+--
+-- Both SetExpandBar and SetExpandBarAuto funnel through it, which covers the
+-- trigger the report described: OnCursorChanged calls SetExpandBarAuto on every
+-- CURSOR_CHANGED. Hovering an NPC is not a "relevant cursor type", so it passes
+-- false, and on the first hover after login the previous value is nil. nil ~= false
+-- counts as a change, so the row gets laid out again for no visible reason.
+--
+-- Verified byte-identical in classic_era, classic_anniversary and classic.
+-- Re-anchor, and keep trying for a short while if the game will not let us.
+--
+-- Moving these buttons is protected, so AnchorBagSlots refuses to touch them in
+-- combat. Reloading mid-fight therefore comes up with Blizzard's spacing, and
+-- PLAYER_REGEN_ENABLED alone does not repair it: DFUI reads combat as
+--
+--   InCombatLockdown() or UnitAffectingCombat('player')
+--
+-- and the second half is the server-side flag, which is still set at the moment
+-- PLAYER_REGEN_ENABLED arrives. A single attempt there loses the race and nothing
+-- tries again, which is why the row stayed wrong for the rest of the session.
+--
+-- So retry on a slow timer until it takes, bounded so a genuinely missing frame
+-- cannot spin forever, and single-chained so several triggers firing at once do
+-- not stack timers on each other.
+--
+-- The retry is driven by what AnchorBagSlots reports, not by a combat check of its
+-- own. An earlier version gated this on Helper:IsCombatLocked and that was a bug in
+-- its own right: it refused to touch anything mid-fight, including the Show and Hide
+-- calls that collapse the row, even though the trace showed those going through
+-- perfectly well in combat. AnchorButton now asks each button whether it is
+-- protected, so the only reason left to retry is a button that genuinely said no.
+--
+-- Deliberately not Helper:RunOutOfCombat: that queues into the post-combat
+-- RefreshConfig pass and announces itself in chat, far too much machinery here, and
+-- BagBarExpandToggled runs off BAG_UPDATE_DELAYED, so it fires while looting.
+local RESTORE_RETRY_DELAY = 0.5
+local RESTORE_MAX_RETRIES = 20 -- ten seconds, enough for the combat flag to clear
+local restoreRetries = 0
+local restoreRetryQueued = false
+
+-- RefreshBagBarToggle re-applies the saved state and anchors on its own tail, but it
+-- does nothing until the database exists. Anchor unconditionally as well, because
+-- that is exactly the situation at the first PLAYER_ENTERING_WORLD.
+local function ApplyBagRow()
+    Module.RefreshBagBarToggle()
+    return Module.AnchorBagSlots()
+end
+
+local function RestoreBagRowAttempt()
+    if ApplyBagRow() then
+        restoreRetries = 0
+        return
+    end
+
+    if restoreRetryQueued or restoreRetries >= RESTORE_MAX_RETRIES then return end
+
+    restoreRetries = restoreRetries + 1
+    restoreRetryQueued = true
+
+    C_Timer.After(RESTORE_RETRY_DELAY, function()
+        restoreRetryQueued = false
+        RestoreBagRowAttempt()
+    end)
+end
+
+-- The entry point every hook and event uses. Each fresh trigger gets a fresh
+-- budget, otherwise one exhausted run would make every later trigger give up
+-- immediately for the rest of the session.
+function Module.QueueBagRowRestore()
+    restoreRetries = 0
+    RestoreBagRowAttempt()
+end
+
+-- Opening our own edit mode wrecks the row, and closing it has to put it back.
+--
+-- AddStateUpdater registers BagsBar as a hide-frame of the bag holder's state handler,
+-- and UpdateStateHandler forces 'show' while edit mode is active. So the row gets
+-- hidden and shown again, KeyringMixin:OnShow fires, and Blizzard lays the whole thing
+-- out - back to the 5px gaps and the keyring's original 18x39.
+--
+-- Without this the repair waited for one of the other triggers, which is why closing
+-- edit mode appeared to fix things only sometimes: a cursor change over an item, a zone
+-- change, or the end of the next fight.
+--
+-- Idempotent and retried, because CallbackRegistryMixin validates the event against the
+-- table GenerateCallbackEvents builds in the Editmode module's own startup, and that is
+-- not ordered against ours.
+local bagRowEditModeHooked = false
+
+local function HookBagRowEditMode()
+    if bagRowEditModeHooked then return end
+
+    local editmode = DF.GetModule and DF:GetModule('Editmode')
+    if not (editmode and editmode.RegisterCallback and editmode.Event and editmode.Event.OnEditMode) then return end
+
+    bagRowEditModeHooked = true
+
+    -- Both directions: the row should look right inside edit mode too.
+    --
+    -- Corrected in the same frame first, then again on the next one. Deferring alone
+    -- was visible as a flicker: Blizzard's layout widens the row by five 5px gaps, that
+    -- frame gets drawn, and only then does the correction land. The immediate pass
+    -- catches the damage that has already happened by the time this callback runs, the
+    -- deferred one catches the state handler's show if it settles a frame later.
+    local ok, err = pcall(editmode.RegisterCallback, editmode, 'OnEditMode', function()
+        Module.QueueBagRowRestore()
+        C_Timer.After(0, Module.QueueBagRowRestore)
+    end, Module)
+    if not ok then geterrorhandler()('DFUI bag row edit mode hook: ' .. tostring(err)) end
 end
 
 function Module.HookBagBarLayout()
     if Module.BagBarLayoutHooked then return end
-    local bar = _G['BagsBar']
-    if not (bar and bar.Layout) then return end
+
+    local mgr = _G['MainMenuBarBagManager']
+    if not (mgr and mgr.OnExpandBarChanged) then return end
 
     Module.BagBarLayoutHooked = true
-    hooksecurefunc(bar, 'Layout', function() Module.AnchorBagSlots() end)
+    hooksecurefunc(mgr, 'OnExpandBarChanged', Module.QueueBagRowRestore)
+
+    -- Blizzard lays the row out from a second place, and the hook above cannot see
+    -- it either. BagsBarMixin:OnLoad does this:
+    --
+    --   EventUtil.ContinueOnVariablesLoaded(GenerateClosure(self.Layout, self))
+    --
+    -- so Layout runs once at VARIABLES_LOADED without going through
+    -- OnExpandBarChanged, and it lands after our styling pass. That is why the row
+    -- came up spread out after a reload and only snapped into place on the first
+    -- cursor change, when the hook above finally fired.
+    --
+    -- PLAYER_ENTERING_WORLD is always after VARIABLES_LOADED, so re-anchoring there
+    -- closes the gap. Every PEW rather than just the first: it costs six SetPoints
+    -- and it also covers zoning, and the one-frame delay keeps us behind anything
+    -- else still running in the same batch.
+    --
+    -- PLAYER_REGEN_ENABLED is the other half of the combat guard: everything the
+    -- client refused mid-fight, both Blizzard's re-anchoring that we had to let stand
+    -- and any collapse or expand of our own that never took, is settled here.
+    local watcher = CreateFrame('Frame')
+    watcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+    watcher:RegisterEvent('PLAYER_REGEN_ENABLED')
+    watcher:SetScript('OnEvent', function()
+        -- Retried here because the Editmode module may not have been ready when we
+        -- first asked; HookBagRowEditMode is a no-op once it has taken.
+        HookBagRowEditMode()
+
+        -- Same reasoning as the edit mode callback: repair now so nothing wrong gets
+        -- drawn, and again next frame for whatever settles late.
+        Module.QueueBagRowRestore()
+        C_Timer.After(0, Module.QueueBagRowRestore)
+    end)
+
+    -- Opening our own edit mode wrecks the row, and closing it has to put it back.
+    --
+    -- AddStateUpdater registers BagsBar as a hide-frame of the bag holder's state
+    -- handler, and UpdateStateHandler forces 'show' while edit mode is active. So the
+    -- row gets hidden and shown again, KeyringMixin:OnShow fires, and Blizzard lays
+    -- the whole thing out - back to the 5px gaps and the keyring's original 18x39.
+    --
+    -- Without this the repair waited for one of the triggers above, which is why
+    -- closing edit mode looked like it fixed things only sometimes: a cursor change
+    -- over an item, a zone change, or the end of the next fight.
+    HookBagRowEditMode()
 end
 
 function Module.UpdateBagSlotIcons()
@@ -513,7 +743,12 @@ function Module.CreateBagExpandButton()
     f:SetScript('OnClick', function()
         local bags = Module.db.profile.bags
         bags.expanded = not bags.expanded
-        Module.BagBarExpandToggled(bags.expanded)
+
+        -- Only queue a retry if the anchoring genuinely did not land, which now means
+        -- a button reported itself protected. The saved state is written either way,
+        -- so the retry has something to restore from.
+        if not Module.BagBarExpandToggled(bags.expanded) then Module.QueueBagRowRestore() end
+
         Module:RefreshOptionScreens()
     end)
     f:RegisterEvent('BAG_UPDATE_DELAYED')
@@ -549,28 +784,62 @@ function Module.BagBarExpandToggled(expanded)
 
     local hasKeyring = not (DF.Cata or DF.MoP) and KeyRingButton
 
+    -- Bags first, keyring afterwards, and never from inside the loop.
+    --
+    -- KeyringMixin:OnShow is one line, and it is the whole reason the row came back
+    -- scrambled:
+    --
+    --   function KeyringMixin:OnShow() self:GetParent():Layout() end
+    --
+    -- So showing the keyring makes Blizzard lay out the entire row, and Layout only
+    -- chains the buttons that are visible at that instant. Showing it from inside the
+    -- loop fired it on the very first pass, with bag 0 up and bags 1 to 3 still
+    -- hidden, so Blizzard built keyring -> bag 0 -> backpack and left the other three
+    -- on stale anchors. That is the row with the keyring stranded in the middle.
+    --
+    -- Showing it last means Layout sees the full row, and AnchorBagSlots below then
+    -- only has to correct the spacing.
     for i = 0, 3 do
         local bag = _G['CharacterBag' .. i .. 'Slot']
         if bag then
-            if (expanded) then
-                bag:Show()
-                if hasKeyring then KeyRingButton:Show() end
-            else
-                bag:Hide()
-                if hasKeyring then KeyRingButton:Hide() end
-            end
+            if expanded then bag:Show() else bag:Hide() end
         end
     end
 
-    if not hasKeyring and KeyRingButton then
-        KeyRingButton:Hide()
+    if KeyRingButton then
+        if hasKeyring and expanded then
+            KeyRingButton:Show()
+        else
+            KeyRingButton:Hide()
+        end
     end
+
+    -- Re-anchor, because this function only changed visibility.
+    --
+    -- Blizzard's BagsBarMixin:Layout skips hidden buttons - "if bagButton:IsShown()
+    -- and bagButton ~= MainMenuBarBackpackButton" - and rebuilds the chain from the
+    -- visible ones alone. If it runs while the row is collapsed, the buttons that
+    -- were hidden keep stale anchors, and showing them again puts the keyring in the
+    -- middle of the row with the toggle arrow sitting on top of the first bag.
+    --
+    -- Collapsing and expanding is our own toggle, not Blizzard's, so nothing here
+    -- goes through OnExpandBarChanged and the hook on it never fires. This is the
+    -- one path that has to re-anchor by itself.
+    --
+    -- AnchorBagSlots directly, not QueueBagRowRestore: that retries by way of
+    -- RefreshBagBarToggle, which calls straight back into this function.
+    --
+    -- The result is passed up so callers know whether it landed, rather than having to
+    -- assume it did.
+    return Module.AnchorBagSlots()
 end
 
 function Module.RefreshBagBarToggle()
     if Module.db and Module.db.profile and Module.db.profile.bags then
-        Module.BagBarExpandToggled(Module.db.profile.bags.expanded)
+        return Module.BagBarExpandToggled(Module.db.profile.bags.expanded)
     end
+
+    return false
 end
 
 function Module.ChangeFramerate()

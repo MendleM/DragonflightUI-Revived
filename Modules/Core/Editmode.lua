@@ -387,8 +387,12 @@ end
 -- unit-frame right-click entry hides, the raid manager button greys, the micro
 -- menu stops offering its helptip - and we touch none of them.
 --
--- Our own layout applications are unaffected: LibEditModeOverride:ApplyChanges
--- reaches the frame through ShowUIPanel, which never consults the gate.
+-- Our own edit mode is unaffected: it is a separate overlay of our own frames
+-- and never goes through EditModeManagerFrame at all.
+--
+-- This used to claim the layout was applied through LibEditModeOverride. It was
+-- not, and the library is no longer loaded: DragonflightUI does not write
+-- Blizzard's layout. Its own settings live in its AceDB profile.
 local blockerFrame
 
 function Module:SetBlizzEditmodeBlocked(blocked)
@@ -408,8 +412,20 @@ function Module:SetBlizzEditmodeBlocked(blocked)
     return true
 end
 
+-- Is our blocker actually registered right now?
+--
+-- This used to be a bare "return true", which was a guess dressed as an answer:
+-- SetBlizzEditmodeBlocked gives up and returns false on a client that has no
+-- EditModeManagerFrame, so the honest answer there is false. Ask the table
+-- Blizzard's own CanEnterEditMode() consults - it returns false exactly while
+-- FramesBlockingEditMode is non-empty.
+--
+-- Reading a Blizzard table does not taint it; only writing to one would.
 function Module:IsBlizzEditmodeBlocked()
-    return true
+    if not (EditModeManagerFrame and blockerFrame) then return false end
+
+    local blocking = EditModeManagerFrame.FramesBlockingEditMode
+    return (blocking and blocking[blockerFrame]) and true or false
 end
 
 function Module:ApplySettingsInternal(sub, key)
@@ -589,11 +605,18 @@ function Module:SelectFrame(frameRef)
 end
 
 function Module:InitEditmodeOverride()
+    -- One call, and only through SetBlizzEditmodeBlocked.
+    --
+    -- There was a second BlockEnteringEditMode here that read
+    -- "blockerFrame or CreateFrame(...)". If the call above had bailed out - which
+    -- it does when EditModeManagerFrame does not exist yet - blockerFrame was
+    -- still nil, so this built a second frame, registered that one as the blocker
+    -- and threw the reference away. FramesBlockingEditMode is keyed by frame, so
+    -- the table then held an entry that UnblockEnteringEditMode could never
+    -- remove: edit mode would have stayed blocked for the session even after
+    -- unblocking. Nothing noticed because nothing unblocks today, which is
+    -- exactly the kind of bug that surfaces the moment someone adds that.
     Module:SetBlizzEditmodeBlocked(true)
-    if EditModeManagerFrame and EditModeManagerFrame.BlockEnteringEditMode then
-        local blocker = blockerFrame or CreateFrame('Frame', 'DragonflightUIEditModeBlocker')
-        EditModeManagerFrame:BlockEnteringEditMode(blocker)
-    end
 
     addonTable.BlizzEditmodeReapply = {}
     addonTable.BlizzEditmodeReapplyTimer = nil
@@ -634,8 +657,14 @@ function Module:InitEditmodeOverride()
     end
 end
 
+-- Returns -1 when the answer is unknown, which now includes "this client has no
+-- Edit Mode". C_EditMode was dereferenced unguarded here, and this is reachable:
+-- ShowEditmodeWarning below calls it, and Unitframe.lua calls that.
 function Module:GetEditmodeSettingValue(setting)
-    local accountSettings = C_EditMode.GetAccountSettings()
+    if not (C_EditMode and C_EditMode.GetAccountSettings) then return -1; end
+
+    local ok, accountSettings = pcall(C_EditMode.GetAccountSettings)
+    if not ok or type(accountSettings) ~= 'table' then return -1; end
 
     for k, v in ipairs(accountSettings) do if v.setting == setting then return v.value; end end
 

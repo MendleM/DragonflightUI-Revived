@@ -147,10 +147,94 @@ end
 
 -- Use Raid-Style Party Frames.
 --
--- As per AGENTS.MD architecture rules:
--- DragonflightUI is decoupled from Blizzard Edit Mode layout mutations (C_EditMode.SaveLayouts).
--- DragonflightUI's database (Module.db.profile.party.useCompactPartyFrames) is the Single Source of Truth.
--- Blizzard's EditModeManagerFrame:UseRaidStylePartyFrames() is overridden to directly return the DragonflightUI setting.
+-- Module.db.profile.party.useCompactPartyFrames is the single source of truth,
+-- and the sync to Blizzard is one-way: DragonflightUI writes, Blizzard reads.
+--
+-- This is the one Blizzard setting that cannot be applied from here. Which party
+-- system is live is decided inside Blizzard's own code, and every path through
+-- it - UpdateRaidAndPartyFrames, CompactPartyFrame:ShouldShow,
+-- CompactRaidFrameManager - asks EditModeManagerFrame:UseRaidStylePartyFrames(),
+-- which resolves the value through GetRegisteredSystemFrame out of the layout.
+-- So the layout is where the value has to go, and SyncRaidStylePartyFrameToBlizzard
+-- puts it there through C_EditMode.GetLayouts/SaveLayouts. That is a settings
+-- value, self-contained and still meaningful with this addon disabled - unlike an
+-- anchorInfo pointing at a DragonflightUI frame, which is what must never be
+-- written and no longer is.
+--
+-- What used to be here instead was an assignment:
+--
+--     EditModeManagerFrame.UseRaidStylePartyFrames = QuerySetting
+--     EditModeManagerFrameMixin.UseRaidStylePartyFrames = QuerySetting
+--
+-- reinstalled on every ADDON_LOADED, with no backup, so Blizzard's own
+-- implementation was gone for the session. It was added as a workaround one
+-- commit after the argument-less UpdateLayoutInfo() call in Helper.lua nil'd
+-- layoutInfo and broke the real accessor - treating the symptom of a bug that is
+-- now fixed at the cause.
+--
+-- The cost was taint. Blizzard's ShouldShow for BOTH party systems ran an addon
+-- function, so both inherited taint on a protected path, and the blocked actions
+-- on the party frames followed from it. The taint analysis in DebugLog.lua had
+-- already narrowed the seed to this exact call and was right.
+
+-- Told once, when the setting is switched on, because the frames it produces are
+-- configured somewhere other than the page the player is standing on.
+--
+-- This notice used to walk people through disabling the addon, reloading, opening
+-- Blizzard's Edit Mode and enabling it again. That is obsolete: the raid frame Edit
+-- Mode settings - raid size, frame width and height, group split, border, template,
+-- opacity, icon size, sort order - are now offered directly under Unitframes, Raid
+-- Frame, and on the Raid Frame entry in this addon's own edit mode. Blizzard's Edit
+-- Mode stays blocked and no longer needs to be reached.
+--
+-- What is still Blizzard's own is the raid profile panel, which opens from a button on
+-- the Raid Frame page and needs no reload either. Its exact contents are deliberately
+-- not listed here or in the popup: they differ by flavour, and the list that used to be
+-- quoted came from DFUI's old proxy-CVar names rather than from the panel itself.
+--
+-- So the notice has one job left, which is to say WHERE. Turning this on replaces the
+-- portrait party frames with the compact ones, and from then on the settings that
+-- matter live under Raid Frame rather than PartyFrame - which is not obvious.
+local raidStyleNoticeShown = false
+
+StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
+    text = 'DragonflightUI has switched your party frames to the raid-style (compact) frames.\n\n' ..
+        'From now on these frames are configured under |cffffff78Unitframes > Raid Frame|r, not on this page - ' ..
+        'position, scale, raid size, frame width and height, how groups are split, the border and the rest.\n\n' ..
+        'You can also select |cffffff78Raid Frame|r in DragonflightUI\'s own Edit Mode to move it and change the ' ..
+        'same settings there, with a preview.\n\n' ..
+        'Blizzard\'s own raid profile options open from a button on the same page. Nothing here needs Blizzard\'s ' ..
+        'Edit Mode or a reload.',
+    -- button1 silences it for good, button2 just closes - the same way round as the
+    -- leftover-layout notice, so the two behave alike.
+    button1 = 'Do not show again',
+    button2 = CLOSE or 'Close',
+    showAlert = true,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+    OnAccept = function()
+        local db = DF.db and DF.db.global
+        if db then db.raidStyleNoticeDismissed = true end
+        DF:Print('Notice about raid-style party frames will not be shown again. ' ..
+                     'Type /df raidnotice to bring it back.')
+    end
+}
+
+function addonTable:ShowRaidStylePartyNotice(force)
+    if not force then
+        if raidStyleNoticeShown then return false end
+
+        local db = DF.db and DF.db.global
+        if db and db.raidStyleNoticeDismissed then return true end
+    end
+
+    raidStyleNoticeShown = true
+    StaticPopup_Show('DragonflightUIRaidStylePartyNotice')
+
+    return false
+end
 
 function SubModuleMixin.GetRaidStylePartyFrames(self)
     local Module = (self and type(self) == 'table' and self.ModuleRef) or DF:GetModule('Unitframe')
@@ -190,6 +274,12 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
         addonTable:SyncRaidStylePartyFrameToBlizzard(val)
     end
 
+    -- Only when switching on, and only once per session. Switching back to the
+    -- portrait frames needs no explanation - those this addon does configure.
+    if val and addonTable and addonTable.ShowRaidStylePartyNotice then
+        addonTable:ShowRaidStylePartyNotice()
+    end
+
     -- Update preview in Edit Mode
     local fakeParty = _G['DragonflightUIEditModePartyFramePreview']
     if fakeParty and fakeParty.Update then
@@ -200,8 +290,19 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     Helper:RunOutOfCombat('RaidStylePartyFrames', function()
         C_Timer.After(0, function()
             if InCombatLockdown() then return end
-            if PartyFrame and PartyFrame.UpdateSystem and Enum and Enum.EditModeUnitFrameSetting then
-                pcall(PartyFrame.UpdateSystem, PartyFrame, Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames)
+            -- EditModeManagerFrame:UpdateSystem, not PartyFrame:UpdateSystem.
+            --
+            -- Two different functions with different arguments. The manager's
+            -- version takes a system FRAME and looks the systemInfo up out of the
+            -- active layout; the frame's own version takes that systemInfo table
+            -- and iterates systemInfo.settings. This used to call the frame
+            -- version with a setting enum, so it indexed a number and threw
+            -- inside the pcall on every single toggle, without a word.
+            if EditModeManagerFrame and EditModeManagerFrame.UpdateSystem and PartyFrame then
+                local forceFullUpdate = true
+                local ok, err = pcall(EditModeManagerFrame.UpdateSystem, EditModeManagerFrame, PartyFrame,
+                                      forceFullUpdate)
+                if not ok then geterrorhandler()('DFUI PartyFrame UpdateSystem: ' .. tostring(err)) end
             end
             if PartyFrame and PartyFrame.UpdatePartyFrames then
                 pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
@@ -224,28 +325,6 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
         end)
     end)
 end
-
-local function InstallEditModeOverride()
-    local function QuerySetting()
-        return SubModuleMixin.GetRaidStylePartyFrames()
-    end
-
-    if EditModeManagerFrame then
-        EditModeManagerFrame.UseRaidStylePartyFrames = QuerySetting
-    end
-    if EditModeManagerFrameMixin and EditModeManagerFrameMixin.UseRaidStylePartyFrames then
-        EditModeManagerFrameMixin.UseRaidStylePartyFrames = QuerySetting
-    end
-end
-InstallEditModeOverride()
-
-local editModeWatcher = CreateFrame('Frame')
-editModeWatcher:RegisterEvent('ADDON_LOADED')
-editModeWatcher:SetScript('OnEvent', function(_, _, addon)
-    if addon == 'Blizzard_EditMode' or EditModeManagerFrame ~= nil then
-        InstallEditModeOverride()
-    end
-end)
 
 function SubModuleMixin:SetupOptions()
     local Module = self.ModuleRef;
@@ -368,9 +447,16 @@ function SubModuleMixin:SetupOptions()
                 blizzard = true,
                 editmode = true
             },
+            -- Blizzard's Interface options panel, not the Edit Mode dialog. Named for
+            -- what it actually opens: the two are easy to confuse, they hold
+            -- different settings, and the Edit Mode ones are offered by this addon
+            -- directly in the Raid section.
             raidFrameBtn = {
                 type = 'execute',
-                name = 'Raid Frame Settings',
+                name = 'Blizzard raid profile options',
+                desc = 'Opens Blizzard\'s own Interface options for raid frames - health text, class colours and ' ..
+                    'the like. Frame size and group layout are Edit Mode settings and are in DragonflightUI\'s ' ..
+                    'Raid section.',
                 btnName = 'Open',
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
@@ -967,6 +1053,25 @@ function SubModuleMixin:SetupModern()
         end
     end
 
+    -- A newly styled member frame gets the golden art, so anything Darkmode had
+    -- recolored is undone the moment the roster changes. Rather than reading
+    -- Darkmode's settings from here, ask it to re-apply - the same shape as
+    -- Actionbar.lua's DarkmodeReapply step.
+    --
+    -- Deferred by a frame and coalesced: styleAll can run several times during one
+    -- roster update, and a re-apply per member would be wasted work.
+    local darkmodeReapplyPending = false
+    local function ReapplyDarkmode()
+        if darkmodeReapplyPending then return end
+        darkmodeReapplyPending = true
+
+        C_Timer.After(0, function()
+            darkmodeReapplyPending = false
+            local dm = DF:GetModule('Darkmode', true)
+            if dm and dm.GetWasEnabled and dm:GetWasEnabled() then pcall(dm.ApplySettings, dm) end
+        end)
+    end
+
     local function styleAll()
         if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
         local count = 0
@@ -976,6 +1081,8 @@ function SubModuleMixin:SetupModern()
             if not ok then geterrorhandler()('DFPartyModern: ' .. tostring(err)) end
             pcall(UpdateBars, pf)
         end
+
+        if count > 0 then ReapplyDarkmode() end
     end
 
     if PartyFrame and PartyFrame.InitializePartyMemberFrames then
@@ -988,6 +1095,23 @@ function SubModuleMixin:SetupModern()
     -- were InitializePartyMemberFrames above and the roster watcher below -
     -- both of which only fire when the group itself changes.
     subModule.RestyleModernParty = styleAll
+
+    -- How Darkmode reaches the frame art on pooled member frames.
+    --
+    -- It cannot look the textures up itself. On this client there are no
+    -- PartyMemberFrame1..4 globals to walk, and our border texture deliberately
+    -- does not live on the frame - see the comment above memberState: writing
+    -- pf.DFPartyFrameBorder is what tainted the pooled members in the first place.
+    -- So the table stays private and callers get an iterator instead.
+    subModule.ForEachPartyBorder = function(fn)
+        if type(fn) ~= 'function' then return end
+        if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
+
+        for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            local st = memberState[pf]
+            if st and st.styled and st.border then pcall(fn, st.border) end
+        end
+    end
 
     -- Gradient coloring follows current health, so it needs health events.
     -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would

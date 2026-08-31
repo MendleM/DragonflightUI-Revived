@@ -195,7 +195,11 @@ function SubModuleMixin:CreateBase()
     -- baseFrame:Hide()
     self.BaseFrame = baseFrame;
 
-    local fake = CreateFrame('Frame', 'sss', baseFrame, 'DFEditModePreviewDurability')
+    -- Named for the same reason the other edit mode previews are: so it can be
+    -- found in a frame dump. It used to be called 'sss', a debug placeholder that
+    -- shipped, which put a global called sss into _G for every player.
+    local fake = CreateFrame('Frame', 'DragonflightUIEditModeDurabilityPreview', baseFrame,
+                             'DFEditModePreviewDurability')
     -- fake:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
     fake:SetWidth(58 + 20 + 14)
     fake.DurabilityHead:SetPoint('TOPRIGHT', -40, 0)

@@ -131,7 +131,9 @@ if DF.Caps.HasFocus then
     table.insert(frameTable, {value = 'FocusFrame', text = 'FocusFrame', tooltip = 'descr', label = 'label'})
 end
 
-function AddCastbarTable(optionTable, sub)
+-- local, not global: only this file calls it. As a global it sat in _G under a
+-- name any other addon could collide with, and showed up in every taint sweep.
+local function AddCastbarTable(optionTable, sub)
     local CastbarTable = {
         activate = {
             type = 'toggle',
@@ -286,7 +288,7 @@ function AddCastbarTable(optionTable, sub)
     end
 end
 
-function AddAutoAdjustTable(optionTable, sub)
+local function AddAutoAdjustTable(optionTable, sub)
     local autoAdjustTable = {
         headerAutoAdjust = {
             type = 'header',

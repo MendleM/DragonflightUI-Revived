@@ -191,23 +191,29 @@ function Module:OnEnable()
         ChatFrame1.ignoreFramePositionManager = true
         ChatFrame1:SetUserPlaced(true)
 
-        if ChatFrame1.ApplySystemAnchor then
-            ChatFrame1.ApplySystemAnchor = function(self)
+        -- Both of these used to be plain assignments, replacing a Blizzard method
+        -- with one of ours. That taints the method and every execution that runs
+        -- through it, and SetToLayoutAnchor in particular sits on the action bar
+        -- positioning path (UpdateBottomActionBarPositions calls it for any bar
+        -- with skipAutomaticPositioning), so the taint reached the action bars.
+        --
+        -- A post-hook is enough here. Blizzard applies its anchor, we re-apply
+        -- ours immediately after, and ours is the one that ends up in effect. The
+        -- SetPoint calls are not visible until the next frame is drawn, so there
+        -- is nothing to see in between.
+        if ChatFrame1.ApplySystemAnchor and not ChatFrame1.DFChatAnchorHooked then
+            ChatFrame1.DFChatAnchorHooked = true
+            hooksecurefunc(ChatFrame1, 'ApplySystemAnchor', function()
                 Module:ApplySettingsInternal()
-            end
+            end)
         end
 
         local em = _G['EditModeManagerFrame']
         if em and em.SetToLayoutAnchor and not em.DFChatHooked then
             em.DFChatHooked = true
-            local orig_SetToLayoutAnchor = em.SetToLayoutAnchor
-            em.SetToLayoutAnchor = function(self, systemFrame, ...)
-                if systemFrame == ChatFrame1 then
-                    Module:ApplySettingsInternal()
-                    return
-                end
-                return orig_SetToLayoutAnchor(self, systemFrame, ...)
-            end
+            hooksecurefunc(em, 'SetToLayoutAnchor', function(_, systemFrame)
+                if systemFrame == ChatFrame1 then Module:ApplySettingsInternal() end
+            end)
         end
 
         local ok, err = pcall(function() Module:AddEditMode() end)

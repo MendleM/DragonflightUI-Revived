@@ -248,7 +248,7 @@ function DragonflightUIEditModePreviewTargetMixin:SetupFrame()
     end
     targetIcon:UpdateTargetIcon(0)
 
-    local fontName = self:CreateFontString('**', 'OVERLAY', 'GameFontNormalSmall')
+    local fontName = self:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
     fontName:SetPoint('BOTTOM', healthBar, 'TOP', 10, 3 - 2)
     fontName:SetSize(100, 12)
     self.FontName = fontName
@@ -257,7 +257,7 @@ function DragonflightUIEditModePreviewTargetMixin:SetupFrame()
     end
     fontName:SetName('Zimtschnecke')
 
-    local fontLevel = self:CreateFontString('**', 'OVERLAY', 'GameFontNormalSmall')
+    local fontLevel = self:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
     fontLevel:SetPoint('BOTTOMRIGHT', healthBar, 'TOPLEFT', 16, 3 - 2)
     fontLevel:SetHeight(12);
     self.FontLevel = fontLevel
@@ -468,7 +468,7 @@ function DragonflightUIEditModePreviewTargetOfTargetMixin:SetupFrame()
     -- end
     -- targetIcon:UpdateTargetIcon(0)
 
-    local fontName = self:CreateFontString('**', 'OVERLAY', 'GameFontNormalSmall')
+    local fontName = self:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
     fontName:SetPoint('LEFT', portrait, 'RIGHT', 1 + 1, 2 + 12 - 1 + totDelta)
     fontName:SetSize(100, 10)
     fontName:SetJustifyH('LEFT')
@@ -478,7 +478,7 @@ function DragonflightUIEditModePreviewTargetOfTargetMixin:SetupFrame()
     end
     fontName:SetName('Zimtschnecke')
 
-    -- local fontLevel = self:CreateFontString('**', 'OVERLAY', 'GameFontNormalSmall')
+    -- local fontLevel = self:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
     -- fontLevel:SetPoint('BOTTOMRIGHT', healthBar, 'TOPLEFT', 16, 3 - 2)
     -- fontLevel:SetHeight(12);
     -- self.FontLevel = fontLevel
@@ -946,7 +946,7 @@ function DragonflightUIEditModePreviewPartyMixin:SetupFrame()
     -- end
     -- targetIcon:UpdateTargetIcon(0)
 
-    local fontName = self:CreateFontString('**', 'OVERLAY', 'GameFontNormalSmall')
+    local fontName = self:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
     fontName:SetPoint('TOPLEFT', self, 'TOPLEFT', 46, -6)
     fontName:SetSize(57, 12)
     if DF.Era then fontName:SetWidth(100) end
@@ -957,7 +957,7 @@ function DragonflightUIEditModePreviewPartyMixin:SetupFrame()
     end
     fontName:SetName('Zimtschnecke')
 
-    -- local fontLevel = self:CreateFontString('**', 'OVERLAY', 'GameFontNormalSmall')
+    -- local fontLevel = self:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
     -- fontLevel:SetPoint('BOTTOMRIGHT', healthBar, 'TOPLEFT', 16, 3 - 2)
     -- fontLevel:SetHeight(12);
     -- self.FontLevel = fontLevel

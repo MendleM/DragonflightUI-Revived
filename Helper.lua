@@ -31,50 +31,325 @@ function addonTable:OverrideBlizzEditmode(f, ...)
     end
 end
 
-function addonTable:FixBlizzEditModeManagerLayouts()
-    if not (EditModeManagerFrame and EditModeManagerFrame.layoutInfo) then return end
-    local info = EditModeManagerFrame.layoutInfo
-    if not info.layouts then return end
+-- EditModeManagerFrame.layoutInfo is Blizzard's, and nothing here may write it.
+--
+-- There used to be a FixBlizzEditModeManagerLayouts() at this spot that
+-- "repaired" layoutInfo when activeLayout pointed past the end of layouts. It
+-- was treating damage this file caused, and it caused more of its own:
+--
+--   1. Blizzard already builds that list as presets .. savedLayouts, at the top
+--      of UpdateLayoutInfo. Merging GetCopyOfPresetLayouts() in a second time
+--      duplicated every preset and shifted every index, which is what made
+--      activeLayout run past the end in the first place.
+--   2. Assigning info.layouts / info.layouts[i] from here is an addon write
+--      into a Blizzard table. Blizzard walks that table under
+--      secureexecuterange (InitSystemAnchors, UpdateSystems) and ends up
+--      calling SetPoint on the action bars and unit frames with it, so the
+--      taint lands on protected frames and their actions get blocked.
+--
+-- The condition it checked cannot occur once the argument-less
+-- UpdateLayoutInfo() call below is gone: that call was what nil'd layoutInfo.
+-- Read layouts through C_EditMode.GetLayouts(), which hands out a copy, mutate
+-- that, and give it to C_EditMode.SaveLayouts(). Never touch the live table.
 
-    if info.activeLayout and info.activeLayout > #info.layouts then
-        if EditModePresetLayoutManager and EditModePresetLayoutManager.GetCopyOfPresetLayouts then
-            local ok, presets = pcall(EditModePresetLayoutManager.GetCopyOfPresetLayouts, EditModePresetLayoutManager)
-            if ok and presets and #presets > 0 then
-                local merged = {}
-                for _, p in ipairs(presets) do table.insert(merged, p) end
-                for _, c in ipairs(info.layouts) do table.insert(merged, c) end
-                info.layouts = merged
+-- One-time repair of leftover DragonflightUI anchors in Blizzard's Edit Mode layout.
+--
+-- An earlier version of this addon anchored Blizzard's Edit Mode systems to its
+-- own holder frames and let that be written into Blizzard's layout. Those
+-- layouts live on Blizzard's server, so the references outlived every reinstall
+-- and every WTF wipe: with DragonflightUI disabled, the client restored a layout
+-- anchoring PlayerFrame to DragonflightUIPlayerFrame - a frame that no longer
+-- exists - and the UI came up broken.
+--
+-- Repointing those anchors at UIParent, which is what the first attempt at this
+-- did, is not a repair. The offsets stored beside them were measured against a
+-- DragonflightUI frame, so keeping point/relativePoint/offsetX/offsetY and only
+-- swapping the reference leaves the frame at a position that means nothing - and
+-- then saves it back to the server as though it were deliberate.
+--
+-- Blizzard's own answer to "this system has no custom position" is
+-- EditModeSystemMixin:ResetToDefaultPosition:
+--
+--     self.systemInfo.anchorInfo = EditModePresetLayoutManager:GetDefaultSystemAnchorInfo(...)
+--     self.systemInfo.anchorInfo2 = nil
+--     self.systemInfo.isInDefaultPosition = true
+--
+-- isInDefaultPosition is the flag the rest of the system actually reads -
+-- initSystemAnchor skips managed frames that report it, and the action bar
+-- placement only positions bars that report it - so that is what this sets, on
+-- the copy C_EditMode.GetLayouts() hands out.
+local ANCHOR_MIGRATION_VERSION = 1
+local migrationRunning = false
+
+local function IsLegacyDFUIAnchor(anchorInfo)
+    if not (anchorInfo and anchorInfo.relativeTo) then return false end
+
+    -- Narrow on purpose. The frames that can legitimately turn up here are the
+    -- holders this addon anchors Blizzard systems to, and every one of them is
+    -- named DragonflightUI* (PlayerFrame, TargetFrame, PartyMoveFrame, the edit
+    -- mode frames). Also matching '^DF' would catch DFTrainerInset*, which is
+    -- never an anchor target, at the price of resetting positions the player
+    -- chose themselves.
+    return tostring(anchorInfo.relativeTo):find('^DragonflightUI') ~= nil
+end
+
+local function ResetSystemToDefaultPosition(sys)
+    if not (sys and sys.system) then return false end
+    if not (EditModePresetLayoutManager and EditModePresetLayoutManager.GetDefaultSystemAnchorInfo) then
+        return false
+    end
+
+    local ok, defaultAnchor = pcall(EditModePresetLayoutManager.GetDefaultSystemAnchorInfo,
+                                    EditModePresetLayoutManager, sys.system, sys.systemIndex)
+
+    -- A half-finished reset is worse than none. ApplySystemAnchor indexes
+    -- anchorInfo.point without checking, and C_EditMode.SaveLayouts validates
+    -- the structure and throws on a malformed one - which is exactly how people
+    -- end up with a layout that is corrupt on the server for good. If Blizzard
+    -- will not hand over the default for this system, leave the system alone.
+    if not (ok and type(defaultAnchor) == 'table' and defaultAnchor.point) then return false end
+
+    sys.anchorInfo = defaultAnchor
+    sys.anchorInfo2 = nil
+    sys.isInDefaultPosition = true
+    return true
+end
+
+-- Returns true once this character has nothing left to migrate.
+function addonTable:SanitizeLegacyEditModeAnchors()
+    if migrationRunning then return false end
+    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return false end
+
+    -- Per character, not global. GetLayouts() only ever returns the layouts that
+    -- apply to the character you are on, so a character-scoped layout carrying a
+    -- stale anchor is invisible until that character logs in. A global flag would
+    -- mark the job done after the first one and never look at the rest.
+    local db = DF.db and DF.db.char
+    if not db then return false end
+    if (db.editModeAnchorMigration or 0) >= ANCHOR_MIGRATION_VERSION then return true end
+
+    migrationRunning = true
+
+    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
+    if not (ok and layoutInfo and layoutInfo.layouts) then
+        migrationRunning = false
+        return false
+    end
+
+    local repaired, skipped = 0, 0
+    for _, layout in ipairs(layoutInfo.layouts) do
+        if layout.systems then
+            for _, sys in ipairs(layout.systems) do
+                if IsLegacyDFUIAnchor(sys.anchorInfo) or IsLegacyDFUIAnchor(sys.anchorInfo2) then
+                    if ResetSystemToDefaultPosition(sys) then
+                        repaired = repaired + 1
+                    else
+                        skipped = skipped + 1
+                    end
+                end
             end
         end
     end
-    if info.activeLayout and not info.layouts[info.activeLayout] and info.layouts[1] then
-        info.layouts[info.activeLayout] = info.layouts[1]
+
+    if repaired > 0 then
+        pcall(C_EditMode.SaveLayouts, layoutInfo)
+        DF:Print(string.format('reset %d frame(s) in Blizzard\'s Edit Mode layout that were still anchored to ' ..
+                                   'DragonflightUI frames from an older version. They are back at their default ' ..
+                                   'position and this will not run again.', repaired))
     end
+
+    -- A clean scan counts as done: it is the same answer the next login would
+    -- get, and re-scanning only risks another write to a server-side layout.
+    -- Anything we could not reset safely leaves the flag unset, so a later
+    -- client - or a later login - gets another attempt. That costs a scan and
+    -- never a write, because repaired stays 0.
+    if skipped == 0 then
+        db.editModeAnchorMigration = ANCHOR_MIGRATION_VERSION
+    else
+        DF:Debug(DF, string.format('editmode anchor migration: %d system(s) had no default anchor, deferred', skipped))
+    end
+
+    migrationRunning = false
+    return skipped == 0
 end
 
-function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
-    local val = (enabled and 1) or 0
+-- EDIT_MODE_LAYOUTS_UPDATED, not PLAYER_LOGIN.
+--
+-- The first attempt ran this out of Editmode's OnEnable, where C_EditMode need
+-- not exist yet: Blizzard_EditMode is load-on-demand and no TOC in this addon
+-- lists it under OptionalDeps, so the call returned silently and the migration
+-- simply never happened that session. This event is the moment the layout data
+-- is known to be present - it is the one Blizzard's own OnEvent uses to fill
+-- layoutInfo in the first place.
+-- The leftover layout, which is the one thing here that cannot be cleaned up in
+-- code - so the player gets told instead.
+--
+-- A version of this addon up to and including cda4133 did this on every login:
+--
+--   LibEditModeOverride:AddLayout(Enum.EditModeLayoutType.Character, 'DragonflightUI_Layout')
+--   LibEditModeOverride:SetActiveLayout('DragonflightUI_Layout')
+--
+-- It created a character-specific layout in Blizzard's Edit Mode and made it the
+-- active one. That code is long gone, but the layout is not: Edit Mode layouts
+-- live on Blizzard's server, so it survives uninstalling the addon, wiping WTF
+-- and reinstalling the game. SanitizeLegacyEditModeAnchors above cleans the
+-- dangling anchors inside it, which is what caused the visible damage, but the
+-- layout itself stays.
+--
+-- Deleting it from here is not safe. Blizzard's DeleteLayout indexes
+-- self.layoutInfo.layouts, which is presets .. saved, while C_EditMode.GetLayouts()
+-- returns the saved ones only - two different index spaces for the same data. Get
+-- that wrong and you delete somebody else's layout, on the server, permanently.
+-- Blizzard's own dropdown computes the index correctly, so the player is the safer
+-- tool here.
+local LEGACY_LAYOUT_NAME = 'DragonflightUI_Layout'
+local legacyLayoutNoticeShown = false
 
-    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSetting) then
-        return
+local function HasLegacyEditModeLayout()
+    if not (C_EditMode and C_EditMode.GetLayouts) then return false end
+
+    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
+    if not (ok and layoutInfo and layoutInfo.layouts) then return false end
+
+    for _, layout in ipairs(layoutInfo.layouts) do
+        if layout.layoutName == LEGACY_LAYOUT_NAME then return true end
     end
+
+    return false
+end
+
+StaticPopupDialogs['DragonflightUILegacyLayoutNotice'] = {
+    text = 'DragonflightUI found a leftover Edit Mode layout called |cff8080ff' .. LEGACY_LAYOUT_NAME ..
+        '|r on this character.\n\n' ..
+        'An older version created it and made it active. It is stored on Blizzard\'s server, so this addon cannot ' ..
+        'remove it for you without risking your other layouts. Leaving it active can make the interface look ' ..
+        'broken while DragonflightUI is disabled.\n\n' ..
+        'To remove it:\n' .. '1. Disable DragonflightUI and reload\n' .. '2. Escape, then Edit Mode\n' ..
+        '3. Switch the layout to a preset or one of your own\n' .. '4. Delete ' .. LEGACY_LAYOUT_NAME .. '\n' ..
+        '5. Enable DragonflightUI again\n\n' ..
+        'It is character-specific, so repeat this on any other character that shows this message.',
+    button1 = 'Do not show again',
+    button2 = CLOSE or 'Close',
+    showAlert = true,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+    -- button1 is the only thing that silences it for good. Escape and Close leave
+    -- the flag alone, so closing it by accident brings it back next login - which
+    -- is what was asked for in issue #27.
+    OnAccept = function()
+        local db = DF.db and DF.db.global
+        if db then db.editModeLayoutNoticeDismissed = true end
+        DF:Print('Notice about ' .. LEGACY_LAYOUT_NAME .. ' will not be shown again. ' ..
+                     'Type /df layoutnotice to bring it back.')
+    end
+}
+
+-- Returns true when there is nothing left to tell the player.
+function addonTable:ShowLegacyEditModeLayoutNotice(force)
+    if not force then
+        if legacyLayoutNoticeShown then return false end
+
+        local db = DF.db and DF.db.global
+        if db and db.editModeLayoutNoticeDismissed then return true end
+    end
+
+    if not HasLegacyEditModeLayout() then return true end
+
+    legacyLayoutNoticeShown = true
+    StaticPopup_Show('DragonflightUILegacyLayoutNotice')
+
+    -- Also in chat, because the popup can be dismissed before it is read and the
+    -- steps are the part people need again later.
+    DF:Print('Leftover Edit Mode layout |cff8080ff' .. LEGACY_LAYOUT_NAME .. '|r found. Disable DragonflightUI, ' ..
+                 'open Blizzard\'s Edit Mode, switch to another layout, delete it, then enable DragonflightUI again.')
+
+    return false
+end
+
+local legacyEditModeWatcher = CreateFrame('Frame')
+legacyEditModeWatcher:SetScript('OnEvent', function(self)
+    -- SaveLayouts drags the whole layout-apply chain behind it, and that ends in
+    -- SetPoint on the action bars and unit frames, which the client refuses in
+    -- combat. RunOutOfCombat queues by label, so a fight only delays it.
+    Helper:RunOutOfCombat('editmode legacy cleanup', function()
+        local anchorsSettled = addonTable:SanitizeLegacyEditModeAnchors()
+        local noticeSettled = addonTable:ShowLegacyEditModeLayoutNotice()
+
+        if anchorsSettled and noticeSettled then self:UnregisterAllEvents() end
+    end)
+end)
+-- Not every flavour has this event, and RegisterEvent throws on an unknown one.
+pcall(legacyEditModeWatcher.RegisterEvent, legacyEditModeWatcher, 'EDIT_MODE_LAYOUTS_UPDATED')
+
+-- Write one Edit Mode unit frame setting, and have Blizzard apply it.
+--
+-- Generalised out of the party raid-style sync below, because the raid frame
+-- settings need the same two steps for the same reason. Every applier in
+-- EditModeUnitFrameSystemMixin reads its own value back out of the layout:
+--
+--   UpdateSystemSettingFrameWidth -> UpdateCompactRaidFrameContainerSetting
+--     -> CompactUnitFrame_UpdateAllFromEditMode -> GetSettingValue(...)
+--       -> GetRegisteredSystemFrame(...) -> systemFrame:GetSettingValue(...)
+--
+-- There is no route that applies these to the frames directly, which is why the
+-- block of raid options in Raid.mixin.lua sat commented out for so long. So the
+-- value goes to the registered system frame through Blizzard's own setter, and to
+-- the layout so it survives a reload.
+--
+-- SETTINGS VALUES ONLY. anchorInfo is never written here and must not be - an
+-- anchor pointing at a DragonflightUI frame is what used to leave the interface
+-- broken with this addon disabled. A setting value is self-contained and still
+-- means something without this addon, which is the line we drew.
+--
+-- systemFrame is the frame Blizzard registered for that system, and it is what
+-- OnSystemSettingChange needs: PartyFrame for the party system, CompactRaidFrame-
+-- Container for the raid one.
+function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, systemFrame, label)
+    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSetting) then return end
+    if setting == nil or value == nil then return end
 
     local targetSystem = Enum.EditModeSystem.UnitFrame
-    local targetSystemIndex = Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Party
-    local targetSetting = Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames
+    if not targetSystem then return end
 
-    if not targetSystem or not targetSetting then return end
+    local val = value
+    if type(val) == 'boolean' then val = val and 1 or 0 end
 
-    if PartyFrame then
-        PartyFrame.system = PartyFrame.system or targetSystem
-        PartyFrame.systemIndex = PartyFrame.systemIndex or targetSystemIndex
-    end
+    local targetSystemIndex = systemIndex
+    local targetSetting = setting
 
-    if addonTable.FixBlizzEditModeManagerLayouts then
-        addonTable:FixBlizzEditModeManagerLayouts()
-    end
+    -- PartyFrame.system / PartyFrame.systemIndex are NOT written here any more,
+    -- and must not be. They were the party taint seed.
+    --
+    -- Blizzard identifies a registered Edit Mode system by exactly these two
+    -- fields, and it reads them inside secureexecuterange:
+    --
+    --   local function findSystem(index, systemFrame)
+    --       if not foundSystem and systemFrame.system == system and systemFrame.systemIndex == systemIndex then
+    --   secureexecuterange(self.registeredSystemFrames, findSystem);
+    --
+    -- That runs on every GetSettingValueBool, so on every
+    -- UseRaidStylePartyFrames() - which both party ShouldShow paths ask. Writing
+    -- the fields from addon code made them insecure for the session, and the taint
+    -- then travelled down UpdateRaidAndPartyFrames -> UpdatePartyFrames ->
+    -- UpdateMember into member.unit, member.buffs and member.debuffs, which is
+    -- where the blocked actions on the party frames came from.
+    --
+    -- /df log seed proved it: "the seed is a field, not a global", followed by
+    -- PartyFrame.system and PartyFrame.systemIndex insecure, tainted by
+    -- DragonflightUI.
+    --
+    -- They were only ever set so that the old SetBlizzEditmodeFrameSetting could
+    -- find its layout entry through frame.system. That function is gone, and
+    -- nothing in this addon reads either field - the sys.system reads above are on
+    -- plain layout tables, not on the frame. Blizzard sets both itself when it
+    -- registers PartyFrame as a system.
 
-    local function EnsureSettingInLayout(layout)
+    -- Takes the value as an argument rather than closing over it, because the layout needs
+    -- the RAW form while the setter above needs the display form. Two different numbers
+    -- for the same change; conflating them is what broke the sliders.
+    local function EnsureSettingInLayout(layout, val)
         if not layout then return end
         layout.systems = layout.systems or {}
         local foundSys = false
@@ -106,135 +381,308 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
         end
     end
 
-    if EditModeManagerFrame and EditModeManagerFrame.layoutInfo and EditModeManagerFrame.layoutInfo.layouts then
-        for _, layout in ipairs(EditModeManagerFrame.layoutInfo.layouts) do
-            EnsureSettingInLayout(layout)
+    -- The live EditModeManagerFrame.layoutInfo.layouts is deliberately not
+    -- written here. It holds Blizzard's preset layouts alongside the saved ones,
+    -- so writing settings into it both corrupts the presets and taints the table
+    -- Blizzard hands to SetPoint on protected frames. The GetLayouts() copy
+    -- below carries the same change into the saved data, and the
+    -- EDIT_MODE_LAYOUTS_UPDATED that SaveLayouts triggers is what brings the
+    -- live table back in sync - on Blizzard's own execution, not ours.
+
+    -- Push the value into Blizzard's live system frame, which is what actually
+    -- switches the party frames.
+    --
+    -- This is OnSystemSettingChange, and the name matters. The call here used to
+    -- be OnEditModeSystemSettingChange, which does not exist on
+    -- EditModeManagerFrame - so the guard was nil, the block never ran, and the
+    -- layout write below was the only thing happening. That write alone does not
+    -- switch anything: Blizzard reads this setting through
+    --
+    --   UseRaidStylePartyFrames() -> GetSettingValueBool(...)
+    --     -> GetRegisteredSystemFrame(...) -> systemFrame:GetSettingValueBool(...)
+    --
+    -- so the value has to reach the registered system frame's setting map, and
+    -- the layout only feeds that on the next EDIT_MODE_LAYOUTS_UPDATED. Blizzard's
+    -- own setter does it now, and its UpdateSystemSetting hop runs
+    -- UpdateSystemSettingUseRaidStylePartyFrames -> UpdateRaidAndPartyFrames,
+    -- which is the switch itself.
+    --
+    -- Out of combat only: that chain ends in Show/Hide and SetPoint on the
+    -- protected party frames, which the client refuses mid-fight.
+    -- Order matters, and so does which form of the value goes where.
+    --
+    -- The value handed in is the DISPLAY value, the number a slider shows. Blizzard's
+    -- setter takes that form and converts it itself:
+    --
+    --   EditModeSystemMixin:UpdateSystemSettingValue(setting, newValue)
+    --     local rawNewValue = self:ConvertSettingDisplayValueToRawValue(setting, newValue)
+    --     settingInfo.value = rawNewValue
+    --
+    -- The LAYOUT stores the raw form. Writing the display value there is what made
+    -- sliders come back at their maximum after a reload: frame width 98 was saved as 98,
+    -- read back as raw on the next login and converted to 98 + 72 = 170, which clamps to
+    -- the maximum of 144. Every reload pushed it further out.
+    --
+    -- So Blizzard's setter runs first and the raw value is then read back off the system
+    -- frame through GetSettingValue(setting, useRawValue), rather than converted here.
+    -- No arithmetic of ours to get wrong, and it stays correct for the settings that have
+    -- no conversion at all.
+    local function WriteLayout()
+        if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
+
+        local rawVal = val
+        if systemFrame and systemFrame.GetSettingValue then
+            local gotRaw, raw = pcall(systemFrame.GetSettingValue, systemFrame, targetSetting, true)
+            if gotRaw and raw ~= nil then rawVal = raw end
         end
-    end
 
-    if EditModeManagerFrame and EditModeManagerFrame.OnEditModeSystemSettingChange and PartyFrame then
-        pcall(EditModeManagerFrame.OnEditModeSystemSettingChange, EditModeManagerFrame, PartyFrame, targetSetting, val)
-    end
-
-    if C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts then
         local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
         if ok and layoutInfo and layoutInfo.layouts then
             for _, layout in ipairs(layoutInfo.layouts) do
-                EnsureSettingInLayout(layout)
+                EnsureSettingInLayout(layout, rawVal)
             end
             pcall(C_EditMode.SaveLayouts, layoutInfo)
         end
     end
-end
 
-function addonTable:SetBlizzEditmodeFrameSetting(frame, setting, value, apply)
-    if not (frame and setting) then return end
+    if EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and systemFrame then
+        Helper:RunOutOfCombat(label or 'unit frame edit mode setting', function()
+            local ok, err = pcall(EditModeManagerFrame.OnSystemSettingChange, EditModeManagerFrame, systemFrame,
+                                  targetSetting, val)
+            if not ok then geterrorhandler()('DFUI OnSystemSettingChange: ' .. tostring(err)) end
 
-    if frame == PartyFrame and Enum and Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames then
-        if addonTable.SubModuleMixins and addonTable.SubModuleMixins['Party'] and addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames then
-            addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value == 1)
-            return
-        end
-    end
-
-    if EditModeManagerFrame and EditModeManagerFrame.OnEditModeSystemSettingChange then
-        pcall(EditModeManagerFrame.OnEditModeSystemSettingChange, EditModeManagerFrame, frame, setting, value)
-    end
-
-    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then
-        return
-    end
-
-    local targetSystem = frame.system or (Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame)
-    local targetSystemIndex = frame.systemIndex
-
-    local layoutInfo = C_EditMode.GetLayouts()
-    if not layoutInfo or not layoutInfo.layouts then return end
-
-    for _, l in ipairs(layoutInfo.layouts) do
-        if l.systems then
-            for _, sys in ipairs(l.systems) do
-                if (not targetSystem or sys.system == targetSystem) and (not targetSystemIndex or sys.systemIndex == targetSystemIndex) then
-                    if sys.settings then
-                        local found = false
-                        for _, s in ipairs(sys.settings) do
-                            if s.setting == setting then
-                                s.value = value
-                                found = true
-                            end
-                        end
-                        if not found then
-                            table.insert(sys.settings, {setting = setting, value = value})
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    pcall(C_EditMode.SaveLayouts, layoutInfo)
-
-    if EditModeManagerFrame then
-        if EditModeManagerFrame.UpdateLayoutInfo then
-            pcall(EditModeManagerFrame.UpdateLayoutInfo, EditModeManagerFrame)
-        end
-        addonTable:FixBlizzEditModeManagerLayouts()
-    end
-
-    if UIParent_UpdateRaidAndPartyFrames then
-        pcall(UIParent_UpdateRaidAndPartyFrames)
-    end
-    if CompactRaidFrameManager_UpdateShown then
-        pcall(CompactRaidFrameManager_UpdateShown, CompactRaidFrameManager)
-    end
-    if CompactRaidFrameContainer_UpdateDisplayedUnits then
-        pcall(CompactRaidFrameContainer_UpdateDisplayedUnits, CompactRaidFrameContainer)
-    end
-    if PartyFrame and PartyFrame.UpdatePartyFrames then
-        pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
-    end
-
-    local fakeParty = _G['DragonflightUIEditModePartyFramePreview']
-    if fakeParty and fakeParty.Update then
-        pcall(fakeParty.Update, fakeParty)
+            -- Inside the same block, so the raw read always happens after Blizzard has
+            -- converted and stored it - including when this was deferred out of combat.
+            WriteLayout()
+        end)
+    else
+        WriteLayout()
     end
 end
 
-function addonTable:GetBlizzEditmodeFrameSettingBool(frame, setting)
-    if frame == PartyFrame and Enum and Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames then
-        if addonTable.SubModuleMixins and addonTable.SubModuleMixins['Party'] and addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames then
-            return addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames()
-        end
-    end
+-- The party raid-style switch, on top of the general writer above.
+--
+-- This is the setting Blizzard consults on both party visibility paths -
+-- UpdateRaidAndPartyFrames, CompactPartyFrame:ShouldShow and
+-- CompactRaidFrameManager all ask UseRaidStylePartyFrames() - so it decides which
+-- party system is live and nothing this addon does can substitute for it.
+function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
+    if not (Enum and Enum.EditModeUnitFrameSetting) then return end
 
-    if not (C_EditMode and C_EditMode.GetLayouts) then return false end
-    local layoutInfo = C_EditMode.GetLayouts()
-    if not layoutInfo or not layoutInfo.layouts then return false end
+    local systemIndex = Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Party
 
-    local targetSystem = frame and frame.system or (Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame)
-    local targetSystemIndex = frame and frame.systemIndex
-
-    local activeLayout = layoutInfo.activeLayout and layoutInfo.layouts[layoutInfo.activeLayout]
-    local searchLayouts = activeLayout and {activeLayout} or layoutInfo.layouts
-
-    for _, layout in ipairs(searchLayouts) do
-        if layout.systems then
-            for _, sys in ipairs(layout.systems) do
-                if (not targetSystem or sys.system == targetSystem) and (not targetSystemIndex or sys.systemIndex == targetSystemIndex) then
-                    if sys.settings then
-                        for _, s in ipairs(sys.settings) do
-                            if s.setting == setting then
-                                return s.value == 1
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    return false
+    addonTable:SyncUnitFrameEditModeSetting(systemIndex, Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames,
+                                            enabled and 1 or 0, _G['PartyFrame'], 'party raid style setting')
 end
+
+-- Which frame did Blizzard register for the raid unit frame system?
+--
+-- OnSystemSettingChange needs it, and it is not the same object as the party one.
+-- Asked rather than assumed, because the answer differs by flavour and a wrong
+-- guess here silently does nothing.
+local function GetRaidSystemFrame()
+    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSystemIndices) then return nil end
+
+    if EditModeManagerFrame and EditModeManagerFrame.GetRegisteredSystemFrame then
+        local ok, frame = pcall(EditModeManagerFrame.GetRegisteredSystemFrame, EditModeManagerFrame,
+                                Enum.EditModeSystem.UnitFrame, Enum.EditModeUnitFrameSystemIndices.Raid)
+        if ok and frame then return frame end
+    end
+
+    return _G['CompactRaidFrameContainer']
+end
+
+-- The registered raid system frame, for the options builder.
+--
+-- Exposed because the options are built from Blizzard's own display info and have to
+-- ask HasSetting per entry: whatever the raid system actually supports on this
+-- flavour is what gets offered, rather than a hardcoded list.
+function addonTable:GetRaidSystemFrameForOptions()
+    return GetRaidSystemFrame()
+end
+
+-- Establish what the raid container needs before it will lay anything out.
+--
+-- Only Blizzard's Edit Mode ever does this, and this addon locks that Edit Mode out:
+--
+--   EditModeUnitFrameSystemMixin:UpdateSystemSettingRaidGroupDisplayType()
+--     CompactRaidFrameContainer:SetGroupMode(UseCombinedGroups() and "flush" or "discrete")
+--   EditModeUnitFrameSystemMixin:UpdateSystemSettingSortPlayersBy()
+--     CompactRaidFrameContainer:SetFlowSortFunction(sortFunc)
+--
+-- CompactRaidFrameContainerMixin:ReadyToUpdate returns false with no group mode, and
+-- again with mode "flush" and no sort function, so LayoutFrames is skipped and TryUpdate
+-- does nothing whatsoever. The result is a container that is shown, on screen, roughly
+-- one member wide and empty, with no error to show for it - a raid with no frames.
+--
+-- The manager sets the two filter functions itself in its OnLoad, so those are not
+-- missing; only the group mode and the sort function come from the appliers.
+--
+-- Calling Blizzard's own appliers is the same approach Focus.mixin takes with
+-- FocusFrame:SetSmallSize: run the applier, write nothing extra to the layout. Both read
+-- their values back through GetSettingValue, which is already fed by
+-- SyncUnitFrameEditModeSetting.
+function addonTable:ApplyRaidFlowPrereqs()
+    local frame = GetRaidSystemFrame()
+    if not frame then return false, 'no registered raid system frame' end
+
+    local ok, err = pcall(function()
+        if frame.UpdateSystemSettingRaidGroupDisplayType then frame:UpdateSystemSettingRaidGroupDisplayType() end
+        if frame.UpdateSystemSettingSortPlayersBy then frame:UpdateSystemSettingSortPlayersBy() end
+    end)
+    if not ok then return false, err end
+
+    return true
+end
+
+-- Which frame did Blizzard register for the party unit frame system?
+--
+-- Asked rather than assumed, the same way the raid one is, and for the same reason: a
+-- wrong guess here writes a setting nothing ever reads.
+local function GetPartySystemFrame()
+    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSystemIndices) then return nil end
+
+    if EditModeManagerFrame and EditModeManagerFrame.GetRegisteredSystemFrame then
+        local ok, frame = pcall(EditModeManagerFrame.GetRegisteredSystemFrame, EditModeManagerFrame,
+                                Enum.EditModeSystem.UnitFrame, Enum.EditModeUnitFrameSystemIndices.Party)
+        if ok and frame then return frame end
+    end
+
+    return _G['PartyFrame']
+end
+
+-- Mirror one raid frame setting onto the party system, for raid-style party frames.
+--
+-- Raid and party are separate Edit Mode systems and Blizzard keeps their settings apart,
+-- so the raid page cannot reach the party frames by itself. It does not need to, because
+-- every compact unit frame reads its own system's value:
+--
+--   local frameWidth = EditModeManagerFrame:GetRaidFrameWidth(frame.groupType, NATIVE_UNIT_FRAME_WIDTH)
+--     -> GetSettingValue(Enum.EditModeSystem.UnitFrame, systemIndex, ...FrameWidth)
+--
+-- and groupType is that system index. Writing the same number to the party system is all
+-- "show party as raid" needs to follow the raid page.
+--
+-- Only where the party system admits to having the setting. The raid-only layout ones -
+-- raid size, group split, row size - are not in that set, and are skipped rather than
+-- forced onto a system that would ignore them anyway.
+function addonTable:MirrorRaidSettingToParty(setting, value)
+    if setting == nil or value == nil then return false end
+    if not (Enum and Enum.EditModeUnitFrameSystemIndices) then return false end
+
+    local frame = GetPartySystemFrame()
+    if not (frame and frame.HasSetting) then return false end
+
+    local hasIt, has = pcall(frame.HasSetting, frame, setting)
+    if not (hasIt and has) then return false end
+
+    addonTable:SyncUnitFrameEditModeSetting(Enum.EditModeUnitFrameSystemIndices.Party, setting, value, frame,
+                                            'party frame setting ' .. tostring(setting))
+    return true
+end
+
+-- Exposed so the diagnostics can report which settings the party system actually shares
+-- with the raid one, rather than leaving the intersection to guesswork.
+function addonTable:GetPartySystemFrameForOptions()
+    return GetPartySystemFrame()
+end
+
+-- One raid frame Edit Mode setting, by setting id.
+--
+-- Ids rather than Enum key names, because the caller now walks Blizzard's display
+-- info table, which already carries the id in entry.setting. Values are the STORED
+-- form; sliders are converted by the caller through Blizzard's own ConvertValue.
+function addonTable:SetRaidEditModeSettingBySetting(setting, value)
+    if not (Enum and Enum.EditModeUnitFrameSystemIndices) then return false end
+    if setting == nil then return false end
+
+    addonTable:SyncUnitFrameEditModeSetting(Enum.EditModeUnitFrameSystemIndices.Raid, setting, value,
+                                            GetRaidSystemFrame(), 'raid frame setting ' .. tostring(setting))
+    return true
+end
+
+-- The stored value Blizzard currently holds, or nil when the system has no such
+-- setting.
+--
+-- Read from the registered system frame, the same source Blizzard's own appliers use,
+-- so the options show what is actually in effect rather than a copy that can drift.
+-- Reading a Blizzard table does not taint it.
+function addonTable:GetRaidEditModeSettingBySetting(setting)
+    if setting == nil then return nil end
+
+    local frame = GetRaidSystemFrame()
+    if not (frame and frame.GetSettingValue and frame.HasSetting) then return nil end
+
+    local hasIt, has = pcall(frame.HasSetting, frame, setting)
+    if not (hasIt and has) then return nil end
+
+    local ok, val = pcall(frame.GetSettingValue, frame, setting)
+    if not ok then return nil end
+
+    return val
+end
+
+-- Kept for the options layer's existence check, which asks for this by name before
+-- building anything.
+function addonTable:SetRaidEditModeSetting(settingKey, value)
+    if not (Enum and Enum.EditModeUnitFrameSetting) then return false end
+
+    return addonTable:SetRaidEditModeSettingBySetting(Enum.EditModeUnitFrameSetting[settingKey], value)
+end
+
+-- SetBlizzEditmodeFrameSetting / GetBlizzEditmodeFrameSettingBool used to live
+-- here. Both are gone, and with them the last general-purpose route from this
+-- addon into Blizzard's Edit Mode layout.
+--
+-- They read and wrote Blizzard's server-side layout for five settings. For four
+-- of them the write bought nothing, because this addon already produces the
+-- effect itself and Blizzard's applier either does the same thing or has been
+-- stubbed out here:
+--
+--   AlwaysShowButtons  Blizzard applies it in UpdateShownButtons, which
+--                      Actionbar.Controller replaces with an empty function.
+--                      The effect comes from our showgrid attribute.
+--   FrameSize (pet)    Blizzard applies it as PetFrame:SetScale(); Pet.mixin
+--                      sets the scale directly one line earlier.
+--   BuffsOnTop         Blizzard sets self.buffsOnTop and refreshes auras;
+--                      Target.mixin does exactly that from its own profile.
+--   UseLargerFrame     Blizzard calls FocusFrame:SetSmallSize(not v);
+--                      Focus.mixin now makes that call itself.
+--
+-- RotateMinimap was the one where Blizzard would overwrite us, because it pushes
+-- the layout value into the rotateMinimap CVar on every layout application.
+-- Minimap.mixin keeps the value in our profile and re-asserts it on
+-- EDIT_MODE_LAYOUTS_UPDATED instead of handing it to the layout.
+--
+-- The one write that remains is SyncRaidStylePartyFrameToBlizzard above, and it
+-- is not optional: which party system is live is decided inside Blizzard's code,
+-- every path through it asks EditModeManagerFrame:UseRaidStylePartyFrames(), and
+-- that resolves out of the layout. A settings value there is fine - it stays
+-- meaningful with this addon disabled. An anchorInfo pointing at one of our
+-- frames is not, and is what SanitizeLegacyEditModeAnchors cleans up.
+--
+-- Standing rule, learned the expensive way: never call
+-- EditModeManagerFrame:UpdateLayoutInfo() from addon code.
+--
+--   function EditModeManagerFrameMixin:UpdateLayoutInfo(layoutInfo, reconcileLayouts)
+--       self.layoutApplyInProgress = true;
+--       self.layoutInfo = layoutInfo;          -- nil when called with no args
+--       ...
+--       local savedLayouts = self.layoutInfo.layouts;   -- throws here
+--       ...
+--       self.layoutApplyInProgress = false;             -- never reached
+--
+-- It is not a refresh, it is the setter behind EDIT_MODE_LAYOUTS_UPDATED, and the
+-- layout table is its first argument. Called with no argument it nil'd
+-- layoutInfo, threw on the next line, and left layoutApplyInProgress stuck true -
+-- inside a pcall, so nothing was reported. From that point EditModeManagerFrame
+-- had no layoutInfo, IsInitialized() answered false for the session, and every
+-- Blizzard caller that reads the active layout died on the nil: GetDefaultAnchor
+-- via PlayerFrame_ResetPosition, SetToLayoutAnchor via
+-- UIParent_ManageFramePositions. That was issues #26 and #28.
+--
+-- SaveLayouts already makes the client fire EDIT_MODE_LAYOUTS_UPDATED, and
+-- Blizzard's own OnEvent calls UpdateLayoutInfo with the real payload.
 
 function Helper:Benchmark(label, func, level, moduleRef)
     if level == nil or type(level) ~= 'number' then level = 1; end

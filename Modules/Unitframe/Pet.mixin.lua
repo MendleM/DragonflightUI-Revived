@@ -428,11 +428,12 @@ function SubModuleMixin:Update()
         f_orig:SetFrameLevel(10)
     end
 
-    if Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.FrameSize and addonTable.SetBlizzEditmodeFrameSetting then
-        local scale = math.min(math.max(state.scale, 1.0), 2.0)
-        local frameSize = math.floor(((scale - 1.0) * 20) + 0.5)
-        addonTable:SetBlizzEditmodeFrameSetting(f_orig, Enum.EditModeUnitFrameSetting.FrameSize, frameSize, true)
-    end
+    -- The pet frame's scale is set directly above, on f_orig, and that is the
+    -- whole job. What used to be here converted state.scale into Blizzard's
+    -- FrameSize setting and wrote it to the layout - Blizzard's own applier for
+    -- that setting is UpdatePetFrameScale, which does PetFrame:SetScale(), so the
+    -- write only asked Blizzard to redo what we had just done, at the price of a
+    -- server-side layout write on every ApplySettings.
 
     PetFrame.breakUpLargeNumbers = state.breakUpLargeNumbers
     TextStatusBar_UpdateTextString(PetFrameHealthBar)

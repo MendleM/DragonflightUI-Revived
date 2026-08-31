@@ -32,7 +32,9 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          and works with no target, since a hidden frame keeps
 --                          its anchors
 --     /df log tot          every term of the client's target-of-target show
---                          condition, plus the frame's own state, and a verdict
+--                          condition, for the target and the focus frame both,
+--                          plus each frame's own state and a verdict
+--     /df log tot focus    only the focus frame's target-of-target
 --     /df log tot watch    toggle a watcher that logs each time that changes
 --     /df log party        every party/raid frame field that is tainted, and
 --                          the addon that dirtied it. issecurevariable sees
@@ -65,6 +67,22 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          optional name (or 'mouse') adds a frame the list
 --                          does not cover
 --     /df log watch reset  drop the baseline and start again
+--     /df log bagtrace     log every SetPoint, Show and Hide on the bag row,
+--                          backpack and keyring included, each with the combat
+--                          state and the stack of whoever called it. watch says
+--                          what moved; this says who moved it and whether the
+--                          client was in a position to refuse us. 'off' stops
+--                          it, 'copy' opens the window
+--     /df log bagtrace state  the numbers the row is laid out from, without
+--                          tracing: Blizzard's bagPadding and expand flags, our
+--                          saved collapsed state, and each button's anchor,
+--                          visibility and protected status. Run it before and
+--                          after whatever breaks and compare the two
+--     /df log raidopts     why the raid Edit Mode options are or are not in the
+--                          config panel: whether Blizzard_EditMode is loaded,
+--                          whether its setting display info exists, which frame
+--                          the raid system resolves to, and per setting whether
+--                          that frame has it and what value it holds
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
 --
@@ -466,12 +484,17 @@ end
 -- every frame, so a missing ToT means either one of those terms is false or
 -- something is hiding, unanchoring or blanking the frame after the fact. This
 -- prints both halves so the answer is in the paste rather than in a guess.
-function DF:LogToT(tag)
+-- which: 'focus' for the focus frame's target-of-target, anything else for the
+-- target frame's. Both run the same mixin, so the same terms decide both.
+function DF:LogToT(tag, which)
+    local isFocus = (which == 'focus')
     tag = tag or 'tot'
 
-    local tot = (TargetFrame and TargetFrame.totFrame) or _G['TargetFrameToT']
+    local ownerName = isFocus and 'FocusFrame' or 'TargetFrame'
+    local owner = _G[ownerName]
+    local tot = (owner and owner.totFrame) or _G[ownerName .. 'ToT']
     if not tot then
-        DF:Log(tag, 'no ToT frame exists at all (TargetFrame.totFrame is nil)')
+        DF:Log(tag, 'no ToT frame exists at all (%s.totFrame is nil)', ownerName)
         return
     end
 
@@ -485,31 +508,44 @@ function DF:LogToT(tag)
     -- catches a cache that has gone stale behind it
     local rawCVar = GetCVar('showTargetOfTarget')
 
-    local unit = tot.unit or 'targettarget'
-    local targetExists = UnitExists('target') and true or false
+    -- Blizzard's TargetOfTargetMixin:Update does not read the owner frame - it
+    -- reads self:GetParent(). Reparenting the frame onto a holder makes
+    -- parent.unit nil, every term below collapses, and the client hides it with
+    -- no error at all. So report the parent's unit, not the owner's.
+    local parent = tot:GetParent()
+    local parentName = (parent and parent.GetName and (parent:GetName() or '<anonymous>')) or 'none'
+    local ownerUnit = parent and parent.unit or nil
+
+    local unit = tot.unit or (isFocus and 'focustarget' or 'targettarget')
+    local ownerExists = (ownerUnit and UnitExists(ownerUnit)) and true or false
     local totExists = UnitExists(unit) and true or false
-    local targetIsPlayer = (PlayerFrame and PlayerFrame.unit and UnitIsUnit(PlayerFrame.unit, 'target')) and true or false
-    local alive = (UnitHealth('target') or 0) > 0
+    local ownerIsPlayer = (ownerUnit and PlayerFrame and PlayerFrame.unit and UnitIsUnit(PlayerFrame.unit, ownerUnit)) and
+                              true or false
+    local alive = (ownerUnit and (UnitHealth(ownerUnit) or 0) > 0) and true or false
 
-    local expected = (cvar and targetExists and totExists and not targetIsPlayer and alive) and true or false
+    local expected = (cvar and ownerExists and totExists and not ownerIsPlayer and alive) and true or false
 
-    DF:Log(tag, '=== target-of-target ===')
-    DF:Log(tag, 'cvar=%s (raw "%s")  targetExists=%s  totExists=%s (unit=%s, name=%s)  targetIsSelf=%s  targetAlive=%s',
-           tostring(cvar), tostring(rawCVar), tostring(targetExists), tostring(totExists), tostring(unit),
-           tostring(UnitName(unit)), tostring(targetIsPlayer), tostring(alive))
+    DF:Log(tag, '=== %s target-of-target ===', isFocus and 'focus' or 'target')
+    DF:Log(tag, 'parent=%s  parent.unit=%s  parent is %s=%s  parent:UpdateAuras=%s', parentName, tostring(ownerUnit),
+           ownerName, tostring(parent == owner), tostring(parent and parent.UpdateAuras ~= nil))
+    DF:Log(tag, 'cvar=%s (raw "%s")  ownerExists=%s  totExists=%s (unit=%s, name=%s)  ownerIsSelf=%s  ownerAlive=%s',
+           tostring(cvar), tostring(rawCVar), tostring(ownerExists), tostring(totExists), tostring(unit),
+           tostring(UnitName(unit)), tostring(ownerIsPlayer), tostring(alive))
     DF:Log(tag, 'client should show it: %s   frame shown=%s visible=%s', tostring(expected), tostring(tot:IsShown()),
            tostring(tot:IsVisible()))
 
     -- is the safety net still installed? TargetFrameMixin:OnUpdate is what
     -- re-shows the ToT every frame; if something replaced that script rather
     -- than hooking it, nothing self-heals
-    DF:Log(tag, 'TargetFrame OnUpdate installed=%s   ToT OnUpdate installed=%s',
-           tostring((TargetFrame and TargetFrame:GetScript('OnUpdate')) ~= nil),
-           tostring(tot:GetScript('OnUpdate') ~= nil))
+    DF:Log(tag, '%s OnUpdate installed=%s   ToT OnUpdate installed=%s', ownerName,
+           tostring((owner and owner:GetScript('OnUpdate')) ~= nil), tostring(tot:GetScript('OnUpdate') ~= nil))
 
     DF:LogFrame(tot, tag)
 
-    if not expected then
+    if ownerUnit == nil then
+        DF:Log(tag, 'VERDICT: the parent carries no .unit, so TargetOfTargetMixin:Update hides it every frame - ' ..
+                   'the frame has been reparented off %s onto %s', ownerName, parentName)
+    elseif not expected then
         DF:Log(tag, 'VERDICT: the client is deliberately hiding it - see which term above is false')
     elseif not tot:IsShown() then
         DF:Log(tag, 'VERDICT: should be shown and is not. Something hid it, or Update() is erroring - check /df log error')
@@ -1393,7 +1429,11 @@ local function ArmSeedWatcher()
 
         DF:LogTaintedGlobals('seed')
 
-        print(PREFIX .. 'party taint seed captured - run |cffffff78/df log seed|r')
+        -- Captured, not announced. This watcher is armed on every load, so the print
+        -- that used to sit here greeted every player who joined a group with a line
+        -- about taint seeds - a diagnostic aimed at whoever is debugging this addon,
+        -- shown to everyone else. The report is in the buffer and in SavedVariables
+        -- either way; /df log seed prints it on request.
     end)
 end
 
@@ -1552,8 +1592,13 @@ function DF:LogPartyTaint(tag)
     -- file. Whatever taints them is therefore upstream of both, and the one term
     -- both ShouldShow paths run through is
     -- EditModeManagerFrame:UseRaidStylePartyFrames(), which reads the Edit Mode
-    -- layout. This addon writes that layout through LibEditModeOverride on every
-    -- OverrideBlizzEditmode and SetBlizzEditmodeFrameSetting.
+    -- layout.
+    --
+    -- The original note here blamed LibEditModeOverride. That was wrong - the
+    -- library was loaded but never called. The real seed was this addon
+    -- REPLACING UseRaidStylePartyFrames outright, so that Blizzard's own
+    -- ShouldShow ran our function and picked up the taint from it. That
+    -- assignment is gone, along with every write to Blizzard's layout.
     --
     -- taintLog cannot see any of this: it records tainted globals, and these are
     -- fields. That is why this was once "ruled out" and should not have been.
@@ -1571,6 +1616,494 @@ function DF:LogPartyTaint(tag)
             local ok, value = pcall(EditModeManagerFrame.UseRaidStylePartyFrames, EditModeManagerFrame)
             DF:Log(tag, 'UseRaidStylePartyFrames() -> %s (call ok=%s)', tostring(value), tostring(ok))
         end
+    end
+end
+
+-- /df log bagtrace - name whoever re-anchors the bag row.
+--
+-- /df log watch proves WHAT happens: all five buttons, the four bag slots and the
+-- keyring, end up with a uniform -5 offset, and bag 0 loses the -12 gap it needs
+-- for the expand arrow. It cannot say WHO does it. Three fixes aimed at guessed
+-- callers - BagsBar:Layout, ignoreFramePositionManager and
+-- UIParent_ManageFramePositions - all failed, so stop guessing and hook the write
+-- itself. Whoever sets the offset gets named, with its stack.
+-- Anchoring was only half of it. Collapsing the row is Show and Hide on the same
+-- buttons, and both those and SetPoint are refused mid-fight, so a trace that shows
+-- position writes alone cannot explain a row that came back in the wrong state. Every
+-- entry therefore carries the combat state, visibility changes are traced next to
+-- position changes, and 'state' prints everything the layout is computed from -
+-- Blizzard's padding and expand flags, our own saved state, and whether the client
+-- considers these buttons protected at all.
+local bagTraceOn = false
+local bagTraceHooked = false
+
+-- Separate budgets per kind, so a burst of Hide calls cannot crowd out the SetPoint
+-- calls that name the culprit.
+local BAG_TRACE_MAX_PER_KIND = 14
+local bagTraceHits = {}
+
+local BAG_TRACE_BUTTONS = {
+    'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot',
+    'KeyRingButton'
+}
+
+local function BagTraceName(rel)
+    if type(rel) == 'string' then return rel end
+    if type(rel) == 'table' and rel.GetName then return rel:GetName() or '<anon>' end
+    return '-'
+end
+
+local function BagTraceCombat()
+    -- Both halves, because they disagree and the disagreement is the whole point:
+    -- PLAYER_REGEN_ENABLED clears the lockdown while the server-side flag lingers.
+    return string.format('lock=%s unit=%s', tostring(InCombatLockdown()),
+                         tostring(UnitAffectingCombat('player')))
+end
+
+local function BagTracePoint(f)
+    if not (f and f.GetNumPoints) or f:GetNumPoints() == 0 then return 'unplaced' end
+
+    local point, relativeTo, relativePoint, x, y = f:GetPoint(1)
+    return string.format('%s -> %s %s (%.0f,%.0f)', tostring(point), BagTraceName(relativeTo), tostring(relativePoint),
+                         x or 0, y or 0)
+end
+
+-- Everything the bag row layout is derived from, in one place.
+function DF:LogBagRowState(tag)
+    tag = tag or 'bagtrace'
+
+    DF:Log(tag, 'STATE combat %s', BagTraceCombat())
+
+    local bar = _G['BagsBar']
+    if bar then
+        -- bagPadding is the -5. hideExpandToggle decides whether the chain starts at
+        -- the backpack or at Blizzard's own toggle.
+        DF:Log(tag, 'BagsBar: bagPadding=%s hideExpandToggle=%s isHorizontal=%s direction=%s shown=%s',
+               tostring(bar.bagPadding), tostring(bar.hideExpandToggle), tostring(bar.isHorizontal),
+               tostring(bar.direction), tostring(bar:IsShown()))
+    else
+        DF:Log(tag, 'BagsBar: absent')
+    end
+
+    local mgr = _G['MainMenuBarBagManager']
+    if mgr then
+        -- expandBarAuto starting out nil is what makes the first cursor change count
+        -- as a change: nil ~= false.
+        DF:Log(tag, 'MainMenuBarBagManager: expandBar=%s expandBarAuto=%s shouldExpand=%s cvar expandBagBar=%s',
+               tostring(mgr.expandBar), tostring(mgr.expandBarAuto),
+               tostring(mgr.ShouldBarExpand and mgr:ShouldBarExpand()),
+               tostring(GetCVarBool and GetCVarBool('expandBagBar')))
+    else
+        DF:Log(tag, 'MainMenuBarBagManager: absent')
+    end
+
+    local ok, mod = pcall(function() return DF:GetModule('Actionbar') end)
+    local bags = ok and mod and mod.db and mod.db.profile and mod.db.profile.bags
+    if bags then
+        DF:Log(tag, 'DFUI bags: expanded=%s scale=%s hooked=%s', tostring(bags.expanded), tostring(bags.scale),
+               tostring(mod.BagBarLayoutHooked))
+    else
+        DF:Log(tag, 'DFUI bags: profile not reachable yet')
+    end
+
+    for _, name in ipairs(BAG_TRACE_BUTTONS) do
+        local btn = _G[name]
+        if btn then
+            -- IsProtected answers whether the combat guard is actually required on
+            -- these buttons, rather than us assuming it is.
+            local protected, explicit = btn:IsProtected()
+
+            -- Size matters as much as the anchor here. Blizzard's Layout calls
+            -- KeyringMixin:UpdateOrientation, which resets the keyring to the
+            -- dimensions captured before we restyled it, and a frame narrower than its
+            -- own artwork looks like a spacing bug rather than a sizing one.
+            DF:Log(tag, '%s: shown=%s %.0fx%.0f scale=%.2f protected=%s(explicit=%s) %s', name,
+                   tostring(btn:IsShown()), btn:GetWidth() or 0, btn:GetHeight() or 0,
+                   (btn.GetScale and btn:GetScale()) or 1, tostring(protected), tostring(explicit), BagTracePoint(btn))
+        else
+            DF:Log(tag, '%s: absent', name)
+        end
+    end
+end
+
+local function BagTraceRecord(kind, description)
+    if not bagTraceOn then return end
+
+    local hits = (bagTraceHits[kind] or 0)
+    if hits >= BAG_TRACE_MAX_PER_KIND then return end
+    bagTraceHits[kind] = hits + 1
+
+    DF:Log('bagtrace', '%s [%s]', description, BagTraceCombat())
+    DF:Log('bagtrace', '  stack: %s', tostring(debugstack(3, 12, 0)):gsub('\n', ' | '):sub(1, 1200))
+
+    if bagTraceHits[kind] >= BAG_TRACE_MAX_PER_KIND then
+        DF:Log('bagtrace', '%s: hit the cap of %d - no more of this kind will be logged.', kind,
+               BAG_TRACE_MAX_PER_KIND)
+    end
+end
+
+local function BagTracePointHook(self, point, rel, relPoint, x, y)
+    BagTraceRecord('point', string.format('%s:SetPoint(%s -> %s %s, %s, %s)', (self.GetName and self:GetName()) or
+                                              '<anon>', tostring(point), BagTraceName(rel), tostring(relPoint),
+                                          tostring(x), tostring(y)))
+end
+
+local function BagTraceShowHook(self)
+    BagTraceRecord('visibility', string.format('%s:Show()', (self.GetName and self:GetName()) or '<anon>'))
+end
+
+local function BagTraceHideHook(self)
+    BagTraceRecord('visibility', string.format('%s:Hide()', (self.GetName and self:GetName()) or '<anon>'))
+end
+
+function DF:LogBagTrace(on)
+    if on and not bagTraceHooked then
+        local found = 0
+        for _, name in ipairs(BAG_TRACE_BUTTONS) do
+            local btn = _G[name]
+            if btn and btn.SetPoint then
+                found = found + 1
+                hooksecurefunc(btn, 'SetPoint', BagTracePointHook)
+                if btn.Show then hooksecurefunc(btn, 'Show', BagTraceShowHook) end
+                if btn.Hide then hooksecurefunc(btn, 'Hide', BagTraceHideHook) end
+            end
+        end
+
+        if found == 0 then
+            print(PREFIX .. 'no bag buttons exist yet - nothing to trace.')
+            return
+        end
+
+        -- The hooks stay for the session; the flag is what turns logging on and
+        -- off. Re-hooking on every toggle would stack duplicates.
+        bagTraceHooked = true
+        print(PREFIX .. ('bag trace hooked %d button(s).'):format(found))
+    end
+
+    bagTraceOn = on and true or false
+
+    if bagTraceOn then
+        table.wipe(bagTraceHits)
+        -- A baseline, so the trace that follows can be read against a known state
+        -- instead of guessed at.
+        DF:LogBagRowState('bagtrace')
+        print(PREFIX .. 'bag trace ON - reproduce it, then |cffffff78/df log bagtrace copy|r')
+    else
+        local total = 0
+        for _, n in pairs(bagTraceHits) do total = total + n end
+        print(PREFIX .. ('bag trace OFF - %d call(s) captured.'):format(total))
+    end
+end
+
+-- /df log raidopts - why the raid Edit Mode options are or are not there.
+--
+-- The options are built once, from Blizzard's own EditModeSettingDisplayInfoManager,
+-- and four things have to be true for a single entry to appear. When the panel comes
+-- up empty there is no way to tell which one failed, so each is reported separately
+-- here, along with what the raid system frame says about every setting Blizzard
+-- describes.
+--
+-- Run it after login. If the data is all present now but the panel is still empty,
+-- the answer is timing: the options table was built before Blizzard_EditMode loaded.
+function DF:LogRaidOptions(tag)
+    tag = tag or 'raidopts'
+
+    local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded('Blizzard_EditMode')) or
+                       (IsAddOnLoaded and IsAddOnLoaded('Blizzard_EditMode'))
+    DF:Log(tag, 'Blizzard_EditMode loaded=%s', tostring(loaded))
+
+    local mgr = _G['EditModeSettingDisplayInfoManager']
+    DF:Log(tag, 'EditModeSettingDisplayInfoManager=%s systemSettingDisplayInfo=%s GetSettingDisplayInfo=%s',
+           tostring(mgr ~= nil), tostring(mgr and mgr.systemSettingDisplayInfo ~= nil),
+           tostring(mgr and mgr.GetSettingDisplayInfo ~= nil))
+
+    local types = Enum and Enum.EditModeSettingDisplayType
+    if types then
+        local names = {}
+        for k, v in pairs(types) do table.insert(names, k .. '=' .. tostring(v)) end
+        table.sort(names)
+        DF:Log(tag, 'EditModeSettingDisplayType: %s', table.concat(names, ' '))
+    else
+        DF:Log(tag, 'EditModeSettingDisplayType: ABSENT - every entry is skipped')
+    end
+
+    DF:Log(tag, 'helper hooks: SetRaidEditModeSetting=%s GetRaidSystemFrameForOptions=%s',
+           tostring(addonTable and addonTable.SetRaidEditModeSetting ~= nil),
+           tostring(addonTable and addonTable.GetRaidSystemFrameForOptions ~= nil))
+
+    local raidFrame = addonTable and addonTable.GetRaidSystemFrameForOptions and
+                          addonTable:GetRaidSystemFrameForOptions()
+    DF:Log(tag, 'raid system frame=%s HasSetting=%s GetSettingValue=%s',
+           (raidFrame and ((raidFrame.GetName and raidFrame:GetName()) or '<anon>')) or 'nil',
+           tostring(raidFrame and raidFrame.HasSetting ~= nil), tostring(raidFrame and raidFrame.GetSettingValue ~= nil))
+
+    -- What the raid system says about each setting Blizzard describes. This is the
+    -- list the options are built from, so an entry missing here explains an entry
+    -- missing there.
+    local displayInfo = mgr and mgr.systemSettingDisplayInfo and Enum and Enum.EditModeSystem and
+                            mgr.systemSettingDisplayInfo[Enum.EditModeSystem.UnitFrame]
+
+    if not displayInfo then
+        DF:Log(tag, 'no unit frame display info - nothing can be built')
+    else
+        DF:Log(tag, 'unit frame display info entries: %d', #displayInfo)
+
+        -- The party system's own frame, so the intersection is visible rather than assumed.
+        -- Raid settings are mirrored onto it for raid-style party frames, but only where it
+        -- answers HasSetting - "party=false" is a setting that page deliberately skips.
+        local partyFrame = addonTable and addonTable.GetPartySystemFrameForOptions and
+                               addonTable:GetPartySystemFrameForOptions()
+
+        for _, info in ipairs(displayInfo) do
+            local has, val, partyHas = 'n/a', 'n/a', 'n/a'
+            if raidFrame and raidFrame.HasSetting and info.setting ~= nil then
+                local ok, res = pcall(raidFrame.HasSetting, raidFrame, info.setting)
+                has = ok and tostring(res) or ('ERR ' .. tostring(res))
+
+                if ok and res and raidFrame.GetSettingValue then
+                    local okv, v = pcall(raidFrame.GetSettingValue, raidFrame, info.setting)
+                    val = okv and tostring(v) or ('ERR ' .. tostring(v))
+                end
+            end
+
+            if partyFrame and partyFrame.HasSetting and info.setting ~= nil then
+                local okp, resp = pcall(partyFrame.HasSetting, partyFrame, info.setting)
+                partyHas = okp and tostring(resp) or ('ERR ' .. tostring(resp))
+            end
+
+            DF:Log(tag, '  setting=%s type=%s hasSetting=%s party=%s stored=%s name=%s', tostring(info.setting),
+                   tostring(info.type), has, partyHas, val, tostring(info.name))
+        end
+    end
+
+    -- And whether anything actually landed in the options table. Reported by the
+    -- builder itself: reaching the table from here needs the submodule instance, which
+    -- is not the mixin stored in SubModuleMixins, so the earlier attempt to walk to it
+    -- always came up empty and said nothing useful.
+    DF:Log(tag, 'blizzRaid* option entries built: %s',
+           tostring((addonTable and addonTable.RaidEditModeOptionCount) or 'builder never ran'))
+
+    -- Whether the edit mode selection was ever created, and which half of the gate in
+    -- SubModuleMixin:Setup stopped it if not.
+    local diag = addonTable and addonTable.RaidInitDiag
+    if diag then
+        DF:Log(tag, 'raid edit mode init: ran=%s error=%s (HasLoadedCUFProfiles=%s CompactUnitFrameProfiles=%s variablesLoaded=%s)',
+               tostring(diag.initRan), tostring(diag.initError or 'none'), tostring(diag.hasLoadedCUFProfilesFn),
+               tostring(diag.profilesTable), tostring(diag.variablesLoaded))
+
+        -- The legacy raid profile API the preview needs. Absent here, which is why the
+        -- preview is skipped rather than created and left to throw.
+        DF:Log(tag, 'raid profile api: GetRaidProfileFlattenedOptions=%s GetActiveRaidProfile=%s manager.container=%s',
+               type(GetRaidProfileFlattenedOptions), type(GetActiveRaidProfile),
+               tostring(CompactRaidFrameManager ~= nil and CompactRaidFrameManager.container ~= nil))
+    else
+        DF:Log(tag, 'raid edit mode init: Setup never reached this point')
+    end
+
+    -- The holder the selection and the raid container hang off.
+    local holder = _G['DragonflightUIRaidMoveFrame']
+    if holder then
+        DF:Log(tag, 'DragonflightUIRaidMoveFrame: shown=%s visible=%s %.0fx%.0f points=%d selection=%s',
+               tostring(holder:IsShown()), tostring(holder:IsVisible()), holder:GetWidth() or 0,
+               holder:GetHeight() or 0, holder:GetNumPoints(), tostring(holder.DFEditModeSelection ~= nil))
+
+        -- Which anchor the holder actually uses, and what the profile says it should be.
+        --
+        -- The stored anchor starts as TOPLEFT but Raid.mixin's one-time calibration
+        -- overwrites it with whatever Blizzard's container happened to carry, so the
+        -- default in the defaults table is not what a live profile holds. Resizing the
+        -- holder only leaves the frames where they are while the anchor is a corner, which
+        -- is why this has to be visible rather than assumed.
+        if holder:GetNumPoints() > 0 then
+            local point, relativeTo, relativePoint, ox, oy = holder:GetPoint(1)
+            DF:Log(tag, '  holder point: %s -> %s %s (%.0f,%.0f)', tostring(point),
+                   tostring((relativeTo and relativeTo.GetName and relativeTo:GetName()) or 'nil'),
+                   tostring(relativePoint), ox or 0, oy or 0)
+        end
+
+        local gotUf, ufModule = pcall(DF.GetModule, DF, 'Unitframe', true)
+        local raidState = gotUf and ufModule and ufModule.db and ufModule.db.profile and ufModule.db.profile.raid
+        if raidState then
+            DF:Log(tag, '  profile raid anchor: %s -> %s %s (%s,%s) frame=%s scale=%s calibrated=%s',
+                   tostring(raidState.anchor), tostring(raidState.anchorFrame), tostring(raidState.anchorParent),
+                   tostring(raidState.x), tostring(raidState.y), tostring(raidState.customAnchorFrame),
+                   tostring(raidState.scale), tostring(raidState.calibrated))
+        end
+
+        -- Reported next to the party holder on purpose. Party's is the one that is
+        -- known to work, so on its own "secure=false" says nothing: it could be normal
+        -- for a holder declared in this addon's XML, or it could be the taint the
+        -- party comment warns about. Only the comparison tells them apart.
+        local raidSecure, raidBlame = issecurevariable('DragonflightUIRaidMoveFrame')
+        local partySecure, partyBlame = issecurevariable('DragonflightUIPartyMoveFrame')
+
+        DF:Log(tag, 'holder globals: raid secure=%s blame=%s | party secure=%s blame=%s', tostring(raidSecure),
+               tostring(raidBlame or '-'), tostring(partySecure), tostring(partyBlame or '-'))
+    else
+        DF:Log(tag, 'DragonflightUIRaidMoveFrame: ABSENT - Load.xml did not create it')
+    end
+
+    -- What this addon stores itself. That is the source of truth for these settings now,
+    -- since Blizzard's layout has been shown to be unable to keep them.
+    local gotModule, unitframeModule = pcall(DF.GetModule, DF, 'Unitframe', true)
+    local raidProfile = gotModule and unitframeModule and unitframeModule.db and unitframeModule.db.profile and
+                            unitframeModule.db.profile.raid
+    local storedSettings = raidProfile and raidProfile.blizzSettings
+
+    if storedSettings then
+        local parts = {}
+        for key, value in pairs(storedSettings) do table.insert(parts, key .. '=' .. tostring(value)) end
+        table.sort(parts)
+
+        DF:Log(tag, 'profile blizzSettings: %d entries%s', #parts,
+               (#parts > 0) and (' -> ' .. table.concat(parts, ' ')) or ' (nothing edited yet)')
+    else
+        DF:Log(tag, 'profile blizzSettings: ABSENT - the raid profile carries no table for them')
+    end
+
+    -- Which layout is active, and can it even hold a changed setting?
+    --
+    -- EditModeManagerFrameMixin:SaveLayoutChanges refuses to save into a preset and opens
+    -- the new-layout dialog instead, so a preset cannot keep an edited value. Anything
+    -- written there is back to the preset's own number on the next login, which looks
+    -- exactly like a broken save.
+    if C_EditMode and C_EditMode.GetLayouts then
+        local gotLayouts, layoutInfo = pcall(C_EditMode.GetLayouts)
+        if gotLayouts and layoutInfo and layoutInfo.layouts then
+            -- C_EditMode.GetLayouts hands back the player's OWN layouts only, while
+            -- activeLayout indexes the combined list Blizzard builds in UpdateLayoutInfo
+            -- with the presets in front. So an index into this table is meaningless on its
+            -- own, and asking the manager is the only honest answer.
+            local saved = #layoutInfo.layouts
+            local active = EditModeManagerFrame and EditModeManagerFrame.GetActiveLayoutInfo and
+                               select(2, pcall(EditModeManagerFrame.GetActiveLayoutInfo, EditModeManagerFrame))
+            local isPreset = EditModeManagerFrame and EditModeManagerFrame.IsActiveLayoutPreset and
+                                 select(2, pcall(EditModeManagerFrame.IsActiveLayoutPreset, EditModeManagerFrame))
+
+            DF:Log(tag, 'edit mode layout: activeIndex=%s name="%s" preset=%s   saved (non-preset) layouts=%d',
+                   tostring(layoutInfo.activeLayout), tostring(active and active.layoutName or '?'),
+                   tostring(isPreset), saved)
+
+            -- Not a fault, and worth saying so plainly: with no saved layout the write loop
+            -- in SyncUnitFrameEditModeSetting runs zero times, and a preset would refuse
+            -- the save regardless. That is the reason the raid settings live in our own
+            -- profile, which the line above reports. Only a disagreement between the two
+            -- is a problem now.
+            if saved == 0 or isPreset then
+                DF:Log(tag, 'note: Blizzard\'s layout cannot keep these settings (%s), which is why the profile ' ..
+                           'line above is the one that counts',
+                       (saved == 0) and 'no saved layout' or 'active layout is a preset')
+            end
+        else
+            DF:Log(tag, 'edit mode layout: C_EditMode.GetLayouts returned nothing usable')
+        end
+    end
+
+    local container = _G['CompactRaidFrameContainer']
+    if container then
+        local parentName = (container:GetParent() and container:GetParent().GetName and container:GetParent():GetName()) or
+                               '<anon>'
+        DF:Log(tag, 'CompactRaidFrameContainer: shown=%s visible=%s parent=%s points=%d %.0fx%.0f',
+               tostring(container:IsShown()), tostring(container:IsVisible()), parentName, container:GetNumPoints(),
+               container:GetWidth() or 0, container:GetHeight() or 0)
+
+        -- CompactRaidFrameManager_UpdateContainerVisibility has exactly two terms:
+        --
+        --   if ShouldShowRaidFrames() and CompactRaidFrameManager.container.enabled
+        --
+        -- container.enabled is reachable only through
+        -- CompactRaidFrameManager_SetSetting("IsShown", ...), which is the player's own
+        -- setting, not a preview flag. It sits in cachedSettings with no CVar behind it,
+        -- so forcing it for a preview and failing to put it back leaves a raid with no
+        -- frames, no error, and a reload that appears to fix it. Report both terms.
+        local mgr = _G['CompactRaidFrameManager']
+        local enabled = mgr and mgr.container and mgr.container.enabled
+        local isShown = CompactRaidFrameManager_GetSetting and CompactRaidFrameManager_GetSetting('IsShown')
+        -- Tracked separately from its result: the function returns nil rather than false
+        -- for "no", so a nil on its own cannot tell "the client says no" from "the function
+        -- is not there". Reading them apart is what stops the verdict below from blaming
+        -- the addon for a player who simply is not in a raid.
+        local haveShouldShow = (ShouldShowRaidFrames ~= nil)
+        local shouldShow
+        if haveShouldShow then
+            local okShow, res = pcall(ShouldShowRaidFrames)
+            shouldShow = okShow and res or nil
+        end
+
+        local inRaid = (IsInRaid and IsInRaid()) and true or false
+
+        DF:Log(tag, 'visibility terms: ShouldShowRaidFrames=%s container.enabled=%s GetSetting("IsShown")=%s',
+               haveShouldShow and tostring(shouldShow) or 'ABSENT', tostring(enabled), tostring(isShown))
+        DF:Log(tag, 'group: inRaid=%s members=%s inCombat=%s', tostring(inRaid),
+               tostring((GetNumGroupMembers and GetNumGroupMembers()) or 0), tostring(InCombatLockdown()))
+
+        -- CompactRaidFrameContainerMixin:ReadyToUpdate gates LayoutFrames, and TryUpdate
+        -- does nothing at all when it says no. Group mode and the sort function come only
+        -- from Blizzard's Edit Mode appliers, the two filter functions from the manager's
+        -- OnLoad, so report all four rather than only the frame's own state.
+        local groupMode = container.GetGroupMode and container:GetGroupMode()
+        local ready = container.ReadyToUpdate and container:ReadyToUpdate()
+        local flowCount = (type(container.flowFrames) == 'table') and #container.flowFrames or -1
+
+        -- Two naming schemes, and which one is in use depends on the group mode. "flush"
+        -- takes flat unit frames from the container's own pool as CompactRaidFrameN;
+        -- "discrete" builds CompactRaidGroupN through CompactRaidGroup_GenerateForGroup
+        -- with CompactRaidGroupNMemberM inside. Counting only the flat ones reports zero
+        -- on a discrete layout that is working perfectly well, so count both.
+        local flat, flatVisible = 0, 0
+        for i = 1, 40 do
+            local m = _G['CompactRaidFrame' .. i]
+            if not m then break end
+            flat = flat + 1
+            if m:IsVisible() then flatVisible = flatVisible + 1 end
+        end
+
+        local groups, groupsVisible, members, membersVisible, withUnit = 0, 0, 0, 0, 0
+        for g = 1, 8 do
+            local gf = _G['CompactRaidGroup' .. g]
+            if gf then
+                groups = groups + 1
+                if gf:IsVisible() then groupsVisible = groupsVisible + 1 end
+
+                for m = 1, 5 do
+                    local mf = _G['CompactRaidGroup' .. g .. 'Member' .. m]
+                    if mf then
+                        members = members + 1
+                        if mf:IsVisible() then membersVisible = membersVisible + 1 end
+                        if mf.unit then withUnit = withUnit + 1 end
+                    end
+                end
+            end
+        end
+
+        DF:Log(tag, 'flow: groupMode=%s ReadyToUpdate=%s flowFrames=%s filterFunc=%s sortFunc=%s groupFilterFunc=%s',
+               tostring(groupMode), tostring(ready), tostring(flowCount), tostring(container.flowFilterFunc ~= nil),
+               tostring(container.flowSortFunc ~= nil), tostring(container.groupFilterFunc ~= nil))
+        DF:Log(tag, 'flat unit frames: %d (visible %d)', flat, flatVisible)
+        DF:Log(tag, 'group frames: %d (visible %d)   members: %d (visible %d, with unit %d)', groups, groupsVisible,
+               members, membersVisible, withUnit)
+
+        if not container:IsShown() and not inRaid then
+            DF:Log(tag, 'VERDICT: nothing to show - not in a raid, so a hidden container is correct')
+        elseif not container:IsShown() and enabled == false then
+            DF:Log(tag, 'VERDICT: container.enabled is false - IsShown was switched off and never restored')
+        elseif not container:IsShown() and haveShouldShow and not shouldShow then
+            DF:Log(tag, 'VERDICT: ShouldShowRaidFrames says no - raid frames do not belong in this situation')
+        elseif ready == false then
+            DF:Log(tag, 'VERDICT: ReadyToUpdate is false, so LayoutFrames never runs and TryUpdate is a no-op - ' ..
+                       'groupMode or the sort function was never set')
+        elseif container:IsShown() and not container:IsVisible() then
+            DF:Log(tag, 'VERDICT: shown, but an ancestor is hidden - see the parent chain below')
+        elseif container:IsShown() and container:GetWidth() <= 2 then
+            DF:Log(tag, 'VERDICT: shown but has no extent - the container was never filled')
+        elseif (flatVisible + membersVisible) == 0 then
+            DF:Log(tag, 'VERDICT: laid out but not one unit frame is visible - the flow ran, the frames did not')
+        else
+            DF:Log(tag, 'VERDICT: %d unit frames are up and drawable - if they are not on screen, check the rect below',
+                   flatVisible + membersVisible)
+        end
+
+        DF:LogFrame(container, tag)
     end
 end
 
@@ -1629,12 +2162,36 @@ function DF:HandleLogCommand(rest)
         DF:LogBlockers(arg ~= '' and arg or nil, 'blockers')
         DF:LogDump('blockers', 60)
     elseif sub == 'tot' then
-        if arg:lower() == 'watch' then
+        local a = arg:lower()
+        if a == 'watch' then
             DF:LogToTWatch(not totWatcher)
-        else
-            DF:LogToT('totdump')
+        elseif a == 'focus' then
+            DF:LogToT('totdump', 'focus')
             DF:LogDump('totdump', 40)
+        else
+            -- both by default: the two run the same mixin, and having the pair
+            -- side by side is what shows which of them lost its parent
+            DF:LogToT('totdump')
+            DF:LogToT('totdump', 'focus')
+            DF:LogDump('totdump', 60)
         end
+    elseif sub == 'bagtrace' then
+        local a = arg:lower()
+        if a == 'off' then
+            DF:LogBagTrace(false)
+        elseif a == 'copy' then
+            DF:LogCopy('bagtrace')
+        elseif a == 'state' then
+            -- Just the numbers, no tracing: run it before and after the thing that
+            -- breaks and compare.
+            DF:LogBagRowState('bagstate')
+            DF:LogDump('bagstate', 20)
+        else
+            DF:LogBagTrace(true)
+        end
+    elseif sub == 'raidopts' then
+        DF:LogRaidOptions('raidopts')
+        DF:LogCopy('raidopts')
     elseif sub == 'globals' then
         DF:LogTaintedGlobals('globals')
         DF:LogCopy('globals')
