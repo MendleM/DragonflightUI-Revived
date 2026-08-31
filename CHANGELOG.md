@@ -14,66 +14,58 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 **Highlights** — login Lua errors fixed at the cause (#26, #28) · party frame taint seed found and removed · genuinely decoupled from Blizzard EditMode · bag row spacing and keyring position stable at last (#30) · seamless combat reload holder positioning · TBC/Era chat frame permanence · Shaman totem anchoring · live Darkmode toggle without /reload · actionbar dividers restricted to main bar
 
 ### Core & Architecture
-- **Login Lua errors fixed at the cause (Issues #26, #28):** `EditModeManagerFrame:UpdateLayoutInfo` is Blizzard's setter behind `EDIT_MODE_LAYOUTS_UPDATED` and takes the layout table as its first argument. This addon called it with no argument, which set `layoutInfo` to `nil` and then threw on the next line inside a `pcall`, so nothing was ever reported. For the rest of the session Blizzard's edit mode had no layout: `IsInitialized()` answered false, `GetDefaultAnchor` failed through `PlayerFrame_ResetPosition`, and `SetToLayoutAnchor` failed through `UIParent_ManageFramePositions` on every reposition and every action bar transition.
-- **Decoupled from Blizzard EditMode:** permanently suppressed Blizzard's EditModeManager through Blizzard's own `BlockEnteringEditMode` gate, and stopped replacing Blizzard functions altogether. The chat window now uses `hooksecurefunc`; the one remaining exception, on the background action bars, is documented in place with the reason it cannot be a hook.
-- **Settings moved out of Blizzard's layout:** five settings used to be written to Blizzard's server-side layout on every login. Four are now applied directly to the frame, the way Blizzard's own appliers do it, and stored in the DragonflightUI profile. The fifth drives which party frame system Blizzard shows and is documented as unavoidable. No anchor pointing at a DragonflightUI frame is ever written again — that was what left the interface broken with the addon disabled.
-- **Leftover `DragonflightUI_Layout` (Issue #27):** a version up to and including `cda4133` created a character-specific Blizzard edit mode layout and made it active. Edit mode layouts live on Blizzard's server, so it outlived the code that made it. The addon now detects it, explains once how to remove it, and offers an opt-out; `/df layoutnotice` brings the message back. Stale anchors inside it are cleaned up automatically, once per character, using Blizzard's own `ResetToDefaultPosition` semantics rather than repointing everything at `UIParent`.
-- **LibEditModeOverride removed:** it was loaded on all six flavours and never called once. Two comments claiming the addon wrote layouts through it were wrong and have been corrected.
-- **Version.API Refactoring:** streamlined universal expansion detection across Era, TBC, Wrath, Cata, and MoP with automatic capability mirroring (`DF.Caps`).
-- **Combat Reload Banner:** silenced on-screen reload state banner to preserve a clean UI during in-combat reloads.
-- **Post-Combat Recovery:** reduced post-combat reapply delay to 100ms for immediate UI responsiveness.
-- **Under the Hood:** Escape closes our windows again without taking keyboard focus. Stopped leaking generic names into `_G` — sixteen earlier in the cycle, and since then four option-builder helpers plus two frames that shipped under the placeholder names `sss` and `**`.
+- Fixed the login Lua errors in Issues #26 and #28, at the cause: a Blizzard setter was being called with no argument, which erased Blizzard's edit mode layout for the rest of the session.
+- Genuinely decoupled from Blizzard's Edit Mode: it stays blocked, no Blizzard function is replaced any more, and settings live in this addon's own profile instead of Blizzard's layout.
+- Leftover `DragonflightUI_Layout` (Issue #27): a one-time notice explains how to remove it, with an opt-out; `/df layoutnotice` brings it back. Stale anchors inside it are cleaned up automatically.
+- `LibEditModeOverride` removed - loaded on every flavour, never called.
+- Streamlined expansion detection across Era, TBC, Wrath, Cata and MoP.
+- Silenced the on-screen combat reload banner and sped up post-combat recovery to 100ms.
+- Escape closes our windows again without stealing keyboard focus. Stopped leaking generic names into `_G`.
 
 ### Chat
-- **TBC & Era Chat Permanence:** decoupled `ChatFrame1` from Blizzard's EditModeManager and legacy position manager. The chat window stays firmly anchored through loading screens, reloads, and window resizing without disappearing.
+- TBC & Era: the chat window stays anchored through loading screens, reloads and resizing without disappearing.
 
 ### Unit Frames & Party / Raid
-- **Raid frames configurable from DragonflightUI:** the raid frame Edit Mode settings — raid size, frame width and height, group split, border, sort order, template, opacity, icon size — are now offered under Unitframes ▸ Raid Frame and on the Raid Frame entry in this addon's own edit mode. Reaching them used to mean disabling the addon, reloading, opening Blizzard's Edit Mode and enabling it again; Blizzard's Edit Mode stays blocked and no longer needs to be visited. The options are built from Blizzard's own `EditModeSettingDisplayInfoManager`, so labels, bounds and choices are Blizzard's and localised, and `HasSetting` on the registered system frame decides what appears — a flavour without a setting simply does not show it.
-- **Raid frame placement and preview:** the raid frame now has a real placeholder in this addon's edit mode, with position, scale and visibility like every other unit frame. The selection used to hang off Blizzard's `CompactRaidFrameManagerContainerResizeFrame`, which the client keeps hidden and unanchored now that raid frames are an Edit Mode system, so it could never be seen or dragged. It sits on a holder of this addon's own, declared in XML for the same reason the party holder is. Alone, the placeholder previews the layout from those settings; in a group Blizzard's real frames are shown instead, the way its own edit mode does it.
-- **Party & Raid Frame Toggle (Issue #14):** Fixed "Use Raid-Style Party Frames" (Gruppen wie Schlachtzug anzeigen) to switch immediately and live between portrait party frames and compact raid frames without requiring a `/reload`. The DragonflightUI database is the single source of truth and the sync to Blizzard is one-way, through Blizzard's own `OnSystemSettingChange`.
-- **Party frame blocked actions, fixed at the seed:** this addon wrote `PartyFrame.system` and `PartyFrame.systemIndex`. Those are the two fields Blizzard uses to identify a registered edit mode system, and it reads them inside `secureexecuterange` on every `UseRaidStylePartyFrames()` call — which both party visibility paths ask. Writing them from addon code made them insecure for the session, and the taint travelled through `UpdateRaidAndPartyFrames` → `UpdatePartyFrames` → `UpdateMember` into the pooled members' `unit`, `buffs` and `debuffs`. Neither field was ever read by this addon; they only existed for a helper that no longer exists.
-- **Removed the workaround that caused it:** Blizzard's `EditModeManagerFrame:UseRaidStylePartyFrames` was being replaced outright, and reinstalled on every `ADDON_LOADED`, so Blizzard's own visibility checks ran addon code on a protected path. It had been added one commit after the `UpdateLayoutInfo` bug above broke the real accessor — a workaround for a symptom whose cause is now fixed.
-- **Party Frame Positioning & Fonts:** Unified party member names and health/mana status text typography to FRIZQT outline font, and anchored the pooled modern `PartyFrame` container directly to `DragonflightUIPartyMoveFrame`.
-- **Edit Mode Party Preview:** Dynamic preview switching between 4 portrait party member frames and 5 compact raid member boxes based on the active raid-style party frame setting.
-- **Shaman Totem Bar:** dynamic `HasTotemBar` detection and anchored positioning to prevent active totem icons from snapping below player frame.
-- **Combat Reload Visuals:** early holder pre-positioning and immediate visual skinning prevent visual snapping when reloading during combat.
-- **Pet Frame Anchoring:** locked `PetFrame` to `DragonflightUIPetFrame` and suppressed Blizzard's position manager to prevent the unit frame from jumping to default coordinates when summoning a pet.
-- **TBC:** the pet frame is back. It was saved to the layout and then never actually placed.
-- **Focus Target & Faction Icons:** focus target frame restored on TBC and MoP; target faction icon alignment fixed on Era.
-- **Target of Target:** eliminated reload errors during combat when target-of-target is not yet built.
+- Raid frames are configurable from DragonflightUI at last - raid size, frame width and height, group split, border, sort order, template, opacity, icon size - under Unitframes ▸ Raid Frame and in this addon's own edit mode, with a preview. No more disabling the addon to reach Blizzard's Edit Mode.
+- Fixed "Use Raid-Style Party Frames" (Issue #14) switching immediately and living through a `/reload`.
+- Found and removed the party frame taint seed - two fields this addon wrote onto Blizzard's `PartyFrame` that Blizzard itself reads on every visibility check.
+- Party member names and health/mana text unified to the FRIZQT outline font.
+- Shaman totem bar anchors correctly instead of snapping below the player frame.
+- Pet frame no longer jumps to default coordinates when summoning a pet.
+- TBC: the pet frame is back after being saved to the layout but never placed.
+- Focus target frame restored on TBC and MoP; target faction icon fixed on Era.
+- Fixed a combat reload error from target-of-target not being built yet.
 
 ### Action Bars
-- **Pet Bar Sizing & Centering (Issue #13):** standardized default button scale to 0.8 (36px), removed legacy fixed 30px sizing loop, and centered icon art to prevent undersized pet action buttons.
-- **SpellBook & Pet Action Taint:** neutralized Blizzard's default `UpdateShownButtons` and `SetShowGrid` on background bars to eliminate `ADDON BLOCKED` errors when opening the spellbook, leveling up, or casting pet abilities.
-- **Pet Bar Clickability:** disabled mouse interception on replaced Blizzard container frames and updated secure frame templates so pet action buttons are immediately clickable upon login.
-- **Bar Dividers:** fixed rendering condition so dividers only appear on Action Bar 1 when background border art is active, removing stray lines from Action Bars 2–8.
-- **Art Cleanup:** eliminated legacy Blizzard gryphons and duplicate visual layers on TBC.
-- **Scaling & Alignment:** corrected Action Bar 1 scaling and in-combat alignment for backpack and bag bar slots.
-- **Flyout Direction:** choosing *Up* works properly.
-- **MoP:** the latency indicator sits on the bottom edge of the game menu button instead of in the middle of it.
-- **Keyring (Cata & MoP):** suppressed phantom keyring button on Cataclysm and MoP while preserving full display and styling on Classic Era, TBC, and Wrath.
-- **Reputation Bar:** unchecking "Show as experience bar" (Als Erfahrungsleiste anzeigen) now properly hides the reputation text immediately without requiring a /reload.
-- **FPS Frame (Issue #16):** prevented duplicate FPS/latency frame creation during initialization, resolving ghost/duplicate FPS overlays when moving the frame in Edit Mode.
-- **MoP Bag Counter:** fixed free bag slots counter placement and text sizing inside the backpack button.
-- **Bag row spacing (Issue #30):** `BagsBarMixin:Layout` re-anchors all five buttons from `bagPadding`, which is 5, so the row spread out and bag 1 lost the 12px gap it needs for the expand arrow. Three things ran it. The first mouseover after login, because `OnCursorChanged` calls `SetExpandBarAuto` on every `CURSOR_CHANGED` and the initial `nil` → `false` counts as a change. Every reload, through `EventUtil.ContinueOnVariablesLoaded` at `VARIABLES_LOADED`. And every collapse or expand, because `KeyringMixin:OnShow` is `self:GetParent():Layout()`. Hooking `BagsBar.Layout` cannot catch any of it: `RegisterCallback` and `GenerateClosure` both captured the function value at load, so replacing the table field is invisible to the caller. The hook now sits on `MainMenuBarBagManager:OnExpandBarChanged`, which is called through a live table lookup, with `PLAYER_ENTERING_WORLD` covering the load-time pass.
-- **Keyring position (Issue #30):** the keyring was shown from inside the loop that shows the bags, so `KeyringMixin:OnShow` ran Blizzard's layout on the first pass with only bag 1 visible. `Layout` chains only the buttons visible at that moment, so it built keyring → bag 1 → backpack and left the other three on stale anchors, stranding the keyring in the middle of the row. It is now shown after the bags.
-- **Bag row in combat (Issue #30):** none of these buttons are protected, so the blanket combat guard added earlier in this cycle was wrong in both directions: it let Blizzard's layout through and blocked the correction, leaving the row scrambled after a mid-fight collapse or reload. Each button is now asked with `IsProtected` instead, and the retry is driven by what the anchoring reports rather than by the combat flag — which matters because `PLAYER_REGEN_ENABLED` fires while `UnitAffectingCombat` is still set.
-- **Keyring spacing (Issue #30):** the gap to the last bag was never an anchor problem. `BagsBarMixin:Layout` runs `UpdateOrientation` on every registered bag button, and for the keyring that is `self:SetSize(self.initialWidth, self.initialHeight)` — dimensions captured in `KeyringMixin:OnLoad`, before this addon restyles the button into a 30x30 disc. Measured, that is 18x39 against the bags' 30x30. The artwork is 30.5px and centred on the frame, so on the narrower frame it overhung roughly six pixels each side and crowded the neighbouring bag. The size is now reasserted alongside the anchors.
-- **Keyring scale (Issue #30):** the keyring scales with the bag row instead of staying at full size.
-- **New: `/df log bagtrace`:** logs every `SetPoint`, `Show` and `Hide` on the bag row with the caller's stack and the combat state, and `/df log bagtrace state` prints what the layout is computed from — Blizzard's padding and expand flags, the saved collapsed state, and each button's anchor, visibility and protected status. All of the above was found with it after three fixes aimed at guessed callers had failed.
+- Pet bar buttons resized to their correct scale and centred (Issue #13).
+- Fixed `ADDON BLOCKED` errors on spellbook open, levelling up and pet casts.
+- Pet action buttons are clickable immediately on login.
+- Bar dividers now only appear on Action Bar 1, not 2-8.
+- Removed legacy Blizzard gryphon art and duplicate visuals on TBC.
+- Fixed Action Bar 1 scaling and in-combat alignment.
+- Flyout direction *Up* works properly.
+- MoP: the latency indicator sits correctly on the game menu button.
+- Keyring suppressed on Cata and MoP, kept on Era, TBC and Wrath.
+- Unchecking "Show as experience bar" hides the reputation text immediately.
+- Fixed duplicate FPS/latency frames (Issue #16).
+- MoP: fixed the bag counter's placement and text size.
+- Bag row spacing (Issue #30): the bags no longer drift apart on their own - on login, on collapse and expand, and after a reload, in combat included.
+- Keyring position (Issue #30): stays at the end of the row instead of landing in the middle of the bags.
+- Keyring spacing (Issue #30): sits at the correct distance from the last bag instead of overlapping it.
+- Keyring scale (Issue #30): scales with the rest of the bag row.
+- New: `/df log bagtrace` for tracing bag row and keyring issues.
 
 ### Professions
-- **Skill rank text restored (Issue #29):** the number on the profession rank bar was being created on the bar's parent frame, which puts it behind the bar's own fill texture — a child frame draws above every draw layer of its parent, `OVERLAY` included. The bar was fully drawn and the text was underneath it. It now lives on the bar itself.
-- **Beast Training:** restored Beast Training (Wildtierausbildung) and CraftFrame support for Hunter pets in Classic Era, Season of Discovery, and TBC with spellbook tab scanning, training points counter, and legacy craft frame suppression.
-- **MoP & Cataclysm Crash Fix:** included `LibTradeSkillRecipes` in MoP and Cata TOC files and hardened mixins to prevent startup errors and restore the Dragonflight UI profession window.
+- Skill rank text is visible again (Issue #29) - it was drawn behind the bar's own fill texture.
+- Restored Beast Training and CraftFrame support for Hunter pets on Era, Season of Discovery and TBC.
+- Fixed a MoP and Cataclysm startup crash in the profession window.
 
 ### Dark Mode
-- **Live Toggle:** Dark Mode can now be toggled on and off live with immediate color and saturation restoration without requiring `/reload`.
-- **Dynamic State Lookup:** unit frame hooks, action bar buttons, and flyouts dynamically fetch active settings to avoid stale styling closures.
-- **Party Member Borders:** the golden party border now goes dark with every other unit frame. Dark Mode was walking `PartyMemberFrame1` through `4`, globals that do not exist on Era 1.15.9, TBC 2.5.6 and MoP 5.5.4 where the member frames come out of `PartyFrame.PartyMemberFramePool` — so the loop found nothing and failed quietly. The border also survives a roster change now, which previously restored the golden art.
+- Live toggle: switch Dark Mode on and off without a `/reload`.
+- Party member borders go dark with every other unit frame, and stay dark through a roster change.
 
 ### Nameplates
-- Fixed an error that could repeat hundreds of times in a session from querying a nameplate's parent when the element was not a frame. Reported with Plater.
+- Fixed a repeating error from querying a nameplate's parent when it was not a frame. Reported with Plater.
 
 ## 0.43.0 — Party frames and professions (13 August 2026)
 
