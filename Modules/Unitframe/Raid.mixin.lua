@@ -69,7 +69,18 @@ function SubModuleMixin:SetDefaults()
         hideNoStealth = false,
         hideBattlePet = false,
         hideCustom = false,
-        hideCustomCond = ''
+        hideCustomCond = '',
+
+        -- Blizzard's own raid Edit Mode settings, keyed by setting id as a string.
+        --
+        -- Held here because Blizzard's layout cannot hold them. C_EditMode.GetLayouts
+        -- returns the player's own layouts only, so an account that never built one
+        -- hands back an empty list and the write loop in SyncUnitFrameEditModeSetting
+        -- runs zero times. And even with a layout present, SaveLayoutChanges refuses to
+        -- save into a preset, which is what a default account is on. Both were true on
+        -- the report: preset "Classic", zero saved layouts, frame width applied live at
+        -- 112 and back to the preset's 98 after a reload.
+        blizzSettings = {}
     };
     self.Defaults = defaults;
 end
@@ -232,13 +243,35 @@ function SubModuleMixin:SetupOptions()
 
                 local option = {
                     name = info.name or tostring(setting),
-                    desc = 'Blizzard Edit Mode setting. Applied at once and kept in your Edit Mode layout.' .. note,
+                    desc = 'Blizzard Edit Mode setting. Applied at once and kept in this addon\'s profile.' .. note,
                     order = order,
                     editmode = true
                 }
 
-                local function GetStored() return addonTable:GetRaidEditModeSettingBySetting(setting) end
-                local function SetStored(value) addonTable:SetRaidEditModeSettingBySetting(setting, value) end
+                -- Our profile is the source of truth; Blizzard's system frame is only
+                -- where the value gets pushed so it takes effect. Reading Blizzard's live
+                -- value while nothing is stored seeds the first read, so upgrading does
+                -- not move anybody's frames.
+                local settingKey = tostring(setting)
+
+                local function SavedTable()
+                    local profile = Module.db and Module.db.profile
+                    return profile and profile.raid and profile.raid.blizzSettings
+                end
+
+                local function GetStored()
+                    local saved = SavedTable()
+                    if saved and saved[settingKey] ~= nil then return saved[settingKey] end
+
+                    return addonTable:GetRaidEditModeSettingBySetting(setting)
+                end
+
+                local function SetStored(value)
+                    local saved = SavedTable()
+                    if saved then saved[settingKey] = value end
+
+                    addonTable:SetRaidEditModeSettingBySetting(setting, value)
+                end
 
                 if info.type == types.Checkbox then
                     option.type = 'toggle'
@@ -740,6 +773,22 @@ function SubModuleMixin:Setup()
             -- One frame later, for the same reason initRaid waits above: the settings can
             -- still be unreadable while the event is being handled.
             C_Timer.After(0, function()
+                -- Push the stored settings back onto Blizzard's system frame first.
+                -- Nothing else does it: the layout the client applies at login is a
+                -- preset carrying its own numbers, so without this the profile is never
+                -- consulted and frame width and friends fall back on every reload.
+                local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile
+                local saved = profile and profile.raid and profile.raid.blizzSettings
+
+                if saved then
+                    for key, value in pairs(saved) do
+                        local setting = tonumber(key)
+                        if setting and value ~= nil then
+                            addonTable:SetRaidEditModeSettingBySetting(setting, value)
+                        end
+                    end
+                end
+
                 if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
 
                 local c = _G['CompactRaidFrameContainer']
