@@ -176,8 +176,29 @@ function SubModuleMixin:SetupOptions()
     -- The forDisplay direction runs self:ClampValue, which lives on the dialog's
     -- slider rather than on the data. A proxy supplies it, so Blizzard's arithmetic
     -- is still what runs.
+    -- Only converted when the stored value clearly is not already the real one.
+    --
+    -- The live values say the stored form is absolute. FrameWidth is described as
+    -- minValue 72, maxValue 144, ConvertValueDiffFromMin, and /df log raidopts read it
+    -- back as 98 - applying DiffFromMin would make that 170, past the maximum, and pin
+    -- the slider at the far end. FrameHeight reads 44 against 36 to 72, RowSize 5,
+    -- Transparency and IconSize 100: every one of them already inside its own range.
+    --
+    -- ConvertValue exists for Blizzard's own slider widget, whose internal value is not
+    -- the setting value. Reading the setting straight off the system frame skips that
+    -- widget entirely, so there is nothing to undo.
+    --
+    -- It is still used as a fallback for any setting whose stored value does land
+    -- outside its range, rather than assuming this holds everywhere. Identical bounds
+    -- in classic_era, classic_anniversary and classic, so this reasoning covers Era,
+    -- TBC and MoP alike.
     local function ConvertSettingValue(info, value, forDisplay)
-        if not (info and info.ConvertValue) then return value end
+        if not info then return value end
+
+        local minV, maxV = info.minValue, info.maxValue
+        local inRange = minV and maxV and value and value >= minV and value <= maxV
+
+        if inRange or not info.ConvertValue then return value end
 
         local host = info
         if forDisplay and not info.ClampValue then
