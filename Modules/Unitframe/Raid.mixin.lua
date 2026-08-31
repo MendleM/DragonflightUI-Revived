@@ -15,17 +15,24 @@ function SubModuleMixin:Init()
 end
 
 function SubModuleMixin:SetDefaults()
+    -- Position and scale are live now, so these are no longer commented out.
+    --
+    -- The default anchor is deliberately UIParent TOPLEFT with a zero offset rather
+    -- than invented coordinates: Update() calibrates once from wherever the raid
+    -- container already sits and writes that into the profile, so the first run does
+    -- not teleport anybody's raid frames to a spot this file guessed at.
     local defaults = {
         -- breakUpLargeNumbers = true,
         -- enableThreatGlow = true,
-        -- scale = 1.0,
-        -- override = false,
-        -- anchorFrame = 'PlayerFrame',
-        -- customAnchorFrame = '',
-        -- anchor = 'TOPRIGHT',
-        -- anchorParent = 'BOTTOMRIGHT',
-        -- x = 4,
-        -- y = 28,
+        scale = 1.0,
+        override = false,
+        anchorFrame = 'UIParent',
+        customAnchorFrame = '',
+        anchor = 'TOPLEFT',
+        anchorParent = 'TOPLEFT',
+        x = 0,
+        y = 0,
+        calibrated = false,
         -- hideStatusbarText = false,
         -- offset = false,
         -- hideIndicator = false,
@@ -605,6 +612,12 @@ function SubModuleMixin:SetupOptions()
                 local value = Settings.GetValue(moreOptions[sub].proxy);
                 return value;
             end
+
+            -- Everything else out of our own profile. Party's copy of this has always
+            -- ended in getOption; Raid's did not, and returned nil for anything it did
+            -- not recognise - which would have silently broken the position, scale and
+            -- visibility options the moment they were registered.
+            return getOption(info)
         end
 
         optionsRaid.set = function(info, value)
@@ -628,6 +641,7 @@ function SubModuleMixin:SetupOptions()
 
             if sub == 'useCompactPartyFrames' then
                 addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value)
+                return
             end
 
             if moreOptions[sub] and moreOptions[sub].proxy then
@@ -635,8 +649,12 @@ function SubModuleMixin:SetupOptions()
                 Settings.SetValue(moreOptions[sub].proxy, value);
                 -- InterfaceOverrides.SetRaidProfileOption(sub, value);
                 -- local isSecure, taint = issecurevariable('CompactRaidGroup1Member1')
-                -- print('SECURE? ', isSecure, ', TAINT? ', taint)       
+                -- print('SECURE? ', isSecure, ', TAINT? ', taint)
+                return
             end
+
+            -- Same fallback as the getter, and for the same reason.
+            setOption(info, value)
         end
     end
     local optionsRaidEditmode = {
@@ -661,6 +679,12 @@ function SubModuleMixin:SetupOptions()
         }
     }
 
+    -- Position, scale and visibility, the same tables every other unit frame here
+    -- registers. Raid was the only one without them, which is why its edit mode entry
+    -- offered nothing to change even once the selection was reachable.
+    DF.Settings:AddPositionTable(Module, optionsRaid, 'raid', 'Raid', getDefaultStr, frameTable)
+    DragonflightUIStateHandlerMixin:AddStateTable(Module, optionsRaid, 'raid', 'Raid', getDefaultStr)
+
     self.Options = optionsRaid;
     self.OptionsEditmode = optionsRaidEditmode;
 end
@@ -683,8 +707,19 @@ function SubModuleMixin:Setup()
     local EditModeModule = DF:GetModule('Editmode');
     local initRaid = function()
         --         
-        local f = _G['CompactRaidFrameManagerContainerResizeFrame']
-        _G['CompactRaidFrameManagerContainerResizeFrameResizer']:SetFrameLevel(15)
+        -- Our own holder, not Blizzard's resize frame.
+        --
+        -- This used to be CompactRaidFrameManagerContainerResizeFrame. That frame
+        -- lives under CompactRaidFrameManager, which the client keeps hidden now that
+        -- raid frames are an Edit Mode system, and it has no anchor points - /df log
+        -- frame reported "shown=true visible=false points=0". So the selection existed
+        -- but could never be seen or dragged, which is why the raid entry in our edit
+        -- mode did nothing while the party one worked.
+        local f = self:EnsureRaidMoveFrame()
+        if not f then return end
+
+        local resizer = _G['CompactRaidFrameManagerContainerResizeFrameResizer']
+        if resizer then resizer:SetFrameLevel(15) end
 
         local fakeRaid = CreateFrame('Frame', 'DragonflightUIEditModeRaidFramePreview', f,
                                      'DFEditModePreviewRaidFrameTemplate')
@@ -718,41 +753,21 @@ function SubModuleMixin:Setup()
                 -- setDefaultSubValues('focus')
             end,
             moduleRef = self.ModuleRef,
-            showFunction = function()
-                --  
-                f:Show()
-                CompactRaidFrameManager_SetSetting('Locked', false)
-                f:Show()
-            end,
-            hideFunction = function()
-                --      
-                CompactRaidFrameManager_SetSetting('Locked', true)
-                if CompactRaidFrameManager_ResizeFrame_SavePosition then
-                    if CompactRaidFrameManager_ResizeFrame_SavePosition then
-                    CompactRaidFrameManager_ResizeFrame_SavePosition(CompactRaidFrameManager)
-                end
-                end
-            end
+            -- The old CompactRaidFrameManager_SetSetting('Locked', ...) pair is gone
+            -- from both of these, along with the ResizeFrame_SavePosition call and the
+            -- CompactRaidFrameManager_UpdateContainerVisibility hook that kept
+            -- re-unlocking it.
+            --
+            -- All of that drove Blizzard's old raid manager, which the client now keeps
+            -- hidden. Dragging happens on our own holder and its position is stored in
+            -- the DragonflightUI profile through the position table, the same as every
+            -- other unit frame here - so writing Blizzard's resize-frame position was
+            -- both pointless and a write into a frame we no longer use.
+            showFunction = function() f:Show() end,
+            hideFunction = function() end
         });
 
         fakeRaid:UpdateState(nil)
-
-        hooksecurefunc('CompactRaidFrameManager_UpdateContainerVisibility', function()
-            -- print('CompactRaidFrameManager_UpdateContainerVisibility')
-            if EditModeModule.IsEditMode then
-                --             
-                -- CompactRaidFrameManager_SetSetting('Locked', false)
-                C_Timer.After(0, function()
-                    --
-                    CompactRaidFrameManager_SetSetting('Locked', false)
-                end)
-            end
-        end)
-
-        f.DFEditModeSelection:HookScript('OnDragStop', function()
-            --
-            CompactRaidFrameManager_ResizeFrame_SavePosition(CompactRaidFrameManager)
-        end)
     end
 
     if HasLoadedCUFProfiles() and CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded then
@@ -776,15 +791,83 @@ end
 function SubModuleMixin:OnEvent(event, ...)
 end
 
+-- The anchor the raid container is parked on.
+--
+-- From XML, never CreateFrame. CompactRaidFrameContainer is protected and gets
+-- reparented onto this frame; a Lua-created global would be insecure and Blizzard
+-- would taint itself updating the raid members, the same way the pooled party members
+-- broke. Load.xml carries the reasoning in full.
+function SubModuleMixin:EnsureRaidMoveFrame()
+    if self.RaidMoveFrame then return self.RaidMoveFrame end
+
+    local moveFrame = _G['DragonflightUIRaidMoveFrame']
+    if not moveFrame then return nil end
+
+    moveFrame:SetParent(UIParent)
+    moveFrame:SetFrameStrata('LOW')
+    moveFrame:SetFrameLevel(2)
+    moveFrame:EnableMouse(false)
+    moveFrame:SetSize(200, 200)
+    self.RaidMoveFrame = moveFrame
+
+    return moveFrame
+end
+
 function SubModuleMixin:UpdateState(state)
     self.state = state;
     self:Update();
-
 end
 
 function SubModuleMixin:Update()
     local state = self.state;
     if not state then return end
+
+    local holder = self:EnsureRaidMoveFrame()
+    if not holder then return end
+
+    local container = _G['CompactRaidFrameContainer']
+
+    -- One-time calibration, so enabling this feature does not move anybody's raid
+    -- frames. Whatever position the container already has becomes the stored default;
+    -- after that the profile is the source of truth.
+    if not state.calibrated and container and container:GetNumPoints() > 0 then
+        local point, relativeTo, relativePoint, x, y = container:GetPoint(1)
+        local relName = (relativeTo and relativeTo.GetName and relativeTo:GetName()) or 'UIParent'
+
+        state.anchor = point or state.anchor
+        state.anchorParent = relativePoint or state.anchorParent
+        state.anchorFrame = relName
+        state.x = x or 0
+        state.y = y or 0
+        state.calibrated = true
+    end
+
+    holder:SetScale(state.scale or 1.0)
+
+    -- Helper resolves the anchor frame and rejects a chain that would close a loop,
+    -- falling back to UIParent and reporting it once per session. The other unit
+    -- frames go through the same pair, so a bad anchor behaves the same everywhere.
+    local parent, legal, chain = Helper:ResolveAnchorParent(holder, state)
+    if not legal then Helper:WarnIllegalAnchor(holder, chain) end
+
+    holder:ClearAllPoints()
+    holder:SetPoint(state.anchor or 'TOPLEFT', parent, state.anchorParent or 'TOPLEFT', state.x or 0, state.y or 0)
+    holder:Show()
+
+    -- Park Blizzard's container on the holder, out of combat only.
+    --
+    -- Protected frame: the client refuses SetParent and SetPoint on it mid-fight, and
+    -- reparenting is why this holder has to come from XML. Blizzard's Edit Mode also
+    -- re-places the container from its layout at login, so this runs from Update,
+    -- which the module calls again on every settings apply.
+    if container and not Helper:IsCombatLocked() then
+        local ok, err = pcall(function()
+            if container:GetParent() ~= holder then container:SetParent(holder) end
+            container:ClearAllPoints()
+            container:SetPoint('TOPLEFT', holder, 'TOPLEFT', 0, 0)
+        end)
+        if not ok then geterrorhandler()('DFUI raid container anchor: ' .. tostring(err)) end
+    end
 end
 
 function SubModuleMixin:AddRaidframeRoleIcons()

@@ -47,4 +47,24 @@
 	-->
 	<Frame name="DragonflightUIPartyMoveFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 	</Frame>
+	<!--
+		Same reasoning as the party holder above, and for the same reason it has to
+		be XML: CompactRaidFrameContainer is reparented onto this one, and it is
+		protected. A Lua-created global would be insecure, Blizzard would taint
+		itself while updating the raid members, and the member frames would start
+		refusing Show and SetAttribute - exactly what happened to the pooled party
+		members.
+
+		The raid edit mode selection used to hang off Blizzard's
+		CompactRaidFrameManagerContainerResizeFrame instead. That frame sits under
+		CompactRaidFrameManager, which the client keeps hidden now that raid frames
+		are an Edit Mode system, and it carries no anchor points at all - so the
+		selection was invisible and unplaceable. /df log frame reported it as
+		"shown=true visible=false points=0".
+
+		Not hidden: this is only ever an anchor, and what hangs off it must stay
+		visible.
+	-->
+	<Frame name="DragonflightUIRaidMoveFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
+	</Frame>
 </Ui>
