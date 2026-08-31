@@ -1944,18 +1944,43 @@ function DF:LogRaidOptions(tag)
         local ready = container.ReadyToUpdate and container:ReadyToUpdate()
         local flowCount = (type(container.flowFrames) == 'table') and #container.flowFrames or -1
 
-        local created, shownMembers = 0, 0
+        -- Two naming schemes, and which one is in use depends on the group mode. "flush"
+        -- takes flat unit frames from the container's own pool as CompactRaidFrameN;
+        -- "discrete" builds CompactRaidGroupN through CompactRaidGroup_GenerateForGroup
+        -- with CompactRaidGroupNMemberM inside. Counting only the flat ones reports zero
+        -- on a discrete layout that is working perfectly well, so count both.
+        local flat, flatVisible = 0, 0
         for i = 1, 40 do
             local m = _G['CompactRaidFrame' .. i]
             if not m then break end
-            created = created + 1
-            if m:IsShown() then shownMembers = shownMembers + 1 end
+            flat = flat + 1
+            if m:IsVisible() then flatVisible = flatVisible + 1 end
+        end
+
+        local groups, groupsVisible, members, membersVisible, withUnit = 0, 0, 0, 0, 0
+        for g = 1, 8 do
+            local gf = _G['CompactRaidGroup' .. g]
+            if gf then
+                groups = groups + 1
+                if gf:IsVisible() then groupsVisible = groupsVisible + 1 end
+
+                for m = 1, 5 do
+                    local mf = _G['CompactRaidGroup' .. g .. 'Member' .. m]
+                    if mf then
+                        members = members + 1
+                        if mf:IsVisible() then membersVisible = membersVisible + 1 end
+                        if mf.unit then withUnit = withUnit + 1 end
+                    end
+                end
+            end
         end
 
         DF:Log(tag, 'flow: groupMode=%s ReadyToUpdate=%s flowFrames=%s filterFunc=%s sortFunc=%s groupFilterFunc=%s',
                tostring(groupMode), tostring(ready), tostring(flowCount), tostring(container.flowFilterFunc ~= nil),
                tostring(container.flowSortFunc ~= nil), tostring(container.groupFilterFunc ~= nil))
-        DF:Log(tag, 'member frames: created=%d shown=%d', created, shownMembers)
+        DF:Log(tag, 'flat unit frames: %d (visible %d)', flat, flatVisible)
+        DF:Log(tag, 'group frames: %d (visible %d)   members: %d (visible %d, with unit %d)', groups, groupsVisible,
+               members, membersVisible, withUnit)
 
         if not container:IsShown() and enabled == false then
             DF:Log(tag, 'VERDICT: container.enabled is false - IsShown was switched off and never restored')
@@ -1968,6 +1993,11 @@ function DF:LogRaidOptions(tag)
             DF:Log(tag, 'VERDICT: shown, but an ancestor is hidden - see the parent chain below')
         elseif container:IsShown() and container:GetWidth() <= 2 then
             DF:Log(tag, 'VERDICT: shown but has no extent - the container was never filled')
+        elseif (flatVisible + membersVisible) == 0 then
+            DF:Log(tag, 'VERDICT: laid out but not one unit frame is visible - the flow ran, the frames did not')
+        else
+            DF:Log(tag, 'VERDICT: %d unit frames are up and drawable - if they are not on screen, check the rect below',
+                   flatVisible + membersVisible)
         end
 
         DF:LogFrame(container, tag)
