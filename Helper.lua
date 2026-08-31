@@ -283,18 +283,41 @@ end)
 -- Not every flavour has this event, and RegisterEvent throws on an unknown one.
 pcall(legacyEditModeWatcher.RegisterEvent, legacyEditModeWatcher, 'EDIT_MODE_LAYOUTS_UPDATED')
 
-function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
-    local val = (enabled and 1) or 0
-
-    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSetting) then
-        return
-    end
+-- Write one Edit Mode unit frame setting, and have Blizzard apply it.
+--
+-- Generalised out of the party raid-style sync below, because the raid frame
+-- settings need the same two steps for the same reason. Every applier in
+-- EditModeUnitFrameSystemMixin reads its own value back out of the layout:
+--
+--   UpdateSystemSettingFrameWidth -> UpdateCompactRaidFrameContainerSetting
+--     -> CompactUnitFrame_UpdateAllFromEditMode -> GetSettingValue(...)
+--       -> GetRegisteredSystemFrame(...) -> systemFrame:GetSettingValue(...)
+--
+-- There is no route that applies these to the frames directly, which is why the
+-- block of raid options in Raid.mixin.lua sat commented out for so long. So the
+-- value goes to the registered system frame through Blizzard's own setter, and to
+-- the layout so it survives a reload.
+--
+-- SETTINGS VALUES ONLY. anchorInfo is never written here and must not be - an
+-- anchor pointing at a DragonflightUI frame is what used to leave the interface
+-- broken with this addon disabled. A setting value is self-contained and still
+-- means something without this addon, which is the line we drew.
+--
+-- systemFrame is the frame Blizzard registered for that system, and it is what
+-- OnSystemSettingChange needs: PartyFrame for the party system, CompactRaidFrame-
+-- Container for the raid one.
+function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, systemFrame, label)
+    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSetting) then return end
+    if setting == nil or value == nil then return end
 
     local targetSystem = Enum.EditModeSystem.UnitFrame
-    local targetSystemIndex = Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Party
-    local targetSetting = Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames
+    if not targetSystem then return end
 
-    if not targetSystem or not targetSetting then return end
+    local val = value
+    if type(val) == 'boolean' then val = val and 1 or 0 end
+
+    local targetSystemIndex = systemIndex
+    local targetSetting = setting
 
     -- PartyFrame.system / PartyFrame.systemIndex are NOT written here any more,
     -- and must not be. They were the party taint seed.
@@ -383,9 +406,9 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
     --
     -- Out of combat only: that chain ends in Show/Hide and SetPoint on the
     -- protected party frames, which the client refuses mid-fight.
-    if EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and PartyFrame then
-        Helper:RunOutOfCombat('party raid style setting', function()
-            local ok, err = pcall(EditModeManagerFrame.OnSystemSettingChange, EditModeManagerFrame, PartyFrame,
+    if EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and systemFrame then
+        Helper:RunOutOfCombat(label or 'unit frame edit mode setting', function()
+            local ok, err = pcall(EditModeManagerFrame.OnSystemSettingChange, EditModeManagerFrame, systemFrame,
                                   targetSetting, val)
             if not ok then geterrorhandler()('DFUI OnSystemSettingChange: ' .. tostring(err)) end
         end)
@@ -400,6 +423,77 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
             pcall(C_EditMode.SaveLayouts, layoutInfo)
         end
     end
+end
+
+-- The party raid-style switch, on top of the general writer above.
+--
+-- This is the setting Blizzard consults on both party visibility paths -
+-- UpdateRaidAndPartyFrames, CompactPartyFrame:ShouldShow and
+-- CompactRaidFrameManager all ask UseRaidStylePartyFrames() - so it decides which
+-- party system is live and nothing this addon does can substitute for it.
+function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
+    if not (Enum and Enum.EditModeUnitFrameSetting) then return end
+
+    local systemIndex = Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Party
+
+    addonTable:SyncUnitFrameEditModeSetting(systemIndex, Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames,
+                                            enabled and 1 or 0, _G['PartyFrame'], 'party raid style setting')
+end
+
+-- Which frame did Blizzard register for the raid unit frame system?
+--
+-- OnSystemSettingChange needs it, and it is not the same object as the party one.
+-- Asked rather than assumed, because the answer differs by flavour and a wrong
+-- guess here silently does nothing.
+local function GetRaidSystemFrame()
+    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSystemIndices) then return nil end
+
+    if EditModeManagerFrame and EditModeManagerFrame.GetRegisteredSystemFrame then
+        local ok, frame = pcall(EditModeManagerFrame.GetRegisteredSystemFrame, EditModeManagerFrame,
+                                Enum.EditModeSystem.UnitFrame, Enum.EditModeUnitFrameSystemIndices.Raid)
+        if ok and frame then return frame end
+    end
+
+    return _G['CompactRaidFrameContainer']
+end
+
+-- One raid frame Edit Mode setting, by Enum.EditModeUnitFrameSetting key name.
+--
+-- Takes the name rather than the value so the options table does not have to guard
+-- every entry against a flavour that lacks that setting - unknown keys are simply
+-- skipped here.
+function addonTable:SetRaidEditModeSetting(settingKey, value)
+    if not (Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSystemIndices) then return false end
+
+    local setting = Enum.EditModeUnitFrameSetting[settingKey]
+    if setting == nil then return false end
+
+    addonTable:SyncUnitFrameEditModeSetting(Enum.EditModeUnitFrameSystemIndices.Raid, setting, value,
+                                            GetRaidSystemFrame(), 'raid frame ' .. settingKey)
+    return true
+end
+
+-- The value Blizzard currently holds for a raid setting, or nil when it has none.
+--
+-- Read from the registered system frame, which is the same source Blizzard's own
+-- appliers use, so the options always show what is actually in effect rather than a
+-- copy that can drift. Reading a Blizzard table does not taint it.
+function addonTable:GetRaidEditModeSetting(settingKey)
+    if not (Enum and Enum.EditModeUnitFrameSetting) then return nil end
+
+    local setting = Enum.EditModeUnitFrameSetting[settingKey]
+    if setting == nil then return nil end
+
+    local frame = GetRaidSystemFrame()
+    if not (frame and frame.GetSettingValue and frame.HasSetting) then return nil end
+
+    local hasIt, has = pcall(frame.HasSetting, frame, setting)
+    if not (hasIt and has) then return nil end
+
+    local ok, val = pcall(frame.GetSettingValue, frame, setting)
+    if not ok then return nil end
+
+    return val
 end
 
 -- SetBlizzEditmodeFrameSetting / GetBlizzEditmodeFrameSettingBool used to live

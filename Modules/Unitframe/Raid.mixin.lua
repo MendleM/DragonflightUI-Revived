@@ -110,6 +110,104 @@ function SubModuleMixin:SetupOptions()
         return newTable
     end
 
+    -- The raid frame Edit Mode settings, offered here instead of sending people out
+    -- to Blizzard's Edit Mode - which this addon blocks, so reaching it meant
+    -- disabling the addon and reloading twice.
+    --
+    -- These cannot be applied to the frames directly. Every applier in
+    -- EditModeUnitFrameSystemMixin reads its value back through GetSettingValue ->
+    -- GetRegisteredSystemFrame, so the value has to reach the registered system
+    -- frame and the layout. Helper's SetRaidEditModeSetting does both, the same way
+    -- the party raid-style switch already did.
+    --
+    -- Bounds and choices are taken from Blizzard's own display info rather than
+    -- invented here, because inventing them is how you ship a slider that lets
+    -- people set a value the client then rejects. Anything Blizzard does not
+    -- describe is left out.
+    local EDIT_MODE_RAID_SETTINGS = {
+        {key = 'FrameWidth', kind = 'range', name = 'Frame width', order = 20.1},
+        {key = 'FrameHeight', kind = 'range', name = 'Frame height', order = 20.2},
+        {key = 'RaidGroupDisplayType', kind = 'select', name = 'Groups', order = 20.3},
+        {key = 'DisplayBorder', kind = 'toggle', name = 'Show border', order = 20.4},
+        {key = 'SortPlayersBy', kind = 'select', name = 'Sort players by', order = 20.5},
+        {key = 'RowSize', kind = 'range', name = 'Row size', order = 20.6},
+        {key = 'ViewRaidSize', kind = 'select', name = 'Raid size shown', order = 20.7},
+        {key = 'Opacity', kind = 'range', name = 'Opacity', order = 20.8},
+        {key = 'IconSize', kind = 'range', name = 'Icon size', order = 20.9}
+    }
+
+    -- Blizzard's description of one setting: min, max, step for a slider, or the
+    -- list of choices for a dropdown. Returns nil when this client does not have
+    -- that setting, which is how flavours that lack it drop out.
+    local function GetRaidSettingDisplayInfo(settingKey)
+        if not (Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeSystem) then return nil end
+
+        local setting = Enum.EditModeUnitFrameSetting[settingKey]
+        if setting == nil then return nil end
+
+        local mgr = _G['EditModeSettingDisplayInfoManager']
+        if not (mgr and mgr.GetSettingDisplayInfo) then return nil end
+
+        local ok, info = pcall(mgr.GetSettingDisplayInfo, mgr, Enum.EditModeSystem.UnitFrame, setting)
+        if not ok then return nil end
+
+        return info
+    end
+
+    local function BuildRaidEditModeArgs(args)
+        if not addonTable.SetRaidEditModeSetting then return end
+
+        for _, entry in ipairs(EDIT_MODE_RAID_SETTINGS) do
+            local info = GetRaidSettingDisplayInfo(entry.key)
+
+            -- No description from Blizzard means either the setting does not exist on
+            -- this flavour or its shape is unknown. Either way, not offered.
+            if info then
+                local option = {
+                    name = entry.name,
+                    desc = 'Blizzard Edit Mode setting, applied immediately and stored in your Edit Mode layout.',
+                    order = entry.order,
+                    editmode = true
+                }
+
+                if entry.kind == 'toggle' then
+                    option.type = 'toggle'
+                    option.get = function() return (addonTable:GetRaidEditModeSetting(entry.key) or 0) ~= 0 end
+                    option.set = function(_, value)
+                        addonTable:SetRaidEditModeSetting(entry.key, value and 1 or 0)
+                    end
+                elseif entry.kind == 'range' then
+                    option.type = 'range'
+                    option.min = info.minValue or 0
+                    option.max = info.maxValue or 100
+                    option.step = info.stepSize or 1
+                    option.get = function() return addonTable:GetRaidEditModeSetting(entry.key) end
+                    option.set = function(_, value) addonTable:SetRaidEditModeSetting(entry.key, value) end
+                elseif entry.kind == 'select' then
+                    -- Blizzard hands the choices back as an ordered list of display
+                    -- strings; the value is the index minus one, matching the enums.
+                    local values = {}
+                    for i, text in ipairs(info.options or {}) do values[i - 1] = text end
+
+                    -- No choices means nothing sensible to show, so the entry is
+                    -- dropped rather than rendered as an empty dropdown. Written as a
+                    -- guard instead of a goto: this runs on Lua 5.1, where goto and
+                    -- labels do not exist.
+                    if next(values) ~= nil then
+                        option.type = 'select'
+                        option.values = values
+                        option.get = function() return addonTable:GetRaidEditModeSetting(entry.key) end
+                        option.set = function(_, value) addonTable:SetRaidEditModeSetting(entry.key, value) end
+                    end
+                end
+
+                -- option.type is only set on the branches that produced something
+                -- usable, so this drops the ones that did not.
+                if option.type then args[entry.key] = option end
+            end
+        end
+    end
+
     local optionsRaid = {
         name = L["RaidFrameName"],
         advancedName = 'RaidFrame',
@@ -204,9 +302,12 @@ function SubModuleMixin:SetupOptions()
             --     blizzard = true,
             --     editmode = false
             -- },
+            -- Blizzard's Interface options panel, not the Edit Mode dialog.
             raidFrameBtn = {
                 type = 'execute',
-                name = 'Raid Frame Settings',
+                name = 'Blizzard raid profile options',
+                desc = 'Opens Blizzard\'s own Interface options for raid frames - health text, class colours and ' ..
+                    'the like. The Edit Mode settings, frame size and group layout, are above.',
                 btnName = 'Open',
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
@@ -214,13 +315,6 @@ function SubModuleMixin:SetupOptions()
                 end,
                 order = 5,
                 blizzard = true,
-                editmode = false
-            },
-            headerTaint = {
-                type = 'header',
-                name = 'Use the blizzard settings, as setting them through addons taints the UI.',
-                desc = '',
-                order = 1,
                 editmode = false
             }
             -- headerTaint = {type = 'header', name = 'May Cause Taint Issues - /reload after setup', desc = '', order = 10},
@@ -353,6 +447,10 @@ function SubModuleMixin:SetupOptions()
 
         for k, v in pairs(moreOptions) do optionsRaid.args[k] = v end
 
+        -- After moreOptions, so a hand-written entry can still override one of these
+        -- if a flavour ever needs it.
+        BuildRaidEditModeArgs(optionsRaid.args)
+
         local defaultFuncs = {}
 
         -- Proxy
@@ -389,7 +487,11 @@ function SubModuleMixin:SetupOptions()
                 return addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames()
             end
 
-            if moreOptions[sub].proxy then
+            -- Guarded: args now also holds the Edit Mode settings, which are not in
+            -- moreOptions. They carry their own get/set so this should never be
+            -- reached for them, but an unguarded index here would be an error rather
+            -- than a fallback.
+            if moreOptions[sub] and moreOptions[sub].proxy then
                 -- proxy
                 local value = Settings.GetValue(moreOptions[sub].proxy);
                 return value;
@@ -404,7 +506,7 @@ function SubModuleMixin:SetupOptions()
                 addonTable.SubModuleMixins['Party'].SetRaidStylePartyFrames(value)
             end
 
-            if moreOptions[sub].proxy then
+            if moreOptions[sub] and moreOptions[sub].proxy then
                 -- proxy
                 Settings.SetValue(moreOptions[sub].proxy, value);
                 -- InterfaceOverrides.SetRaidProfileOption(sub, value);

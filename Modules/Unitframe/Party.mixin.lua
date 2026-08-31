@@ -445,9 +445,16 @@ function SubModuleMixin:SetupOptions()
                 blizzard = true,
                 editmode = true
             },
+            -- Blizzard's Interface options panel, not the Edit Mode dialog. Named for
+            -- what it actually opens: the two are easy to confuse, they hold
+            -- different settings, and the Edit Mode ones are offered by this addon
+            -- directly in the Raid section.
             raidFrameBtn = {
                 type = 'execute',
-                name = 'Raid Frame Settings',
+                name = 'Blizzard raid profile options',
+                desc = 'Opens Blizzard\'s own Interface options for raid frames - health text, class colours and ' ..
+                    'the like. Frame size and group layout are Edit Mode settings and are in DragonflightUI\'s ' ..
+                    'Raid section.',
                 btnName = 'Open',
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
