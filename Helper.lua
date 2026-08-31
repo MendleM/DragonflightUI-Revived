@@ -346,7 +346,10 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
     -- plain layout tables, not on the frame. Blizzard sets both itself when it
     -- registers PartyFrame as a system.
 
-    local function EnsureSettingInLayout(layout)
+    -- Takes the value as an argument rather than closing over it, because the layout needs
+    -- the RAW form while the setter above needs the display form. Two different numbers
+    -- for the same change; conflating them is what broke the sliders.
+    local function EnsureSettingInLayout(layout, val)
         if not layout then return end
         layout.systems = layout.systems or {}
         local foundSys = false
@@ -406,22 +409,54 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
     --
     -- Out of combat only: that chain ends in Show/Hide and SetPoint on the
     -- protected party frames, which the client refuses mid-fight.
+    -- Order matters, and so does which form of the value goes where.
+    --
+    -- The value handed in is the DISPLAY value, the number a slider shows. Blizzard's
+    -- setter takes that form and converts it itself:
+    --
+    --   EditModeSystemMixin:UpdateSystemSettingValue(setting, newValue)
+    --     local rawNewValue = self:ConvertSettingDisplayValueToRawValue(setting, newValue)
+    --     settingInfo.value = rawNewValue
+    --
+    -- The LAYOUT stores the raw form. Writing the display value there is what made
+    -- sliders come back at their maximum after a reload: frame width 98 was saved as 98,
+    -- read back as raw on the next login and converted to 98 + 72 = 170, which clamps to
+    -- the maximum of 144. Every reload pushed it further out.
+    --
+    -- So Blizzard's setter runs first and the raw value is then read back off the system
+    -- frame through GetSettingValue(setting, useRawValue), rather than converted here.
+    -- No arithmetic of ours to get wrong, and it stays correct for the settings that have
+    -- no conversion at all.
+    local function WriteLayout()
+        if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
+
+        local rawVal = val
+        if systemFrame and systemFrame.GetSettingValue then
+            local gotRaw, raw = pcall(systemFrame.GetSettingValue, systemFrame, targetSetting, true)
+            if gotRaw and raw ~= nil then rawVal = raw end
+        end
+
+        local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
+        if ok and layoutInfo and layoutInfo.layouts then
+            for _, layout in ipairs(layoutInfo.layouts) do
+                EnsureSettingInLayout(layout, rawVal)
+            end
+            pcall(C_EditMode.SaveLayouts, layoutInfo)
+        end
+    end
+
     if EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and systemFrame then
         Helper:RunOutOfCombat(label or 'unit frame edit mode setting', function()
             local ok, err = pcall(EditModeManagerFrame.OnSystemSettingChange, EditModeManagerFrame, systemFrame,
                                   targetSetting, val)
             if not ok then geterrorhandler()('DFUI OnSystemSettingChange: ' .. tostring(err)) end
-        end)
-    end
 
-    if C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts then
-        local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
-        if ok and layoutInfo and layoutInfo.layouts then
-            for _, layout in ipairs(layoutInfo.layouts) do
-                EnsureSettingInLayout(layout)
-            end
-            pcall(C_EditMode.SaveLayouts, layoutInfo)
-        end
+            -- Inside the same block, so the raw read always happens after Blizzard has
+            -- converted and stored it - including when this was deferred out of combat.
+            WriteLayout()
+        end)
+    else
+        WriteLayout()
     end
 end
 
