@@ -786,8 +786,35 @@ function DFEditModeSystemSelectionBaseMixin:CalcSnapParentToGrid()
     -- db.x = self:SnapToGrid(centerX, gridSize / scale)
     -- db.y = self:SnapToGrid(centerY, gridSize / scale)
 
-    return 'CENTER', 'UIParent', 'CENTER', self:SnapToGrid(centerX, gridSize / scale),
-           self:SnapToGrid(centerY, gridSize / scale)
+    -- CENTER for everything, unless the frame asked for a different corner.
+    --
+    -- Committing CENTER on every drag is fine for a frame of fixed size, and that is all
+    -- of them bar one. The raid frame is exactly as large as the raid, so a CENTER anchor
+    -- makes it grow in all four directions at once - drag it to the left edge and half the
+    -- raid leaves the screen as people join. It asks for TOPLEFT so its corner stays put
+    -- and it grows right and down.
+    --
+    -- Set DFAnchorPoint on the selection to opt in. Anything that does not is unchanged,
+    -- which is why this returns CENTER by default rather than picking something clever.
+    local anchor = self.DFAnchorPoint or 'CENTER'
+
+    local w, h = self.parent:GetWidth() or 0, self.parent:GetHeight() or 0
+    local fromCenter = {
+        TOPLEFT = {-w / 2, h / 2},
+        TOP = {0, h / 2},
+        TOPRIGHT = {w / 2, h / 2},
+        LEFT = {-w / 2, 0},
+        CENTER = {0, 0},
+        RIGHT = {w / 2, 0},
+        BOTTOMLEFT = {-w / 2, -h / 2},
+        BOTTOM = {0, -h / 2},
+        BOTTOMRIGHT = {w / 2, -h / 2}
+    }
+
+    local delta = fromCenter[anchor] or fromCenter.CENTER
+
+    return anchor, 'UIParent', 'CENTER', self:SnapToGrid(centerX + delta[1], gridSize / scale),
+           self:SnapToGrid(centerY + delta[2], gridSize / scale)
 end
 
 function DFEditModeSystemSelectionBaseMixin:SnapToGrid(value, gridSize)

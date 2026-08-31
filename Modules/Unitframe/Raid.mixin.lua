@@ -610,6 +610,14 @@ function SubModuleMixin:Setup()
             return self.Options.name
         end)
 
+        -- Commit drags by the top left corner, not by the middle.
+        --
+        -- CalcSnapParentToGrid returns CENTER for every other frame, and for a frame of
+        -- fixed size that is fine. This holder is exactly as large as the raid, so a CENTER
+        -- anchor would grow it in all four directions and push half the raid off screen
+        -- from a position near an edge.
+        f.DFEditModeSelection.DFAnchorPoint = 'TOPLEFT'
+
         f.DFEditModeSelection:ClearAllPoints()
         f.DFEditModeSelection:SetPoint('TOPLEFT', f, 'TOPLEFT', 0, -7)
         f.DFEditModeSelection:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 11)
