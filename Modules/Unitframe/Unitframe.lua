@@ -229,7 +229,21 @@ function Module:RefreshOptionScreens()
     if self.SubParty.PreviewParty then self.SubParty.PreviewParty.DFEditModeSelection:RefreshOptionScreen(); end
     _G['DragonflightUIPlayerFrame'].DFEditModeSelection:RefreshOptionScreen();
     _G['DragonflightUIPetFrame'].DFEditModeSelection:RefreshOptionScreen();
-    -- self.SubRaid.PreviewRaid.DFEditModeSelection:RefreshOptionScreen();
+
+    -- The raid selection, which used to be the one commented-out line in this list.
+    --
+    -- That single omission is why dragging the raid frame looked like it saved nothing:
+    -- the drag did write x and y to the profile, and every other frame's dialog was told
+    -- to re-read them, so only the raid one kept showing the old numbers until the player
+    -- selected something else and came back.
+    --
+    -- Guarded, unlike its neighbours: the selection now lives on our own holder and is
+    -- only created once the edit mode setup has succeeded, so it can legitimately be
+    -- absent - the frames above always exist from XML.
+    local raidHolder = _G['DragonflightUIRaidMoveFrame']
+    if raidHolder and raidHolder.DFEditModeSelection then
+        raidHolder.DFEditModeSelection:RefreshOptionScreen();
+    end
     _G['DragonflightUITargetFrame'].DFEditModeSelection:RefreshOptionScreen();
     _G['DragonflightUITargetToTFrame'].DFEditModeSelection:RefreshOptionScreen();
     if DF.Cata then self.SubAltPower.PowerBarAltPreview.DFEditModeSelection:RefreshOptionScreen(); end
