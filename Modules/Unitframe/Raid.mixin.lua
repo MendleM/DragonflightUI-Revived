@@ -15,17 +15,20 @@ function SubModuleMixin:Init()
 end
 
 function SubModuleMixin:SetDefaults()
-    -- Position and scale are live now, so these are no longer commented out.
+    -- Position, scale and visibility are live now, so they are no longer commented out.
     --
-    -- The default anchor is deliberately UIParent TOPLEFT with a zero offset rather
-    -- than invented coordinates: Update() calibrates once from wherever the raid
-    -- container already sits and writes that into the profile, so the first run does
-    -- not teleport anybody's raid frames to a spot this file guessed at.
+    -- The anchor default is deliberately UIParent TOPLEFT at a zero offset rather than
+    -- invented coordinates: Update() calibrates once from wherever the raid container
+    -- already sits and writes that into the profile, so the first run does not teleport
+    -- anybody's raid frames to a spot this file guessed at.
+    --
+    -- The commented block that used to trail this table is gone. Ten of its keys were
+    -- duplicates of the visibility defaults above, and the other five - breakUpLarge-
+    -- Numbers, enableThreatGlow, hideStatusbarText, offset, hideIndicator - belong to
+    -- the focus, target and pet frames and were never read here. 'override' went with
+    -- them: nothing in the addon reads it, on any frame.
     local defaults = {
-        -- breakUpLargeNumbers = true,
-        -- enableThreatGlow = true,
         scale = 1.0,
-        override = false,
         anchorFrame = 'UIParent',
         customAnchorFrame = '',
         anchor = 'TOPLEFT',
@@ -52,22 +55,7 @@ function SubModuleMixin:SetDefaults()
         hideNoStealth = false,
         hideBattlePet = false,
         hideCustom = false,
-        hideCustomCond = '',
-        -- hideStatusbarText = false,
-        -- offset = false,
-        -- hideIndicator = false,
-        -- -- Visibility
-        -- showMouseover = false,
-        -- hideAlways = false,
-        -- hideCombat = false,
-        -- hideOutOfCombat = false,
-        -- hidePet = false,
-        -- hideNoPet = false,
-        -- hideStance = false,
-        -- hideStealth = false,
-        -- hideNoStealth = false,
-        -- hideCustom = false,
-        -- hideCustomCond = ''
+        hideCustomCond = ''
     };
     self.Defaults = defaults;
 end
@@ -338,92 +326,10 @@ function SubModuleMixin:SetupOptions()
         set = setOption,
         type = 'group',
         args = {
-            -- scale = {
-            --     type = 'range',
-            --     name = 'Scale',
-            --     desc = '' .. getDefaultStr('scale', 'party'),
-            --     min = 0.1,
-            --     max = 5,
-            --     bigStep = 0.1,
-            --     order = 1,
-            --     editmode = true
-            -- },
-            -- anchorFrame = {
-            --     type = 'select',
-            --     name = 'Anchorframe',
-            --     desc = 'Anchor' .. getDefaultStr('anchorFrame', 'party'),
-            --     values = frameTable,
-            --     order = 4,
-            --     editmode = true
-            -- },
-            -- anchor = {
-            --     type = 'select',
-            --     name = 'Anchor',
-            --     desc = 'Anchor' .. getDefaultStr('anchor', 'party'),
-            --     values = {
-            --         ['TOP'] = 'TOP',
-            --         ['RIGHT'] = 'RIGHT',
-            --         ['BOTTOM'] = 'BOTTOM',
-            --         ['LEFT'] = 'LEFT',
-            --         ['TOPRIGHT'] = 'TOPRIGHT',
-            --         ['TOPLEFT'] = 'TOPLEFT',
-            --         ['BOTTOMLEFT'] = 'BOTTOMLEFT',
-            --         ['BOTTOMRIGHT'] = 'BOTTOMRIGHT',
-            --         ['CENTER'] = 'CENTER'
-            --     },
-            --     order = 2,
-            --     editmode = true
-            -- },
-            -- anchorParent = {
-            --     type = 'select',
-            --     name = 'AnchorParent',
-            --     desc = 'AnchorParent' .. getDefaultStr('anchorParent', 'party'),
-            --     values = {
-            --         ['TOP'] = 'TOP',
-            --         ['RIGHT'] = 'RIGHT',
-            --         ['BOTTOM'] = 'BOTTOM',
-            --         ['LEFT'] = 'LEFT',
-            --         ['TOPRIGHT'] = 'TOPRIGHT',
-            --         ['TOPLEFT'] = 'TOPLEFT',
-            --         ['BOTTOMLEFT'] = 'BOTTOMLEFT',
-            --         ['BOTTOMRIGHT'] = 'BOTTOMRIGHT',
-            --         ['CENTER'] = 'CENTER'
-            --     },
-            --     order = 3,
-            --     editmode = true
-            -- },
-            -- x = {
-            --     type = 'range',
-            --     name = 'X',
-            --     desc = 'X relative to *ANCHOR*' .. getDefaultStr('x', 'party'),
-            --     min = -2500,
-            --     max = 2500,
-            --     bigStep = 1,
-            --     order = 5,
-            --     editmode = true
-            -- },
-            -- y = {
-            --     type = 'range',
-            --     name = 'Y',
-            --     desc = 'Y relative to *ANCHOR*' .. getDefaultStr('y', 'party'),
-            --     min = -2500,
-            --     max = 2500,
-            --     bigStep = 1,
-            --     order = 6,
-            --     editmode = true
-            -- }     
         }
     }
     if true then
         local moreOptions = {
-            -- useCompactPartyFrames = {
-            --     type = 'toggle',
-            --     name = USE_RAID_STYLE_PARTY_FRAMES,
-            --     desc = OPTION_TOOLTIP_USE_RAID_STYLE_PARTY_FRAMES,
-            --     order = 15,
-            --     blizzard = true,
-            --     editmode = false
-            -- },
             -- Blizzard's Interface options panel, not the Edit Mode dialog.
             raidFrameBtn = {
                 type = 'execute',
@@ -439,132 +345,6 @@ function SubModuleMixin:SetupOptions()
                 blizzard = true,
                 editmode = false
             }
-            -- headerTaint = {type = 'header', name = 'May Cause Taint Issues - /reload after setup', desc = '', order = 10},
-            -- keepGroupsTogether = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_KEEPGROUPSTOGETHER,
-            --     desc = OPTION_TOOLTIP_KEEP_GROUPS_TOGETHER,
-            --     proxy = 'PROXY_RAID_FRAME_KEEP_GROUPS_TOGETHER',
-            --     order = 20.1,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- horizontalGroups = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_HORIZONTALGROUPS,
-            --     desc = '',
-            --     proxy = 'PROXY_RAID_FRAME_KEEP_HORIZONTAL_GROUPS',
-            --     order = 20.2,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- sortBy = {
-            --     type = 'select',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_SORTBY,
-            --     desc = '',
-            --     values = {['role'] = 'role', ['group'] = 'group', ['alphabetical'] = 'alphabetical'},
-            --     proxy = 'PROXY_RAID_FRAME_SORT_BY',
-            --     order = 20.21,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayPowerBar = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYPOWERBAR,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYPOWERBAR,
-            --     proxy = 'PROXY_RAID_FRAME_POWER_BAR',
-            --     order = 20.3,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- useClassColors = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_USECLASSCOLORS,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_USECLASSCOLORS,
-            --     proxy = 'PROXY_RAID_FRAME_CLASS_COLORS',
-            --     order = 20.4,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayPets = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYPETS,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYPETS,
-            --     proxy = 'PROXY_RAID_FRAME_PETS',
-            --     order = 20.5,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayMainTankAndAssist = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYMAINTANKANDASSIST,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYMAINTANKANDASSIST,
-            --     proxy = 'PROXY_RAID_FRAME_TANK_ASSIST',
-            --     order = 20.6,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayBorder = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYBORDER,
-            --     desc = '',
-            --     proxy = 'PROXY_RAID_FRAME_BORDER',
-            --     order = 20.7,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayNonBossDebuffs = {
-            --     type = 'toggle',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_DISPLAYNONBOSSDEBUFFS,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYNONBOSSDEBUFFS,
-            --     proxy = 'PROXY_RAID_FRAME_SHOW_DEBUFFS',
-            --     order = 20.8,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- displayOnlyDispellableDebuffs = {
-            --     type = 'toggle',
-            --     name = DISPLAY_ONLY_DISPELLABLE_DEBUFFS,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_DISPLAYONLYDISPELLABLEDEBUFFS,
-            --     proxy = 'PROXY_RAID_FRAME_DISPELLABLE_DEBUFFS',
-            --     order = 21.1,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- healthText = {
-            --     type = 'select',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_HEALTHTEXT,
-            --     desc = OPTION_TOOLTIP_COMPACT_UNIT_FRAME_PROFILE_HEALTHTEXT,
-            --     values = {['none'] = 'none', ['health'] = 'health', ['losthealth'] = 'losthealth', ['perc'] = 'perc'},
-            --     proxy = 'PROXY_RAID_HEALTH_TEXT',
-            --     order = 21.2,
-            --     blizzard = true,
-            --     editmode = true
-            -- },
-            -- frameHeight = {
-            --     type = 'range',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_FRAMEHEIGHT,
-            --     desc = '',
-            --     proxy = 'PROXY_RAID_FRAME_HEIGHT',
-            --     min = 20,
-            --     max = 128,
-            --     bigStep = 1,
-            --     order = 22.1,
-            --     editmode = true,
-            --     blizzard = true
-            -- },
-            -- frameWidth = {
-            --     type = 'range',
-            --     name = COMPACT_UNIT_FRAME_PROFILE_FRAMEWIDTH,
-            --     desc = '',
-            --     proxy = 'PROXY_RAID_FRAME_WIDTH',
-            --     min = 20,
-            --     max = 256,
-            --     bigStep = 1,
-            --     order = 22.2,
-            --     editmode = true,
-            --     blizzard = true
-            -- }
         }
 
         for k, v in pairs(moreOptions) do optionsRaid.args[k] = v end
@@ -600,31 +380,6 @@ function SubModuleMixin:SetupOptions()
             end)
         end
 
-        local defaultFuncs = {}
-
-        -- Proxy
-        -- RevertSetting("PROXY_RAID_FRAME_CLASS_COLORS");
-        -- RevertSetting("PROXY_RAID_FRAME_PETS");
-        -- RevertSetting("PROXY_RAID_FRAME_TANK_ASSIST");
-        -- RevertSetting("PROXY_RAID_FRAME_BORDER");
-        -- RevertSetting("PROXY_RAID_FRAME_SHOW_DEBUFFS");
-        -- RevertSetting("PROXY_RAID_FRAME_KEEP_GROUPS_TOGETHER");
-        -- RevertSetting("PROXY_RAID_FRAME_KEEP_HORIZONTAL_GROUPS");
-        -- RevertSetting("PROXY_RAID_FRAME_SORT_BY");
-        -- RevertSetting("PROXY_RAID_FRAME_POWER_BAR");
-        -- RevertSetting("PROXY_RAID_FRAME_DISPELLABLE_DEBUFFS");
-        -- RevertSetting("PROXY_RAID_HEALTH_TEXT");
-        -- RevertSetting("PROXY_RAID_FRAME_HEIGHT");
-        -- RevertSetting("PROXY_RAID_FRAME_WIDTH");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_2");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_3");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_5");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_10");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_15");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_20");
-        -- RevertSetting("PROXY_RAID_AUTO_ACTIVATE_40");
-
         optionsRaid.get = function(info)
             local key = info[1]
             local sub = info[2]
@@ -649,15 +404,13 @@ function SubModuleMixin:SetupOptions()
                 return addonTable.SubModuleMixins['Party'].GetRaidStylePartyFrames()
             end
 
-            -- Guarded: args now also holds the Edit Mode settings, which are not in
-            -- moreOptions. They carry their own get/set so this should never be
-            -- reached for them, but an unguarded index here would be an error rather
-            -- than a fallback.
-            if moreOptions[sub] and moreOptions[sub].proxy then
-                -- proxy
-                local value = Settings.GetValue(moreOptions[sub].proxy);
-                return value;
-            end
+            -- The Settings.GetValue branch for proxy CVars is gone with the options that
+            -- used it. Fourteen of them were commented out here under a header warning
+            -- that setting them from an addon taints the UI - keepGroupsTogether,
+            -- horizontalGroups, sortBy, class colours, frame height and width and the
+            -- rest. They are all Edit Mode settings now, read from the registered system
+            -- frame above, so nothing declares a proxy any more. Re-add the branch along
+            -- with the option if one ever needs it.
 
             -- Everything else out of our own profile. Party's copy of this has always
             -- ended in getOption; Raid's did not, and returned nil for anything it did
@@ -706,14 +459,7 @@ function SubModuleMixin:SetupOptions()
                 return
             end
 
-            if moreOptions[sub] and moreOptions[sub].proxy then
-                -- proxy
-                Settings.SetValue(moreOptions[sub].proxy, value);
-                -- InterfaceOverrides.SetRaidProfileOption(sub, value);
-                -- local isSecure, taint = issecurevariable('CompactRaidGroup1Member1')
-                -- print('SECURE? ', isSecure, ', TAINT? ', taint)
-                return
-            end
+            -- Same as the getter: no option here declares a proxy any more.
 
             -- Same fallback as the getter, and for the same reason.
             setOption(info, value)
