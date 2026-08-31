@@ -224,25 +224,36 @@ function SubModuleMixin:SetupOptions()
                     option.get = function() return (GetStored() or 0) ~= 0 end
                     option.set = function(_, value) SetStored(value and 1 or 0) end
                 elseif info.type == types.Slider then
+                    -- bigStep, not step. DFSettingsList's slider does
+                    -- SetValueStep(args.bigStep), so a step field it does not read
+                    -- leaves the slider with no increment and no usable handle.
                     option.type = 'range'
                     option.min = info.minValue or 0
                     option.max = info.maxValue or 100
-                    option.step = info.stepSize or 1
+                    option.bigStep = info.stepSize or 1
                     option.get = function() return ConvertSettingValue(info, GetStored() or 0, true) end
                     option.set = function(_, value) SetStored(ConvertSettingValue(info, value, false)) end
                 elseif info.type == types.Dropdown then
-                    -- {value, text} pairs, and the enum value is the key AceConfig
-                    -- stores - not the list position.
-                    local values = {}
+                    -- dropdownValues, an ARRAY of {value, text}, walked with ipairs by
+                    -- DFSettingsListDropdownContainerMixin:Init. Not AceConfig's
+                    -- values map keyed by value - that field is never read here, which
+                    -- is why the dropdowns came up empty.
+                    --
+                    -- Blizzard's own options list is already in exactly that shape, so
+                    -- it is copied rather than reshaped, dropping only malformed
+                    -- entries.
+                    local choices = {}
                     for _, choice in ipairs(info.options or {}) do
-                        if choice.value ~= nil then values[choice.value] = choice.text or tostring(choice.value) end
+                        if choice.value ~= nil then
+                            table.insert(choices, {value = choice.value, text = choice.text or tostring(choice.value)})
+                        end
                     end
 
                     -- Guard rather than a goto: this is Lua 5.1, which has neither
                     -- goto nor labels.
-                    if next(values) ~= nil then
+                    if #choices > 0 then
                         option.type = 'select'
-                        option.values = values
+                        option.dropdownValues = choices
                         option.get = GetStored
                         option.set = function(_, value) SetStored(value) end
                     end
