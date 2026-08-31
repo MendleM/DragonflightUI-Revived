@@ -525,6 +525,36 @@ function Module.QueueBagRowRestore()
     RestoreBagRowAttempt()
 end
 
+-- Opening our own edit mode wrecks the row, and closing it has to put it back.
+--
+-- AddStateUpdater registers BagsBar as a hide-frame of the bag holder's state handler,
+-- and UpdateStateHandler forces 'show' while edit mode is active. So the row gets
+-- hidden and shown again, KeyringMixin:OnShow fires, and Blizzard lays the whole thing
+-- out - back to the 5px gaps and the keyring's original 18x39.
+--
+-- Without this the repair waited for one of the other triggers, which is why closing
+-- edit mode appeared to fix things only sometimes: a cursor change over an item, a zone
+-- change, or the end of the next fight.
+--
+-- Idempotent and retried, because CallbackRegistryMixin validates the event against the
+-- table GenerateCallbackEvents builds in the Editmode module's own startup, and that is
+-- not ordered against ours.
+local bagRowEditModeHooked = false
+
+local function HookBagRowEditMode()
+    if bagRowEditModeHooked then return end
+
+    local editmode = DF.GetModule and DF:GetModule('Editmode')
+    if not (editmode and editmode.RegisterCallback and editmode.Event and editmode.Event.OnEditMode) then return end
+
+    bagRowEditModeHooked = true
+
+    -- Both directions: the row should look right inside edit mode too.
+    local ok, err = pcall(editmode.RegisterCallback, editmode, 'OnEditMode',
+                          function() C_Timer.After(0, Module.QueueBagRowRestore) end, Module)
+    if not ok then geterrorhandler()('DFUI bag row edit mode hook: ' .. tostring(err)) end
+end
+
 function Module.HookBagBarLayout()
     if Module.BagBarLayoutHooked then return end
 
@@ -555,7 +585,24 @@ function Module.HookBagBarLayout()
     local watcher = CreateFrame('Frame')
     watcher:RegisterEvent('PLAYER_ENTERING_WORLD')
     watcher:RegisterEvent('PLAYER_REGEN_ENABLED')
-    watcher:SetScript('OnEvent', function() C_Timer.After(0, Module.QueueBagRowRestore) end)
+    watcher:SetScript('OnEvent', function()
+        -- Retried here because the Editmode module may not have been ready when we
+        -- first asked; HookBagRowEditMode is a no-op once it has taken.
+        HookBagRowEditMode()
+        C_Timer.After(0, Module.QueueBagRowRestore)
+    end)
+
+    -- Opening our own edit mode wrecks the row, and closing it has to put it back.
+    --
+    -- AddStateUpdater registers BagsBar as a hide-frame of the bag holder's state
+    -- handler, and UpdateStateHandler forces 'show' while edit mode is active. So the
+    -- row gets hidden and shown again, KeyringMixin:OnShow fires, and Blizzard lays
+    -- the whole thing out - back to the 5px gaps and the keyring's original 18x39.
+    --
+    -- Without this the repair waited for one of the triggers above, which is why
+    -- closing edit mode looked like it fixed things only sometimes: a cursor change
+    -- over an item, a zone change, or the end of the next fight.
+    HookBagRowEditMode()
 end
 
 function Module.UpdateBagSlotIcons()
