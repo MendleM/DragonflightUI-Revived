@@ -1950,13 +1950,15 @@ function DF:LogRaidOptions(tag)
                    tostring(layoutInfo.activeLayout), tostring(active and active.layoutName or '?'),
                    tostring(isPreset), saved)
 
-            if saved == 0 then
-                DF:Log(tag, 'VERDICT: there is not one saved layout, so the settings write loop in ' ..
-                           'SyncUnitFrameEditModeSetting never runs - nothing is persisted and the preset ' ..
-                           'value comes back on reload')
-            elseif isPreset then
-                DF:Log(tag, 'VERDICT: the active layout is a preset - SaveLayoutChanges refuses to save into ' ..
-                           'one, so every edited value reverts on reload')
+            -- Not a fault, and worth saying so plainly: with no saved layout the write loop
+            -- in SyncUnitFrameEditModeSetting runs zero times, and a preset would refuse
+            -- the save regardless. That is the reason the raid settings live in our own
+            -- profile, which the line above reports. Only a disagreement between the two
+            -- is a problem now.
+            if saved == 0 or isPreset then
+                DF:Log(tag, 'note: Blizzard\'s layout cannot keep these settings (%s), which is why the profile ' ..
+                           'line above is the one that counts',
+                       (saved == 0) and 'no saved layout' or 'active layout is a preset')
             end
         else
             DF:Log(tag, 'edit mode layout: C_EditMode.GetLayouts returned nothing usable')
