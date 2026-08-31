@@ -269,6 +269,42 @@ function SubModuleMixin:Setup()
         self:ReApplyFocusToT()
     end
 
+    -- FocusFrameMixin:SetSmallSize is the one thing that re-anchors and rescales
+    -- this frame behind our back:
+    --
+    --   FocusFrameToT:SetScale(SMALL_FOCUS_UPSCALE);
+    --   FocusFrameToT:SetPoint("BOTTOMRIGHT", -13, -17);
+    --
+    -- No relativeTo means FocusFrame, and SetPoint adds a point rather than
+    -- replacing ours, so the frame ends up holding our holder point and a
+    -- parent-relative one at once. FocusFrame is an Edit Mode system on both TBC
+    -- Anniversary and MoP while our holder is not, so the client refuses the
+    -- second point - that is the "anchor family connection" error the layout
+    -- update logs. Target frame has no equivalent of SetSmallSize, which is why
+    -- only the focus one ever reported it.
+    --
+    -- Collapse it back to our single point. The scale write lands just before
+    -- the point write, so this is also the right place to restore ours.
+    if not FocusFrameToT.DFPointHooked then
+        FocusFrameToT.DFPointHooked = true
+
+        hooksecurefunc(FocusFrameToT, 'SetPoint', function(frame, _, relativeTo)
+            local holder = _G['DragonflightUIFocusToTFrame']
+            if frame.DFSettingPoint or not holder or relativeTo == holder then return end
+            if InCombatLockdown() then return end
+
+            frame.DFSettingPoint = true
+
+            frame:ClearAllPoints()
+            frame:SetPoint('CENTER', holder, 'CENTER', 0, 0)
+
+            local state = self.ModuleRef.db.profile.focusTarget
+            if state and state.scale then frame:SetScale(state.scale) end
+
+            frame.DFSettingPoint = false
+        end)
+    end
+
     local f = _G['DragonflightUIFocusToTFrame']
     f:SetSize(120, 49)
     f:SetParent(UIParent)
@@ -348,44 +384,35 @@ function SubModuleMixin:Update()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     -- f:SetUserPlaced(true)
 
-    -- Reparent, not just re-anchor, the way the player frame does.
+    -- Anchor only. Never reparent this frame.
     --
-    -- Anchoring this to our holder while leaving FocusFrame as its parent puts
-    -- the frame in one anchor family and its parent in another. Blizzard then
-    -- anchors it parent-relative - FocusFrameMixin:SetSmallSize does
-    -- FocusFrameToT:SetPoint("BOTTOMRIGHT", -13, -17) with no relativeTo, which
-    -- means FocusFrame - and the client refuses the call for crossing families.
-    -- That is the "anchor family connection" warning on every layout update.
+    -- Blizzard's TargetOfTargetMixin reads its own parent on every update:
     --
-    -- With the holder as the parent, Blizzard's parent-relative call lands
-    -- inside our own family and is allowed; our point below still decides where
-    -- it actually sits.
-    if f_orig:GetParent() ~= f and not InCombatLockdown() then f_orig:SetParent(f) end
-
-    -- The holder is declared hidden in Load.xml, like the other five, and
-    -- nothing in this addon ever shows it. That is fine for a holder a frame is
-    -- only anchored to, which is what the other unit frames do - target-of-target
-    -- never reparents, and Focus.mixin.lua has its reparent commented out. This
-    -- one does reparent, and a child of a hidden frame does not render, which is
-    -- "Target of Focus not working, completely hidden" on MoP and "Focus target
-    -- does not show up" on TBC.
+    --   local parent = self:GetParent();
+    --   if ( ... UnitExists(parent.unit) and ( not UnitIsUnit(PlayerFrame.unit,
+    --        parent.unit) ) and ( UnitHealth(parent.unit) > 0 ) ) then ... else
+    --        self:Hide() end
     --
-    -- Show the holder rather than dropping the reparent: the reparent is what
-    -- keeps Blizzard's parent-relative SetPoint in SetSmallSize inside one
-    -- anchor family, which is the warning the comment above describes. The
-    -- holder carries no art and takes no mouse, so showing it costs nothing -
-    -- the party move frame is unhidden for exactly this reason, and says so.
-    f:Show()
-
+    -- Reparenting onto our holder made parent.unit nil, so that condition was
+    -- false on every single frame and the client hid the frame itself. The
+    -- template starts hidden, so it never appeared at all - "Target of Focus
+    -- not working, completely hidden" on MoP and "Focus target does not show
+    -- up" on TBC, with no error to go with it.
+    --
+    -- The parent contract is wider than just unit: OnShow and OnHide call
+    -- parent:UpdateAuras(), which the holder has no method for, and Update sets
+    -- parent.haveToT and calls parent.spellbar:AdjustPosition() so FocusFrame
+    -- knows to move its cast bar. A holder cannot stand in for that - haveToT
+    -- is read back off FocusFrame further down the same file.
+    --
+    -- Target-of-target has always anchored without reparenting, on these same
+    -- clients, and has none of this. This frame now does the same.
     f_orig:ClearAllPoints()
     f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
 
-    -- Scale comes from the holder alone now. Setting it here as well would
-    -- square it, since a child inherits its parent's scale - the player frame
-    -- scales the holder only, for the same reason. Pinned to 1 rather than left
-    -- alone so Blizzard's own writes here, SMALL_FOCUS_UPSCALE and friends from
-    -- SetSmallSize, do not multiply into it either.
-    f_orig:SetScale(1)
+    -- Scale the frame itself, the way target-of-target does. The holder is not
+    -- its parent, so scaling the holder alone would never reach it.
+    f_orig:SetScale(state.scale)
 
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 

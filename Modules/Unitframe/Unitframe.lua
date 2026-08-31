@@ -69,7 +69,7 @@ function Module:PrePositionHolderFrames()
         {name = 'DragonflightUIPetFrame', sub = 'pet', defAnchor = 'TOPRIGHT', defParent = 'BOTTOMRIGHT', defX = -3, defY = 28, sizeW = 120, sizeH = 49},
         {name = 'DragonflightUIFocusFrame', sub = 'focus', defAnchor = 'TOPLEFT', defParent = 'TOPLEFT', defX = 250, defY = -170, sizeW = 232, sizeH = 100},
         {name = 'DragonflightUITargetToTFrame', sub = 'tot', defAnchor = 'BOTTOMRIGHT', defParent = 'BOTTOMRIGHT', defX = -8, defY = -15, sizeW = 120, sizeH = 49},
-        {name = 'DragonflightUIFocusToTFrame', sub = 'focustot', defAnchor = 'BOTTOMRIGHT', defParent = 'BOTTOMRIGHT', defX = -8, defY = -15, sizeW = 120, sizeH = 49},
+        {name = 'DragonflightUIFocusToTFrame', sub = 'focusTarget', defAnchor = 'BOTTOMRIGHT', defParent = 'BOTTOMRIGHT', defX = -8, defY = -15, sizeW = 120, sizeH = 49},
         {name = 'DragonflightUIPartyMoveFrame', sub = 'party', defAnchor = 'TOPLEFT', defParent = 'TOPRIGHT', defX = 0, defY = 0, sizeW = 120, sizeH = 242}
     }
 

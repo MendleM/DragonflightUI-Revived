@@ -42,8 +42,9 @@
 		these, so the global is secure, which is why the player, pet, target and
 		focus holders have never had this problem.
 
-		Not hidden, unlike the others: this one is only ever an anchor, and the
-		frame anchored to it has to stay visible.
+		Not hidden - and neither is any holder above it, despite what the focus
+		target module used to claim. They are only ever anchors, and what is
+		anchored to them has to stay visible.
 	-->
 	<Frame name="DragonflightUIPartyMoveFrame" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 	</Frame>
