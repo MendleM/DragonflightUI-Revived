@@ -1918,17 +1918,27 @@ function DF:LogRaidOptions(tag)
     if C_EditMode and C_EditMode.GetLayouts then
         local gotLayouts, layoutInfo = pcall(C_EditMode.GetLayouts)
         if gotLayouts and layoutInfo and layoutInfo.layouts then
-            local active = layoutInfo.layouts[layoutInfo.activeLayout]
-            local isPreset = (active and Enum and Enum.EditModeLayoutType and active.layoutType ==
-                                 Enum.EditModeLayoutType.Preset) and true or false
+            -- C_EditMode.GetLayouts hands back the player's OWN layouts only, while
+            -- activeLayout indexes the combined list Blizzard builds in UpdateLayoutInfo
+            -- with the presets in front. So an index into this table is meaningless on its
+            -- own, and asking the manager is the only honest answer.
+            local saved = #layoutInfo.layouts
+            local active = EditModeManagerFrame and EditModeManagerFrame.GetActiveLayoutInfo and
+                               select(2, pcall(EditModeManagerFrame.GetActiveLayoutInfo, EditModeManagerFrame))
+            local isPreset = EditModeManagerFrame and EditModeManagerFrame.IsActiveLayoutPreset and
+                                 select(2, pcall(EditModeManagerFrame.IsActiveLayoutPreset, EditModeManagerFrame))
 
-            DF:Log(tag, 'edit mode layout: active=%s name="%s" type=%s preset=%s of %d layouts',
+            DF:Log(tag, 'edit mode layout: activeIndex=%s name="%s" preset=%s   saved (non-preset) layouts=%d',
                    tostring(layoutInfo.activeLayout), tostring(active and active.layoutName or '?'),
-                   tostring(active and active.layoutType), tostring(isPreset), #layoutInfo.layouts)
+                   tostring(isPreset), saved)
 
-            if isPreset then
-                DF:Log(tag, 'VERDICT: the active layout is a preset - Blizzard will not save settings into it, ' ..
-                           'so every edited value reverts on reload')
+            if saved == 0 then
+                DF:Log(tag, 'VERDICT: there is not one saved layout, so the settings write loop in ' ..
+                           'SyncUnitFrameEditModeSetting never runs - nothing is persisted and the preset ' ..
+                           'value comes back on reload')
+            elseif isPreset then
+                DF:Log(tag, 'VERDICT: the active layout is a preset - SaveLayoutChanges refuses to save into ' ..
+                           'one, so every edited value reverts on reload')
             end
         else
             DF:Log(tag, 'edit mode layout: C_EditMode.GetLayouts returned nothing usable')
