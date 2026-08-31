@@ -177,32 +177,34 @@ end
 -- on the party frames followed from it. The taint analysis in DebugLog.lua had
 -- already narrowed the seed to this exact call and was right.
 
--- Told once, when the setting is switched on, because this is where the addon stops
--- being able to help.
+-- Told once, when the setting is switched on, because the frames it produces are
+-- configured somewhere other than the page the player is standing on.
 --
--- DragonflightUI decides WHICH party system is shown. How the compact frames then
--- look - raid size, frame width and height, group split, border, template - are
--- settings on Blizzard's Edit Mode "Raid Frames" system, reached through Escape,
--- Edit Mode, Raid Frames. Not Blizzard's Interface options, which is a different
--- panel with different settings.
+-- This notice used to walk people through disabling the addon, reloading, opening
+-- Blizzard's Edit Mode and enabling it again. That is obsolete: the raid frame Edit
+-- Mode settings - raid size, frame width and height, group split, border, template,
+-- opacity, icon size, sort order - are now offered directly under Unitframes, Raid
+-- Frame, and on the Raid Frame entry in this addon's own edit mode. Blizzard's Edit
+-- Mode stays blocked and no longer needs to be reached.
 --
--- And Editmode.lua deliberately blocks Blizzard's Edit Mode through Blizzard's own
--- BlockEnteringEditMode gate, so that dialog is out of reach while this addon is
--- enabled. Hence the steps in the popup, and hence they end with re-enabling it.
+-- What is still Blizzard's own is the raid profile panel, which opens from a button on
+-- the Raid Frame page and needs no reload either. Its exact contents are deliberately
+-- not listed here or in the popup: they differ by flavour, and the list that used to be
+-- quoted came from DFUI's old proxy-CVar names rather than from the panel itself.
 --
--- Sending people to the wrong panel is worse than sending them nowhere, so the
--- popup names the real place and the real cost of getting there.
+-- So the notice has one job left, which is to say WHERE. Turning this on replaces the
+-- portrait party frames with the compact ones, and from then on the settings that
+-- matter live under Raid Frame rather than PartyFrame - which is not obvious.
 local raidStyleNoticeShown = false
 
 StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
     text = 'DragonflightUI has switched your party frames to the raid-style (compact) frames.\n\n' ..
-        'It can position them, but it cannot yet configure them. Raid size, frame width and height, how groups are ' ..
-        'split, the border and the template all live in Blizzard\'s Edit Mode, under Raid Frames - not in Blizzard\'s ' ..
-        'Interface options.\n\n' ..
-        'DragonflightUI blocks Blizzard\'s Edit Mode, so reaching that dialog currently takes:\n' ..
-        '1. Disable DragonflightUI and reload\n' .. '2. Escape, then Edit Mode, then Raid Frames\n' ..
-        '3. Adjust and save\n' .. '4. Enable DragonflightUI again\n\n' ..
-        'Those settings are stored by Blizzard, so they survive step 4.',
+        'From now on these frames are configured under |cffffff78Unitframes > Raid Frame|r, not on this page - ' ..
+        'position, scale, raid size, frame width and height, how groups are split, the border and the rest.\n\n' ..
+        'You can also select |cffffff78Raid Frame|r in DragonflightUI\'s own Edit Mode to move it and change the ' ..
+        'same settings there, with a preview.\n\n' ..
+        'Blizzard\'s own raid profile options open from a button on the same page. Nothing here needs Blizzard\'s ' ..
+        'Edit Mode or a reload.',
     -- button1 silences it for good, button2 just closes - the same way round as the
     -- leftover-layout notice, so the two behave alike.
     button1 = 'Do not show again',
