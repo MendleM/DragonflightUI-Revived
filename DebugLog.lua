@@ -76,6 +76,11 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          saved collapsed state, and each button's anchor,
 --                          visibility and protected status. Run it before and
 --                          after whatever breaks and compare the two
+--     /df log raidopts     why the raid Edit Mode options are or are not in the
+--                          config panel: whether Blizzard_EditMode is loaded,
+--                          whether its setting display info exists, which frame
+--                          the raid system resolves to, and per setting whether
+--                          that frame has it and what value it holds
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
 --
@@ -1770,6 +1775,92 @@ function DF:LogBagTrace(on)
     end
 end
 
+-- /df log raidopts - why the raid Edit Mode options are or are not there.
+--
+-- The options are built once, from Blizzard's own EditModeSettingDisplayInfoManager,
+-- and four things have to be true for a single entry to appear. When the panel comes
+-- up empty there is no way to tell which one failed, so each is reported separately
+-- here, along with what the raid system frame says about every setting Blizzard
+-- describes.
+--
+-- Run it after login. If the data is all present now but the panel is still empty,
+-- the answer is timing: the options table was built before Blizzard_EditMode loaded.
+function DF:LogRaidOptions(tag)
+    tag = tag or 'raidopts'
+
+    local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded('Blizzard_EditMode')) or
+                       (IsAddOnLoaded and IsAddOnLoaded('Blizzard_EditMode'))
+    DF:Log(tag, 'Blizzard_EditMode loaded=%s', tostring(loaded))
+
+    local mgr = _G['EditModeSettingDisplayInfoManager']
+    DF:Log(tag, 'EditModeSettingDisplayInfoManager=%s systemSettingDisplayInfo=%s GetSettingDisplayInfo=%s',
+           tostring(mgr ~= nil), tostring(mgr and mgr.systemSettingDisplayInfo ~= nil),
+           tostring(mgr and mgr.GetSettingDisplayInfo ~= nil))
+
+    local types = Enum and Enum.EditModeSettingDisplayType
+    if types then
+        local names = {}
+        for k, v in pairs(types) do table.insert(names, k .. '=' .. tostring(v)) end
+        table.sort(names)
+        DF:Log(tag, 'EditModeSettingDisplayType: %s', table.concat(names, ' '))
+    else
+        DF:Log(tag, 'EditModeSettingDisplayType: ABSENT - every entry is skipped')
+    end
+
+    DF:Log(tag, 'helper hooks: SetRaidEditModeSetting=%s GetRaidSystemFrameForOptions=%s',
+           tostring(addonTable and addonTable.SetRaidEditModeSetting ~= nil),
+           tostring(addonTable and addonTable.GetRaidSystemFrameForOptions ~= nil))
+
+    local raidFrame = addonTable and addonTable.GetRaidSystemFrameForOptions and
+                          addonTable:GetRaidSystemFrameForOptions()
+    DF:Log(tag, 'raid system frame=%s HasSetting=%s GetSettingValue=%s',
+           (raidFrame and ((raidFrame.GetName and raidFrame:GetName()) or '<anon>')) or 'nil',
+           tostring(raidFrame and raidFrame.HasSetting ~= nil), tostring(raidFrame and raidFrame.GetSettingValue ~= nil))
+
+    -- What the raid system says about each setting Blizzard describes. This is the
+    -- list the options are built from, so an entry missing here explains an entry
+    -- missing there.
+    local displayInfo = mgr and mgr.systemSettingDisplayInfo and Enum and Enum.EditModeSystem and
+                            mgr.systemSettingDisplayInfo[Enum.EditModeSystem.UnitFrame]
+
+    if not displayInfo then
+        DF:Log(tag, 'no unit frame display info - nothing can be built')
+    else
+        DF:Log(tag, 'unit frame display info entries: %d', #displayInfo)
+
+        for _, info in ipairs(displayInfo) do
+            local has, val = 'n/a', 'n/a'
+            if raidFrame and raidFrame.HasSetting and info.setting ~= nil then
+                local ok, res = pcall(raidFrame.HasSetting, raidFrame, info.setting)
+                has = ok and tostring(res) or ('ERR ' .. tostring(res))
+
+                if ok and res and raidFrame.GetSettingValue then
+                    local okv, v = pcall(raidFrame.GetSettingValue, raidFrame, info.setting)
+                    val = okv and tostring(v) or ('ERR ' .. tostring(v))
+                end
+            end
+
+            DF:Log(tag, '  setting=%s type=%s hasSetting=%s stored=%s name=%s', tostring(info.setting),
+                   tostring(info.type), has, val, tostring(info.name))
+        end
+    end
+
+    -- And whether anything actually landed in the options table.
+    local built = 0
+    local ok, mod = pcall(function() return DF:GetModule('Unitframe') end)
+    local sub = ok and mod and addonTable and addonTable.SubModuleMixins and addonTable.SubModuleMixins['Raid']
+    local args = sub and sub.Options and sub.Options.args
+
+    if args then
+        for key in pairs(args) do
+            if type(key) == 'string' and key:find('blizzRaid', 1, true) == 1 then built = built + 1 end
+        end
+        DF:Log(tag, 'options table reachable, blizzRaid* entries built: %d', built)
+    else
+        DF:Log(tag, 'raid options table not reachable from here')
+    end
+end
+
 -- Returns true when the input was a log command and has been handled.
 function DF:HandleLogCommand(rest)
     rest = rest or ''
@@ -1845,6 +1936,9 @@ function DF:HandleLogCommand(rest)
         else
             DF:LogBagTrace(true)
         end
+    elseif sub == 'raidopts' then
+        DF:LogRaidOptions('raidopts')
+        DF:LogCopy('raidopts')
     elseif sub == 'globals' then
         DF:LogTaintedGlobals('globals')
         DF:LogCopy('globals')
