@@ -176,14 +176,20 @@ function SubModuleMixin:SetupOptions()
     --
     -- HasSetting on the registered system frame decides what appears, so a flavour
     -- without a given setting simply does not show it.
+    -- Returns how many entries it added, so the caller can tell "not ready yet" from
+    -- "nothing to offer" and stop retrying once it has worked.
     local function BuildRaidEditModeArgs(args)
-        if not (addonTable.SetRaidEditModeSetting and Enum and Enum.EditModeSettingDisplayType) then return end
+        addonTable.RaidEditModeOptionCount = addonTable.RaidEditModeOptionCount or 0
+
+        if not (addonTable.SetRaidEditModeSetting and Enum and Enum.EditModeSettingDisplayType) then return 0 end
 
         local displayInfo = GetUnitFrameDisplayInfo()
-        if not displayInfo then return end
+        if not displayInfo then return 0 end
 
         local raidFrame = addonTable.GetRaidSystemFrameForOptions and addonTable:GetRaidSystemFrameForOptions()
-        if not (raidFrame and raidFrame.HasSetting) then return end
+        if not (raidFrame and raidFrame.HasSetting) then return 0 end
+
+        local added = 0
 
         local types = Enum.EditModeSettingDisplayType
         local order = 20
@@ -243,9 +249,15 @@ function SubModuleMixin:SetupOptions()
                 end
 
                 -- Only the branches that produced something usable set a type.
-                if option.type then args['blizzRaid' .. tostring(setting)] = option end
+                if option.type then
+                    args['blizzRaid' .. tostring(setting)] = option
+                    added = added + 1
+                end
             end
         end
+
+        addonTable.RaidEditModeOptionCount = added
+        return added
     end
 
     local optionsRaid = {
@@ -489,7 +501,29 @@ function SubModuleMixin:SetupOptions()
 
         -- After moreOptions, so a hand-written entry can still override one of these
         -- if a flavour ever needs it.
-        BuildRaidEditModeArgs(optionsRaid.args)
+        --
+        -- And again after login, because this attempt usually fails. /df log raidopts
+        -- showed everything present at runtime - Blizzard_EditMode loaded, the display
+        -- info there, CompactRaidFrameContainer answering HasSetting for eleven
+        -- settings - while the panel stayed empty. Options are built during our init,
+        -- which happens before Blizzard's Edit Mode data and the raid container exist,
+        -- so the first pass has nothing to read.
+        --
+        -- AceConfig reads the args table when the panel opens rather than caching it,
+        -- so filling it later is enough; no re-registration needed.
+        if BuildRaidEditModeArgs(optionsRaid.args) == 0 then
+            local optsWatcher = CreateFrame('Frame')
+            optsWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+            optsWatcher:SetScript('OnEvent', function(watcherSelf)
+                -- One frame later: PLAYER_ENTERING_WORLD fires before some systems
+                -- finish registering themselves with the Edit Mode manager.
+                C_Timer.After(0, function()
+                    if BuildRaidEditModeArgs(optionsRaid.args) > 0 then
+                        watcherSelf:UnregisterAllEvents()
+                    end
+                end)
+            end)
+        end
 
         local defaultFuncs = {}
 

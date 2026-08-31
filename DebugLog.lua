@@ -1845,20 +1845,12 @@ function DF:LogRaidOptions(tag)
         end
     end
 
-    -- And whether anything actually landed in the options table.
-    local built = 0
-    local ok, mod = pcall(function() return DF:GetModule('Unitframe') end)
-    local sub = ok and mod and addonTable and addonTable.SubModuleMixins and addonTable.SubModuleMixins['Raid']
-    local args = sub and sub.Options and sub.Options.args
-
-    if args then
-        for key in pairs(args) do
-            if type(key) == 'string' and key:find('blizzRaid', 1, true) == 1 then built = built + 1 end
-        end
-        DF:Log(tag, 'options table reachable, blizzRaid* entries built: %d', built)
-    else
-        DF:Log(tag, 'raid options table not reachable from here')
-    end
+    -- And whether anything actually landed in the options table. Reported by the
+    -- builder itself: reaching the table from here needs the submodule instance, which
+    -- is not the mixin stored in SubModuleMixins, so the earlier attempt to walk to it
+    -- always came up empty and said nothing useful.
+    DF:Log(tag, 'blizzRaid* option entries built: %s',
+           tostring((addonTable and addonTable.RaidEditModeOptionCount) or 'builder never ran'))
 end
 
 -- Returns true when the input was a log command and has been handled.
