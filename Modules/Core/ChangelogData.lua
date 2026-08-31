@@ -68,6 +68,7 @@ DF.ChangelogData = {
                     'Party member names and health/mana text unified to the FRIZQT outline font.',
                     'Shaman totem bar anchors correctly instead of snapping below the player frame.',
                     'Pet frame no longer jumps to default coordinates when summoning a pet.',
+                    'Raid frames appear in an actual raid, and the raid settings survive a reload.',
                     'Focus target is visible on TBC and MoP, and no longer errors on layout updates.',
                     'Era: faction icon sits on target frame properly.',
                     'No more error when reloading during combat from target-of-target not being built yet.'
