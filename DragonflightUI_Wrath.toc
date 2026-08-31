@@ -5,7 +5,7 @@
 ## Notes-esMX: La interfaz moderna para la versión clásica.|n|cffbbbbbbMantenido por MendleM / rakStar91|r|n|cffbbbbbbOriginalmente por Karl-Heinz Schneider|r
 ## Author: MendleM, rakStar91, Karl-Heinz Schneider
 ## X-Website: https://github.com/MendleM/DragonflightUI-Revived
-## X-Curse-Project-ID: 819757
+## X-Curse-Project-ID: 1602557
 ## Version: 0.44.1
 ## IconTexture: Interface\Icons\INV_Misc_Head_Dragon_01
 ## X-Date: @project-date-integer@
