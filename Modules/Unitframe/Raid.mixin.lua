@@ -799,32 +799,34 @@ function SubModuleMixin:Setup()
             -- One frame later, for the same reason initRaid waits above: the settings can
             -- still be unreadable while the event is being handled.
             C_Timer.After(0, function()
-                -- Push the stored settings back onto Blizzard's system frame first.
-                -- Nothing else does it: the layout the client applies at login is a
-                -- preset carrying its own numbers, so without this the profile is never
-                -- consulted and frame width and friends fall back on every reload.
-                local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile
-                local saved = profile and profile.raid and profile.raid.blizzSettings
+                Helper:RunOutOfCombat('RaidFlowWatcher', function()
+                    -- Push the stored settings back onto Blizzard's system frame first.
+                    -- Nothing else does it: the layout the client applies at login is a
+                    -- preset carrying its own numbers, so without this the profile is never
+                    -- consulted and frame width and friends fall back on every reload.
+                    local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile
+                    local saved = profile and profile.raid and profile.raid.blizzSettings
 
-                if saved then
-                    for key, value in pairs(saved) do
-                        local setting = tonumber(key)
-                        if setting and value ~= nil then
-                            addonTable:SetRaidEditModeSettingBySetting(setting, value)
+                    if saved then
+                        for key, value in pairs(saved) do
+                            local setting = tonumber(key)
+                            if setting and value ~= nil then
+                                addonTable:SetRaidEditModeSettingBySetting(setting, value)
 
-                            -- Same mirror as the setter, or raid-style party frames come
-                            -- back at the party system's own numbers after a reload.
-                            if addonTable.MirrorRaidSettingToParty then
-                                addonTable:MirrorRaidSettingToParty(setting, value)
+                                -- Same mirror as the setter, or raid-style party frames come
+                                -- back at the party system's own numbers after a reload.
+                                if addonTable.MirrorRaidSettingToParty then
+                                    addonTable:MirrorRaidSettingToParty(setting, value)
+                                end
                             end
                         end
                     end
-                end
 
-                if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
+                    if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
 
-                local c = _G['CompactRaidFrameContainer']
-                if c and c.TryUpdate then pcall(c.TryUpdate, c) end
+                    local c = _G['CompactRaidFrameContainer']
+                    if c and c.TryUpdate then pcall(c.TryUpdate, c) end
+                end)
             end)
         end)
     end

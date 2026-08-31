@@ -24,6 +24,35 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.44.2',
+        title = 'Stance Bar Fixes & In-Combat Protection',
+        date = '1 September 2026',
+        intro = 'Targeted fixes for the Stance Bar (shapeshift bar) and in-combat reload stability.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'Stance Bar: fixed ADDON_ACTION_BLOCKED taint errors in combat.',
+                    'Stance Bar: fixed flickering and disappearing buttons during action bar updates.',
+                    'Stance Bar: corrected stance button reparenting and scaling.',
+                    'Raid Frames: protected in-combat /reload from CompactPartyFrame SetSize blocked actions.'
+                }
+            }, {
+                title = 'Action Bars & Stance Bar',
+                items = {
+                    'Fixed stance buttons disappearing on macro hover and spell casts by routing UpdateGridState to UpdateButtonState.',
+                    'Corrected button reparenting so StanceButton1..10 are parented to DragonflightUIStancebar.',
+                    'Silenced Blizzard background StanceBar frame events to prevent SetShownBase taint errors.'
+                }
+            }, {
+                title = 'Unit Frames',
+                items = {
+                    'Deferred RaidFlowWatcher settings and container updates during combat to avoid mid-fight SetSize errors.'
+                }
+            }
+        }
+    },
+    {
         version = '0.44.0 / 0.44.1',
         title = 'The Definitive Refactor & Stability Overhaul',
         date = '26 August - 31 August 2026',

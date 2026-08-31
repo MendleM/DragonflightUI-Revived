@@ -2,10 +2,24 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.44.0`.
+May 2026). Current builds report version `0.44.2`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.44.2 — Stance Bar Fixes & In-Combat Protection (1 September 2026)
+
+Targeted fixes for the Stance Bar (shapeshift bar) and in-combat reload stability.
+
+**Highlights** — Stance Bar: fixed `ADDON_ACTION_BLOCKED: StanceBar:SetShownBase()` taint error in combat · fixed flickering and disappearing stance buttons during action bar updates · corrected stance button reparenting and scaling · Raid Frames: protected in-combat `/reload` from `CompactPartyFrameMember1:SetSize()` blocked action errors
+
+### Action Bars & Stance Bar
+- Fixed `ADDON_ACTION_BLOCKED: StanceBar:SetShownBase()` taint error on shapeshift / stance changes in combat by silencing background Blizzard `StanceBar` events and ensuring clean button ownership.
+- Fixed stance buttons disappearing on macro hover and spell casts by overriding `UpdateGridState` to route to `UpdateButtonState` instead of querying action slot IDs.
+- Corrected button reparenting mismatch so `StanceButton1..10` are properly parented to `DragonflightUIStancebar`, inheriting correct frame strata, alpha, and scaling.
+
+### Unit Frames
+- Deferred `RaidFlowWatcher` settings and container updates during combat (`Helper:RunOutOfCombat`) to avoid `CompactPartyFrameMember1:SetSize()` `ADDON_ACTION_BLOCKED` errors on mid-fight `/reload`.
 
 ## 0.44.0/0.44.1 — The Definitive Refactor & Stability Overhaul (26 August - 31 August 2026)
 
