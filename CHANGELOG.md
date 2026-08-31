@@ -33,7 +33,7 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 - Shaman totem bar anchors correctly instead of snapping below the player frame.
 - Pet frame no longer jumps to default coordinates when summoning a pet.
 - TBC: the pet frame is back after being saved to the layout but never placed.
-- Focus target frame restored on TBC and MoP; target faction icon fixed on Era.
+- Focus target frame restored on TBC and MoP, and no longer errors on layout updates (Issues #19, #33); target faction icon fixed on Era.
 - Fixed a combat reload error from target-of-target not being built yet.
 
 ### Action Bars
