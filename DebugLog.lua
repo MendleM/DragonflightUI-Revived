@@ -1913,8 +1913,40 @@ function DF:LogRaidOptions(tag)
     if container then
         local parentName = (container:GetParent() and container:GetParent().GetName and container:GetParent():GetName()) or
                                '<anon>'
-        DF:Log(tag, 'CompactRaidFrameContainer: shown=%s visible=%s parent=%s points=%d', tostring(container:IsShown()),
-               tostring(container:IsVisible()), parentName, container:GetNumPoints())
+        DF:Log(tag, 'CompactRaidFrameContainer: shown=%s visible=%s parent=%s points=%d %.0fx%.0f',
+               tostring(container:IsShown()), tostring(container:IsVisible()), parentName, container:GetNumPoints(),
+               container:GetWidth() or 0, container:GetHeight() or 0)
+
+        -- CompactRaidFrameManager_UpdateContainerVisibility has exactly two terms:
+        --
+        --   if ShouldShowRaidFrames() and CompactRaidFrameManager.container.enabled
+        --
+        -- container.enabled is reachable only through
+        -- CompactRaidFrameManager_SetSetting("IsShown", ...), which is the player's own
+        -- setting, not a preview flag. It sits in cachedSettings with no CVar behind it,
+        -- so forcing it for a preview and failing to put it back leaves a raid with no
+        -- frames, no error, and a reload that appears to fix it. Report both terms.
+        local mgr = _G['CompactRaidFrameManager']
+        local enabled = mgr and mgr.container and mgr.container.enabled
+        local isShown = CompactRaidFrameManager_GetSetting and CompactRaidFrameManager_GetSetting('IsShown')
+        local shouldShow = ShouldShowRaidFrames and ShouldShowRaidFrames()
+
+        DF:Log(tag, 'visibility terms: ShouldShowRaidFrames=%s container.enabled=%s GetSetting("IsShown")=%s',
+               tostring(shouldShow), tostring(enabled), tostring(isShown))
+        DF:Log(tag, 'group: inRaid=%s members=%s inCombat=%s', tostring(IsInRaid and IsInRaid()),
+               tostring((GetNumGroupMembers and GetNumGroupMembers()) or 0), tostring(InCombatLockdown()))
+
+        if not container:IsShown() and enabled == false then
+            DF:Log(tag, 'VERDICT: container.enabled is false - IsShown was switched off and never restored')
+        elseif not container:IsShown() and shouldShow == false then
+            DF:Log(tag, 'VERDICT: the client says raid frames do not belong here - not in a raid, or turned off')
+        elseif container:IsShown() and not container:IsVisible() then
+            DF:Log(tag, 'VERDICT: shown, but an ancestor is hidden - see the parent chain below')
+        elseif container:IsShown() and container:GetWidth() <= 2 then
+            DF:Log(tag, 'VERDICT: shown but has no extent - the container was never filled')
+        end
+
+        DF:LogFrame(container, tag)
     end
 end
 
