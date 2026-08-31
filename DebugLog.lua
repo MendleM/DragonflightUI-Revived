@@ -1856,9 +1856,15 @@ function DF:LogRaidOptions(tag)
     -- SubModuleMixin:Setup stopped it if not.
     local diag = addonTable and addonTable.RaidInitDiag
     if diag then
-        DF:Log(tag, 'raid edit mode init: ran=%s (HasLoadedCUFProfiles=%s CompactUnitFrameProfiles=%s variablesLoaded=%s)',
-               tostring(diag.initRan), tostring(diag.hasLoadedCUFProfilesFn), tostring(diag.profilesTable),
-               tostring(diag.variablesLoaded))
+        DF:Log(tag, 'raid edit mode init: ran=%s error=%s (HasLoadedCUFProfiles=%s CompactUnitFrameProfiles=%s variablesLoaded=%s)',
+               tostring(diag.initRan), tostring(diag.initError or 'none'), tostring(diag.hasLoadedCUFProfilesFn),
+               tostring(diag.profilesTable), tostring(diag.variablesLoaded))
+
+        -- The legacy raid profile API the preview needs. Absent here, which is why the
+        -- preview is skipped rather than created and left to throw.
+        DF:Log(tag, 'raid profile api: GetRaidProfileFlattenedOptions=%s GetActiveRaidProfile=%s manager.container=%s',
+               type(GetRaidProfileFlattenedOptions), type(GetActiveRaidProfile),
+               tostring(CompactRaidFrameManager ~= nil and CompactRaidFrameManager.container ~= nil))
     else
         DF:Log(tag, 'raid edit mode init: Setup never reached this point')
     end

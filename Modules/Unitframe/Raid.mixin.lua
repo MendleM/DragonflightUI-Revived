@@ -762,19 +762,42 @@ function SubModuleMixin:Setup()
         local resizer = _G['CompactRaidFrameManagerContainerResizeFrameResizer']
         if resizer then resizer:SetFrameLevel(15) end
 
-        local fakeRaid = CreateFrame('Frame', 'DragonflightUIEditModeRaidFramePreview', f,
-                                     'DFEditModePreviewRaidFrameTemplate')
-        fakeRaid:OnLoad()
-        fakeRaid:SetPoint('TOPLEFT', f, 'TOPLEFT', 4, -7)
-        fakeRaid:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 0)
+        -- The fake raid preview is optional, and on this client it cannot work.
+        --
+        -- DragonflightUIEditModePreviewRaidFrameMixin:UpdateState opens with
+        --
+        --   local settings = GetRaidProfileFlattenedOptions(GetActiveRaidProfile())
+        --   local managerSize = CompactRaidFrameManager.container:GetHeight()
+        --
+        -- which is the pre-Edit-Mode raid profile API. None of it exists now that raid
+        -- frames are an Edit Mode system, so OnLoad threw "attempt to call a nil value"
+        -- - and because this runs inside SetupSubmodules, it took every submodule after
+        -- the raid one with it. That is the broken edit mode in the report.
+        --
+        -- The CompactUnitFrameProfiles gate that used to sit in front of all this was
+        -- what kept it unreachable. Removing that gate is what finally produced a
+        -- selection, so the preview is what has to become conditional: it is decoration
+        -- inside the placeholder, while the selection is the thing being fixed.
+        local hasRaidProfileApi = type(GetRaidProfileFlattenedOptions) == 'function' and
+                                      type(GetActiveRaidProfile) == 'function' and CompactRaidFrameManager ~= nil and
+                                      CompactRaidFrameManager.container ~= nil
 
-        -- fakeRaid:ClearAllPoints()
-        -- fakeRaid:SetPoint('TOPLEFT', UIParent, 'CENTER', -50, 50)
-        -- fakeRaid:SetParent(UIParent)
+        if hasRaidProfileApi then
+            local ok, err = pcall(function()
+                local fakeRaid = CreateFrame('Frame', 'DragonflightUIEditModeRaidFramePreview', f,
+                                             'DFEditModePreviewRaidFrameTemplate')
+                fakeRaid:OnLoad()
+                fakeRaid:SetPoint('TOPLEFT', f, 'TOPLEFT', 4, -7)
+                fakeRaid:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 0)
+                fakeRaid:Show()
 
-        fakeRaid:Show()
+                self.PreviewRaid = fakeRaid
+            end)
 
-        self.PreviewRaid = fakeRaid;
+            -- Reported, not swallowed, but never fatal: a missing preview must not cost
+            -- the selection or the submodules that come after this one.
+            if not ok then geterrorhandler()('DFUI raid edit mode preview: ' .. tostring(err)) end
+        end
 
         EditModeModule:AddEditModeToFrame(f)
 
@@ -808,7 +831,7 @@ function SubModuleMixin:Setup()
             hideFunction = function() end
         });
 
-        fakeRaid:UpdateState(nil)
+        if self.PreviewRaid then pcall(self.PreviewRaid.UpdateState, self.PreviewRaid, nil) end
     end
 
     -- Recorded so /df log raidopts can say whether the edit mode selection was ever
@@ -822,10 +845,19 @@ function SubModuleMixin:Setup()
         initRan = false
     }
 
+    -- Isolated, because this runs inside SetupSubmodules. An error thrown from here
+    -- used to abort the whole chain, so the raid frame took the submodules after it
+    -- down as well - the same reasoning Unitframe.lua's updateSub already applies to
+    -- UpdateState. Report it and let the rest set itself up.
     local function initRaidTracked()
         if addonTable.RaidInitDiag.initRan then return end
         addonTable.RaidInitDiag.initRan = true
-        initRaid()
+
+        local ok, err = pcall(initRaid)
+        if not ok then
+            addonTable.RaidInitDiag.initError = tostring(err)
+            geterrorhandler()('DFUI raid edit mode setup: ' .. tostring(err))
+        end
     end
 
     -- The CompactUnitFrameProfiles gate that used to be here is gone.
@@ -911,6 +943,14 @@ function SubModuleMixin:Update()
     end
 
     holder:SetScale(state.scale or 1.0)
+
+    -- Sized from the real container so the selection covers what it actually moves.
+    -- The fake preview used to give the placeholder its extent; it does not exist on
+    -- clients without the old raid profile API, so the container is the better source
+    -- anyway. The fallback keeps the selection grabbable when no raid frames are up.
+    local w = container and container:GetWidth() or 0
+    local h = container and container:GetHeight() or 0
+    holder:SetSize((w > 1) and w or 200, (h > 1) and h or 200)
 
     -- Helper resolves the anchor frame and rejects a chain that would close a loop,
     -- falling back to UIParent and reporting it once per session. The other unit
