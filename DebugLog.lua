@@ -65,10 +65,17 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          optional name (or 'mouse') adds a frame the list
 --                          does not cover
 --     /df log watch reset  drop the baseline and start again
---     /df log bagtrace     log every SetPoint on the bag row, backpack and
---                          keyring included, each with the stack of whoever
---                          called it. watch says what moved; this says who
---                          moved it. 'off' stops it, 'copy' opens the window
+--     /df log bagtrace     log every SetPoint, Show and Hide on the bag row,
+--                          backpack and keyring included, each with the combat
+--                          state and the stack of whoever called it. watch says
+--                          what moved; this says who moved it and whether the
+--                          client was in a position to refuse us. 'off' stops
+--                          it, 'copy' opens the window
+--     /df log bagtrace state  the numbers the row is laid out from, without
+--                          tracing: Blizzard's bagPadding and expand flags, our
+--                          saved collapsed state, and each button's anchor,
+--                          visibility and protected status. Run it before and
+--                          after whatever breaks and compare the two
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
 --
@@ -1591,10 +1598,20 @@ end
 -- callers - BagsBar:Layout, ignoreFramePositionManager and
 -- UIParent_ManageFramePositions - all failed, so stop guessing and hook the write
 -- itself. Whoever sets the offset gets named, with its stack.
+-- Anchoring was only half of it. Collapsing the row is Show and Hide on the same
+-- buttons, and both those and SetPoint are refused mid-fight, so a trace that shows
+-- position writes alone cannot explain a row that came back in the wrong state. Every
+-- entry therefore carries the combat state, visibility changes are traced next to
+-- position changes, and 'state' prints everything the layout is computed from -
+-- Blizzard's padding and expand flags, our own saved state, and whether the client
+-- considers these buttons protected at all.
 local bagTraceOn = false
-local bagTraceHits = 0
 local bagTraceHooked = false
-local BAG_TRACE_MAX = 24
+
+-- Separate budgets per kind, so a burst of Hide calls cannot crowd out the SetPoint
+-- calls that name the culprit.
+local BAG_TRACE_MAX_PER_KIND = 14
+local bagTraceHits = {}
 
 local BAG_TRACE_BUTTONS = {
     'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot',
@@ -1607,17 +1624,101 @@ local function BagTraceName(rel)
     return '-'
 end
 
-local function BagTraceHook(self, point, rel, relPoint, x, y)
-    if not bagTraceOn or bagTraceHits >= BAG_TRACE_MAX then return end
-    bagTraceHits = bagTraceHits + 1
+local function BagTraceCombat()
+    -- Both halves, because they disagree and the disagreement is the whole point:
+    -- PLAYER_REGEN_ENABLED clears the lockdown while the server-side flag lingers.
+    return string.format('lock=%s unit=%s', tostring(InCombatLockdown()),
+                         tostring(UnitAffectingCombat('player')))
+end
 
-    DF:Log('bagtrace', '%s:SetPoint(%s -> %s %s, %s, %s)', (self.GetName and self:GetName()) or '<anon>',
-           tostring(point), BagTraceName(rel), tostring(relPoint), tostring(x), tostring(y))
-    DF:Log('bagtrace', '  stack: %s', tostring(debugstack(2, 12, 0)):gsub('\n', ' | '):sub(1, 1200))
+local function BagTracePoint(f)
+    if not (f and f.GetNumPoints) or f:GetNumPoints() == 0 then return 'unplaced' end
 
-    if bagTraceHits >= BAG_TRACE_MAX then
-        DF:Log('bagtrace', 'hit the cap of %d calls - tracing stopped.', BAG_TRACE_MAX)
+    local point, relativeTo, relativePoint, x, y = f:GetPoint(1)
+    return string.format('%s -> %s %s (%.0f,%.0f)', tostring(point), BagTraceName(relativeTo), tostring(relativePoint),
+                         x or 0, y or 0)
+end
+
+-- Everything the bag row layout is derived from, in one place.
+function DF:LogBagRowState(tag)
+    tag = tag or 'bagtrace'
+
+    DF:Log(tag, 'STATE combat %s', BagTraceCombat())
+
+    local bar = _G['BagsBar']
+    if bar then
+        -- bagPadding is the -5. hideExpandToggle decides whether the chain starts at
+        -- the backpack or at Blizzard's own toggle.
+        DF:Log(tag, 'BagsBar: bagPadding=%s hideExpandToggle=%s isHorizontal=%s direction=%s shown=%s',
+               tostring(bar.bagPadding), tostring(bar.hideExpandToggle), tostring(bar.isHorizontal),
+               tostring(bar.direction), tostring(bar:IsShown()))
+    else
+        DF:Log(tag, 'BagsBar: absent')
     end
+
+    local mgr = _G['MainMenuBarBagManager']
+    if mgr then
+        -- expandBarAuto starting out nil is what makes the first cursor change count
+        -- as a change: nil ~= false.
+        DF:Log(tag, 'MainMenuBarBagManager: expandBar=%s expandBarAuto=%s shouldExpand=%s cvar expandBagBar=%s',
+               tostring(mgr.expandBar), tostring(mgr.expandBarAuto),
+               tostring(mgr.ShouldBarExpand and mgr:ShouldBarExpand()),
+               tostring(GetCVarBool and GetCVarBool('expandBagBar')))
+    else
+        DF:Log(tag, 'MainMenuBarBagManager: absent')
+    end
+
+    local ok, mod = pcall(function() return DF:GetModule('Actionbar') end)
+    local bags = ok and mod and mod.db and mod.db.profile and mod.db.profile.bags
+    if bags then
+        DF:Log(tag, 'DFUI bags: expanded=%s scale=%s hooked=%s', tostring(bags.expanded), tostring(bags.scale),
+               tostring(mod.BagBarLayoutHooked))
+    else
+        DF:Log(tag, 'DFUI bags: profile not reachable yet')
+    end
+
+    for _, name in ipairs(BAG_TRACE_BUTTONS) do
+        local btn = _G[name]
+        if btn then
+            -- IsProtected answers whether the combat guard is actually required on
+            -- these buttons, rather than us assuming it is.
+            local protected, explicit = btn:IsProtected()
+            DF:Log(tag, '%s: shown=%s protected=%s(explicit=%s) %s', name, tostring(btn:IsShown()),
+                   tostring(protected), tostring(explicit), BagTracePoint(btn))
+        else
+            DF:Log(tag, '%s: absent', name)
+        end
+    end
+end
+
+local function BagTraceRecord(kind, description)
+    if not bagTraceOn then return end
+
+    local hits = (bagTraceHits[kind] or 0)
+    if hits >= BAG_TRACE_MAX_PER_KIND then return end
+    bagTraceHits[kind] = hits + 1
+
+    DF:Log('bagtrace', '%s [%s]', description, BagTraceCombat())
+    DF:Log('bagtrace', '  stack: %s', tostring(debugstack(3, 12, 0)):gsub('\n', ' | '):sub(1, 1200))
+
+    if bagTraceHits[kind] >= BAG_TRACE_MAX_PER_KIND then
+        DF:Log('bagtrace', '%s: hit the cap of %d - no more of this kind will be logged.', kind,
+               BAG_TRACE_MAX_PER_KIND)
+    end
+end
+
+local function BagTracePointHook(self, point, rel, relPoint, x, y)
+    BagTraceRecord('point', string.format('%s:SetPoint(%s -> %s %s, %s, %s)', (self.GetName and self:GetName()) or
+                                              '<anon>', tostring(point), BagTraceName(rel), tostring(relPoint),
+                                          tostring(x), tostring(y)))
+end
+
+local function BagTraceShowHook(self)
+    BagTraceRecord('visibility', string.format('%s:Show()', (self.GetName and self:GetName()) or '<anon>'))
+end
+
+local function BagTraceHideHook(self)
+    BagTraceRecord('visibility', string.format('%s:Hide()', (self.GetName and self:GetName()) or '<anon>'))
 end
 
 function DF:LogBagTrace(on)
@@ -1627,7 +1728,9 @@ function DF:LogBagTrace(on)
             local btn = _G[name]
             if btn and btn.SetPoint then
                 found = found + 1
-                hooksecurefunc(btn, 'SetPoint', BagTraceHook)
+                hooksecurefunc(btn, 'SetPoint', BagTracePointHook)
+                if btn.Show then hooksecurefunc(btn, 'Show', BagTraceShowHook) end
+                if btn.Hide then hooksecurefunc(btn, 'Hide', BagTraceHideHook) end
             end
         end
 
@@ -1645,10 +1748,15 @@ function DF:LogBagTrace(on)
     bagTraceOn = on and true or false
 
     if bagTraceOn then
-        bagTraceHits = 0
-        print(PREFIX .. 'bag trace ON - hover an NPC until the row spreads, then |cffffff78/df log bagtrace copy|r')
+        table.wipe(bagTraceHits)
+        -- A baseline, so the trace that follows can be read against a known state
+        -- instead of guessed at.
+        DF:LogBagRowState('bagtrace')
+        print(PREFIX .. 'bag trace ON - reproduce it, then |cffffff78/df log bagtrace copy|r')
     else
-        print(PREFIX .. ('bag trace OFF - %d call(s) captured.'):format(bagTraceHits))
+        local total = 0
+        for _, n in pairs(bagTraceHits) do total = total + n end
+        print(PREFIX .. ('bag trace OFF - %d call(s) captured.'):format(total))
     end
 end
 
@@ -1719,6 +1827,11 @@ function DF:HandleLogCommand(rest)
             DF:LogBagTrace(false)
         elseif a == 'copy' then
             DF:LogCopy('bagtrace')
+        elseif a == 'state' then
+            -- Just the numbers, no tracing: run it before and after the thing that
+            -- breaks and compare.
+            DF:LogBagRowState('bagstate')
+            DF:LogDump('bagstate', 20)
         else
             DF:LogBagTrace(true)
         end
