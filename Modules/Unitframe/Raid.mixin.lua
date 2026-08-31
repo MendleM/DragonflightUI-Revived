@@ -33,6 +33,26 @@ function SubModuleMixin:SetDefaults()
         x = 0,
         y = 0,
         calibrated = false,
+        -- Visibility, and every key AddStateTable offers has to be here.
+        --
+        -- A missing default means getOption returns nil, and the settings list feeds
+        -- that straight into Slider:SetValue - which is the "bad argument #1 to
+        -- SetValue" the alpha rows threw. Same list as the party frame's.
+        alphaNormal = 1.0,
+        alphaCombat = 1.0,
+        showMouseover = false,
+        hideAlways = false,
+        hideCombat = false,
+        hideOutOfCombat = false,
+        hideVehicle = false,
+        hidePet = false,
+        hideNoPet = false,
+        hideStance = false,
+        hideStealth = false,
+        hideNoStealth = false,
+        hideBattlePet = false,
+        hideCustom = false,
+        hideCustomCond = '',
         -- hideStatusbarText = false,
         -- offset = false,
         -- hideIndicator = false,
@@ -770,8 +790,27 @@ function SubModuleMixin:Setup()
         fakeRaid:UpdateState(nil)
     end
 
-    if HasLoadedCUFProfiles() and CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded then
+    -- Recorded so /df log raidopts can say whether the edit mode selection was ever
+    -- built, and if not, which half of this gate stopped it. HasLoadedCUFProfiles is a
+    -- Blizzard global and CompactUnitFrameProfiles is the pre-Edit-Mode profile system,
+    -- neither of which is guaranteed to be there now that raid frames are a system.
+    local cufOk = type(HasLoadedCUFProfiles) == 'function' and HasLoadedCUFProfiles() and true or false
+
+    addonTable.RaidInitDiag = {
+        hasLoadedCUFProfilesFn = type(HasLoadedCUFProfiles),
+        hasLoadedCUFProfiles = cufOk,
+        profilesTable = CompactUnitFrameProfiles ~= nil,
+        variablesLoaded = CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded or false,
+        initRan = false
+    }
+
+    local function initRaidTracked()
+        addonTable.RaidInitDiag.initRan = true
         initRaid()
+    end
+
+    if cufOk and CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded then
+        initRaidTracked()
     else
         local waitFrame = CreateFrame('Frame')
         waitFrame:RegisterEvent("COMPACT_UNIT_FRAME_PROFILES_LOADED")
@@ -780,9 +819,9 @@ function SubModuleMixin:Setup()
             --
             -- print(event)
             waitFrame:UnregisterEvent(event);
-            if (HasLoadedCUFProfiles() and CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded) then
-                --
-                initRaid()
+            if type(HasLoadedCUFProfiles) == 'function' and HasLoadedCUFProfiles() and CompactUnitFrameProfiles and
+                CompactUnitFrameProfiles.variablesLoaded then
+                initRaidTracked()
             end
         end)
     end

@@ -1851,6 +1851,38 @@ function DF:LogRaidOptions(tag)
     -- always came up empty and said nothing useful.
     DF:Log(tag, 'blizzRaid* option entries built: %s',
            tostring((addonTable and addonTable.RaidEditModeOptionCount) or 'builder never ran'))
+
+    -- Whether the edit mode selection was ever created, and which half of the gate in
+    -- SubModuleMixin:Setup stopped it if not.
+    local diag = addonTable and addonTable.RaidInitDiag
+    if diag then
+        DF:Log(tag, 'raid edit mode init: ran=%s HasLoadedCUFProfiles=%s(%s) CompactUnitFrameProfiles=%s variablesLoaded=%s',
+               tostring(diag.initRan), tostring(diag.hasLoadedCUFProfiles), tostring(diag.hasLoadedCUFProfilesFn),
+               tostring(diag.profilesTable), tostring(diag.variablesLoaded))
+    else
+        DF:Log(tag, 'raid edit mode init: Setup never reached this point')
+    end
+
+    -- The holder the selection and the raid container hang off.
+    local holder = _G['DragonflightUIRaidMoveFrame']
+    if holder then
+        DF:Log(tag, 'DragonflightUIRaidMoveFrame: shown=%s visible=%s %.0fx%.0f points=%d selection=%s',
+               tostring(holder:IsShown()), tostring(holder:IsVisible()), holder:GetWidth() or 0,
+               holder:GetHeight() or 0, holder:GetNumPoints(), tostring(holder.DFEditModeSelection ~= nil))
+
+        local secure, blame = issecurevariable('DragonflightUIRaidMoveFrame')
+        DF:Log(tag, 'DragonflightUIRaidMoveFrame global secure=%s blame=%s', tostring(secure), tostring(blame or '-'))
+    else
+        DF:Log(tag, 'DragonflightUIRaidMoveFrame: ABSENT - Load.xml did not create it')
+    end
+
+    local container = _G['CompactRaidFrameContainer']
+    if container then
+        local parentName = (container:GetParent() and container:GetParent().GetName and container:GetParent():GetName()) or
+                               '<anon>'
+        DF:Log(tag, 'CompactRaidFrameContainer: shown=%s visible=%s parent=%s points=%d', tostring(container:IsShown()),
+               tostring(container:IsVisible()), parentName, container:GetNumPoints())
+    end
 end
 
 -- Returns true when the input was a log command and has been handled.
