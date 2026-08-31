@@ -1065,17 +1065,38 @@ function SubModuleMixin:Update()
     -- out one pixel wide and there was nothing to drag - which is why moving the frame
     -- did nothing, not the missing SetMovable.
     --
-    -- A floor rather than a threshold: the holder grows with the container when there is
-    -- one, and stays usable when there is not.
+    -- The minimum applies only when there is nothing to measure, not as a floor under a
+    -- real measurement.
+    --
+    -- As a floor it made the placeholder disagree with the frames on every small raid.
+    -- CompactRaidFrameContainer is anchored TOPLEFT to TOPLEFT of this holder, so with a
+    -- 200x200 holder around an 80x94 container the frames sit in the holder's top left
+    -- corner rather than filling it. With the stored anchor being CENTER - which the
+    -- one-time calibration inherits from Blizzard's container, so it usually is - the
+    -- frames then hang 60 left and 53 above the point the profile calls their position.
+    -- /df log raidopts showed exactly that: holder 200x200 CENTER at (-563,199) with an
+    -- 80x94 container pinned to its corner.
+    --
+    -- It also only ever showed up on small raids, because a container past 200 wins the
+    -- max() and the two line up again by accident.
+    --
     -- The preview is laid out first, because while edit mode is open it is what defines
     -- how big the placeholder has to be. Outside edit mode it reports nothing and the
     -- real container decides.
     local previewW, previewH = self:UpdateRaidPreview(holder)
 
+    -- An empty CompactRaidFrameContainer reports a width just over 1, which is what made
+    -- an earlier version produce "DragonflightUIRaidMoveFrame 1x200" and a holder with
+    -- nothing to grab. That is what the minimum is for, and the only case it is for.
     local MIN_HOLDER_SIZE = 200
     local w = math.max((container and container:GetWidth()) or 0, previewW)
     local h = math.max((container and container:GetHeight()) or 0, previewH)
-    holder:SetSize(math.max(w, MIN_HOLDER_SIZE), math.max(h, MIN_HOLDER_SIZE))
+
+    if w > 2 and h > 2 then
+        holder:SetSize(w, h)
+    else
+        holder:SetSize(MIN_HOLDER_SIZE, MIN_HOLDER_SIZE)
+    end
 
     -- Helper resolves the anchor frame and rejects a chain that would close a loop,
     -- falling back to UIParent and reporting it once per session. The other unit
