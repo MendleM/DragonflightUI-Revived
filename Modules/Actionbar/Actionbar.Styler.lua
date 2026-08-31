@@ -550,8 +550,16 @@ local function HookBagRowEditMode()
     bagRowEditModeHooked = true
 
     -- Both directions: the row should look right inside edit mode too.
-    local ok, err = pcall(editmode.RegisterCallback, editmode, 'OnEditMode',
-                          function() C_Timer.After(0, Module.QueueBagRowRestore) end, Module)
+    --
+    -- Corrected in the same frame first, then again on the next one. Deferring alone
+    -- was visible as a flicker: Blizzard's layout widens the row by five 5px gaps, that
+    -- frame gets drawn, and only then does the correction land. The immediate pass
+    -- catches the damage that has already happened by the time this callback runs, the
+    -- deferred one catches the state handler's show if it settles a frame later.
+    local ok, err = pcall(editmode.RegisterCallback, editmode, 'OnEditMode', function()
+        Module.QueueBagRowRestore()
+        C_Timer.After(0, Module.QueueBagRowRestore)
+    end, Module)
     if not ok then geterrorhandler()('DFUI bag row edit mode hook: ' .. tostring(err)) end
 end
 
@@ -589,6 +597,10 @@ function Module.HookBagBarLayout()
         -- Retried here because the Editmode module may not have been ready when we
         -- first asked; HookBagRowEditMode is a no-op once it has taken.
         HookBagRowEditMode()
+
+        -- Same reasoning as the edit mode callback: repair now so nothing wrong gets
+        -- drawn, and again next frame for whatever settles late.
+        Module.QueueBagRowRestore()
         C_Timer.After(0, Module.QueueBagRowRestore)
     end)
 
