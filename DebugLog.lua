@@ -1848,8 +1848,14 @@ function DF:LogRaidOptions(tag)
     else
         DF:Log(tag, 'unit frame display info entries: %d', #displayInfo)
 
+        -- The party system's own frame, so the intersection is visible rather than assumed.
+        -- Raid settings are mirrored onto it for raid-style party frames, but only where it
+        -- answers HasSetting - "party=false" is a setting that page deliberately skips.
+        local partyFrame = addonTable and addonTable.GetPartySystemFrameForOptions and
+                               addonTable:GetPartySystemFrameForOptions()
+
         for _, info in ipairs(displayInfo) do
-            local has, val = 'n/a', 'n/a'
+            local has, val, partyHas = 'n/a', 'n/a', 'n/a'
             if raidFrame and raidFrame.HasSetting and info.setting ~= nil then
                 local ok, res = pcall(raidFrame.HasSetting, raidFrame, info.setting)
                 has = ok and tostring(res) or ('ERR ' .. tostring(res))
@@ -1860,8 +1866,13 @@ function DF:LogRaidOptions(tag)
                 end
             end
 
-            DF:Log(tag, '  setting=%s type=%s hasSetting=%s stored=%s name=%s', tostring(info.setting),
-                   tostring(info.type), has, val, tostring(info.name))
+            if partyFrame and partyFrame.HasSetting and info.setting ~= nil then
+                local okp, resp = pcall(partyFrame.HasSetting, partyFrame, info.setting)
+                partyHas = okp and tostring(resp) or ('ERR ' .. tostring(resp))
+            end
+
+            DF:Log(tag, '  setting=%s type=%s hasSetting=%s party=%s stored=%s name=%s', tostring(info.setting),
+                   tostring(info.type), has, partyHas, val, tostring(info.name))
         end
     end
 
