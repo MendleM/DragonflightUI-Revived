@@ -428,10 +428,13 @@ end
 --
 -- Verified byte-identical in classic_era, classic_anniversary and classic.
 local function ReanchorBagRow()
-    -- Moving these buttons is protected, and AnchorBagSlots bails out in combat.
-    -- Without this the row would keep Blizzard's spacing until something else
-    -- happened to re-anchor it, so park the work and run it once combat drops.
-    Helper:RunOutOfCombat('bag row re-anchor', Module.AnchorBagSlots)
+    -- Moving these buttons is protected, so AnchorBagSlots no-ops in combat and the
+    -- PLAYER_REGEN_ENABLED handler below picks the work up when the fight ends.
+    --
+    -- Deliberately not Helper:RunOutOfCombat: that queues into the post-combat
+    -- RefreshConfig pass and announces itself in chat, which is a lot of machinery
+    -- for six SetPoint calls that nothing else depends on.
+    Module.AnchorBagSlots()
 end
 
 function Module.HookBagBarLayout()
@@ -457,9 +460,14 @@ function Module.HookBagBarLayout()
     -- closes the gap. Every PEW rather than just the first: it costs six SetPoints
     -- and it also covers zoning, and the one-frame delay keeps us behind anything
     -- else still running in the same batch.
-    local pew = CreateFrame('Frame')
-    pew:RegisterEvent('PLAYER_ENTERING_WORLD')
-    pew:SetScript('OnEvent', function() C_Timer.After(0, ReanchorBagRow) end)
+    --
+    -- PLAYER_REGEN_ENABLED is the other half of the combat guard in AnchorBagSlots:
+    -- anything Blizzard re-anchored mid-fight, which we had to let stand, gets put
+    -- back the moment the fight ends.
+    local watcher = CreateFrame('Frame')
+    watcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+    watcher:RegisterEvent('PLAYER_REGEN_ENABLED')
+    watcher:SetScript('OnEvent', function() C_Timer.After(0, ReanchorBagRow) end)
 end
 
 function Module.UpdateBagSlotIcons()
@@ -640,6 +648,19 @@ function Module.BagBarExpandToggled(expanded)
     if not hasKeyring and KeyRingButton then
         KeyRingButton:Hide()
     end
+
+    -- Re-anchor, because this function only changed visibility.
+    --
+    -- Blizzard's BagsBarMixin:Layout skips hidden buttons - "if bagButton:IsShown()
+    -- and bagButton ~= MainMenuBarBackpackButton" - and rebuilds the chain from the
+    -- visible ones alone. If it runs while the row is collapsed, the buttons that
+    -- were hidden keep stale anchors, and showing them again puts the keyring in the
+    -- middle of the row with the toggle arrow sitting on top of the first bag.
+    --
+    -- Collapsing and expanding is our own toggle, not Blizzard's, so nothing here
+    -- goes through OnExpandBarChanged and the hook on it never fires. This is the
+    -- one path that has to re-anchor by itself.
+    ReanchorBagRow()
 end
 
 function Module.RefreshBagBarToggle()
