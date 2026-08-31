@@ -1909,6 +1909,24 @@ function DF:LogRaidOptions(tag)
         DF:Log(tag, 'DragonflightUIRaidMoveFrame: ABSENT - Load.xml did not create it')
     end
 
+    -- What this addon stores itself. That is the source of truth for these settings now,
+    -- since Blizzard's layout has been shown to be unable to keep them.
+    local gotModule, unitframeModule = pcall(DF.GetModule, DF, 'Unitframe', true)
+    local raidProfile = gotModule and unitframeModule and unitframeModule.db and unitframeModule.db.profile and
+                            unitframeModule.db.profile.raid
+    local storedSettings = raidProfile and raidProfile.blizzSettings
+
+    if storedSettings then
+        local parts = {}
+        for key, value in pairs(storedSettings) do table.insert(parts, key .. '=' .. tostring(value)) end
+        table.sort(parts)
+
+        DF:Log(tag, 'profile blizzSettings: %d entries%s', #parts,
+               (#parts > 0) and (' -> ' .. table.concat(parts, ' ')) or ' (nothing edited yet)')
+    else
+        DF:Log(tag, 'profile blizzSettings: ABSENT - the raid profile carries no table for them')
+    end
+
     -- Which layout is active, and can it even hold a changed setting?
     --
     -- EditModeManagerFrameMixin:SaveLayoutChanges refuses to save into a preset and opens
