@@ -1936,10 +1936,34 @@ function DF:LogRaidOptions(tag)
         DF:Log(tag, 'group: inRaid=%s members=%s inCombat=%s', tostring(IsInRaid and IsInRaid()),
                tostring((GetNumGroupMembers and GetNumGroupMembers()) or 0), tostring(InCombatLockdown()))
 
+        -- CompactRaidFrameContainerMixin:ReadyToUpdate gates LayoutFrames, and TryUpdate
+        -- does nothing at all when it says no. Group mode and the sort function come only
+        -- from Blizzard's Edit Mode appliers, the two filter functions from the manager's
+        -- OnLoad, so report all four rather than only the frame's own state.
+        local groupMode = container.GetGroupMode and container:GetGroupMode()
+        local ready = container.ReadyToUpdate and container:ReadyToUpdate()
+        local flowCount = (type(container.flowFrames) == 'table') and #container.flowFrames or -1
+
+        local created, shownMembers = 0, 0
+        for i = 1, 40 do
+            local m = _G['CompactRaidFrame' .. i]
+            if not m then break end
+            created = created + 1
+            if m:IsShown() then shownMembers = shownMembers + 1 end
+        end
+
+        DF:Log(tag, 'flow: groupMode=%s ReadyToUpdate=%s flowFrames=%s filterFunc=%s sortFunc=%s groupFilterFunc=%s',
+               tostring(groupMode), tostring(ready), tostring(flowCount), tostring(container.flowFilterFunc ~= nil),
+               tostring(container.flowSortFunc ~= nil), tostring(container.groupFilterFunc ~= nil))
+        DF:Log(tag, 'member frames: created=%d shown=%d', created, shownMembers)
+
         if not container:IsShown() and enabled == false then
             DF:Log(tag, 'VERDICT: container.enabled is false - IsShown was switched off and never restored')
         elseif not container:IsShown() and shouldShow == false then
             DF:Log(tag, 'VERDICT: the client says raid frames do not belong here - not in a raid, or turned off')
+        elseif ready == false then
+            DF:Log(tag, 'VERDICT: ReadyToUpdate is false, so LayoutFrames never runs and TryUpdate is a no-op - ' ..
+                       'groupMode or the sort function was never set')
         elseif container:IsShown() and not container:IsVisible() then
             DF:Log(tag, 'VERDICT: shown, but an ancestor is hidden - see the parent chain below')
         elseif container:IsShown() and container:GetWidth() <= 2 then
