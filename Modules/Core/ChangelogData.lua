@@ -91,7 +91,10 @@ DF.ChangelogData = {
                     'Keyring (Cata & MoP): suppressed phantom keyring button on Cataclysm and MoP while maintaining full visibility on Classic Era, TBC, and Wrath.',
                     'Reputation Bar: unchecking "Show as experience bar" now properly hides the reputation text immediately without leaving floating text on screen until /reload.',
                     'FPS Frame (Issue #16): prevented duplicate FPS/latency frame creation during initialization, resolving duplicate/ghost frames when moved in Edit Mode.',
-                    'MoP Bag Counter: fixed free bag slots counter positioning and text size inside the backpack button.'
+                    'MoP Bag Counter: fixed free bag slots counter positioning and text size inside the backpack button.',
+                    'Bag row spacing (Issue #30): the bags no longer drift apart on their own. Blizzard re-anchors the whole row with a uniform 5px gap, which also swallowed the gap bag 1 needs for the expand arrow, and it did so on the first mouseover after login, on every collapse, and after a reload. The row now holds its spacing through all of it, in combat included.',
+                    'Keyring position (Issue #30): the keyring stays at the end of the row instead of landing in the middle of the bags after collapsing and expanding.',
+                    'Keyring scale (Issue #30): the keyring scales with the rest of the bag row instead of staying at full size.'
                 }
             }, {
                 title = 'Professions',
