@@ -838,18 +838,62 @@ function SubModuleMixin:Setup()
                 -- setDefaultSubValues('focus')
             end,
             moduleRef = self.ModuleRef,
-            -- The old CompactRaidFrameManager_SetSetting('Locked', ...) pair is gone
-            -- from both of these, along with the ResizeFrame_SavePosition call and the
-            -- CompactRaidFrameManager_UpdateContainerVisibility hook that kept
-            -- re-unlocking it.
+            -- Blizzard's own way of putting raid frames on screen for editing, copied
+            -- from EditModeAccountSettingsMixin:RefreshRaidFrames:
             --
-            -- All of that drove Blizzard's old raid manager, which the client now keeps
-            -- hidden. Dragging happens on our own holder and its position is stored in
-            -- the DragonflightUI profile through the position table, the same as every
-            -- other unit frame here - so writing Blizzard's resize-frame position was
-            -- both pointless and a write into a frame we no longer use.
-            showFunction = function() f:Show() end,
-            hideFunction = function() end
+            --   CompactRaidFrameManager_SetSetting("IsShown", true)
+            --   CompactRaidFrameContainer:ApplyToFrames("group", CompactRaidGroup_UpdateUnits)
+            --   CompactRaidFrameContainer:TryUpdate()
+            --   EditModeManagerFrame:UpdateRaidContainerFlow()
+            --   UpdateRaidAndPartyFrames()
+            --
+            -- That is what fills the container and gives it a real size, which is also
+            -- what the placeholder needs - so there is no reason to rebuild a preview of
+            -- our own. UpdateRaidContainerFlow derives the layout from the same settings
+            -- this panel now edits: RaidGroupDisplayType picks the orientation, RowSize
+            -- the frames per line.
+            --
+            -- The old ResizeFrame_SavePosition call and the
+            -- CompactRaidFrameManager_UpdateContainerVisibility hook are gone: they drove
+            -- the pre-Edit-Mode raid manager, and position now lives in our profile.
+            showFunction = function()
+                f:Show()
+
+                local ok, err = pcall(function()
+                    if CompactRaidFrameManager_SetSetting then
+                        CompactRaidFrameManager_SetSetting('IsShown', true)
+                    end
+
+                    local c = _G['CompactRaidFrameContainer']
+                    if c and c.ApplyToFrames and CompactRaidGroup_UpdateUnits then
+                        c:ApplyToFrames('group', CompactRaidGroup_UpdateUnits)
+                    end
+                    if c and c.TryUpdate then c:TryUpdate() end
+
+                    if EditModeManagerFrame and EditModeManagerFrame.UpdateRaidContainerFlow then
+                        EditModeManagerFrame:UpdateRaidContainerFlow()
+                    end
+                    if UpdateRaidAndPartyFrames then UpdateRaidAndPartyFrames() end
+                end)
+                if not ok then geterrorhandler()('DFUI raid preview show: ' .. tostring(err)) end
+
+                -- Re-measure once the container has content, so the selection covers it.
+                C_Timer.After(0, function() self:Update() end)
+            end,
+            hideFunction = function()
+                -- Only what we turned on. TryUpdate afterwards so the container shrinks
+                -- back rather than keeping the forced-open extent.
+                local ok, err = pcall(function()
+                    if CompactRaidFrameManager_SetSetting then
+                        CompactRaidFrameManager_SetSetting('IsShown', false)
+                    end
+
+                    local c = _G['CompactRaidFrameContainer']
+                    if c and c.TryUpdate then c:TryUpdate() end
+                    if UpdateRaidAndPartyFrames then UpdateRaidAndPartyFrames() end
+                end)
+                if not ok then geterrorhandler()('DFUI raid preview hide: ' .. tostring(err)) end
+            end
         });
 
         if self.PreviewRaid then pcall(self.PreviewRaid.UpdateState, self.PreviewRaid, nil) end
@@ -988,13 +1032,20 @@ function SubModuleMixin:Update()
 
     holder:SetScale(state.scale or 1.0)
 
-    -- Sized from the real container so the selection covers what it actually moves.
-    -- The fake preview used to give the placeholder its extent; it does not exist on
-    -- clients without the old raid profile API, so the container is the better source
-    -- anyway. The fallback keeps the selection grabbable when no raid frames are up.
-    local w = container and container:GetWidth() or 0
-    local h = container and container:GetHeight() or 0
-    holder:SetSize((w > 1) and w or 200, (h > 1) and h or 200)
+    -- Sized from the real container, but never below something a mouse can grab.
+    --
+    -- The previous version took the container's size whenever it was wider than one
+    -- pixel, and /df log raidopts caught the result: "DragonflightUIRaidMoveFrame 1x200".
+    -- An empty CompactRaidFrameContainer reports a width just over 1, so the holder came
+    -- out one pixel wide and there was nothing to drag - which is why moving the frame
+    -- did nothing, not the missing SetMovable.
+    --
+    -- A floor rather than a threshold: the holder grows with the container when there is
+    -- one, and stays usable when there is not.
+    local MIN_HOLDER_SIZE = 200
+    local w = (container and container:GetWidth()) or 0
+    local h = (container and container:GetHeight()) or 0
+    holder:SetSize(math.max(w, MIN_HOLDER_SIZE), math.max(h, MIN_HOLDER_SIZE))
 
     -- Helper resolves the anchor frame and rejects a chain that would close a loop,
     -- falling back to UIParent and reporting it once per session. The other unit
