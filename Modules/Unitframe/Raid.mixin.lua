@@ -7,6 +7,72 @@ local subModuleName = 'RaidFrame';
 local SubModuleMixin = {};
 addonTable.SubModuleMixins[subModuleName] = SubModuleMixin;
 
+
+-- Blizzard's own description of the unit frame settings, read straight from
+-- EditModeSettingDisplayInfoManager.systemSettingDisplayInfo. It is an array per
+-- system, each entry carrying setting, name, type, and either minValue/maxValue/
+-- stepSize or an options list of {value, text}. Reading it does not taint it.
+local function GetUnitFrameDisplayInfo()
+    if not (Enum and Enum.EditModeSystem) then return nil end
+
+    local mgr = _G['EditModeSettingDisplayInfoManager']
+    if not (mgr and mgr.systemSettingDisplayInfo) then return nil end
+
+    return mgr.systemSettingDisplayInfo[Enum.EditModeSystem.UnitFrame]
+end
+
+-- The stored value is not the displayed value.
+--
+--   ConvertValueDiffFromMin: stored = shown - minValue
+--   ConvertValueDefault:     stored = (shown - minValue) / stepSize
+--
+-- Blizzard picks one per setting and hands it over as entry.ConvertValue, so it
+-- is called rather than reimplemented - getting this wrong silently writes
+-- nonsense into the layout.
+--
+-- The forDisplay direction runs self:ClampValue, which lives on the dialog's
+-- slider rather than on the data. A proxy supplies it, so Blizzard's arithmetic
+-- is still what runs.
+-- Always converted, in both directions, using Blizzard's own function.
+--
+-- The stored value is NOT the displayed one. Blizzard's dialog writes through
+-- ConvertValue(value, false) and reads through ConvertValue(value, true):
+--
+--   ConvertValueDiffFromMin: stored = shown - minValue
+--   ConvertValueDefault:     stored = (shown - minValue) / stepSize
+--
+-- An earlier version of this took the stored number as absolute whenever it happened
+-- to fall inside the setting's range, which was a guess and it was wrong. FrameWidth
+-- is minValue 72, maxValue 144, DiffFromMin, and a stored 98 therefore means 170 -
+-- past the maximum, clamped to 144. Showing it as 98 and writing 98 straight back
+-- made every reload come up at the far end of the slider, and it got worse each time.
+--
+-- Every slider was affected the same way: frame width, frame height, row size,
+-- opacity, icon size. Dropdowns and checkboxes were not - they carry no ConvertValue,
+-- their stored value is the enum or the flag itself.
+--
+-- The forDisplay direction calls self:ClampValue, which lives on the dialog's slider
+-- rather than on the data. A proxy supplies it so Blizzard's arithmetic still runs;
+-- clamping to minValue..maxValue is what the field names describe, and it is also what
+-- repairs a value stored out of range - the next write brings it back in.
+local function ConvertSettingValue(info, value, forDisplay)
+    if not (info and info.ConvertValue and value) then return value end
+
+    local host = info
+    if forDisplay and not info.ClampValue then
+        host = setmetatable({
+            ClampValue = function(selfRef, v)
+                return math.max(selfRef.minValue or v, math.min(selfRef.maxValue or v, v))
+            end
+        }, {__index = info})
+    end
+
+    local ok, converted = pcall(info.ConvertValue, host, value, forDisplay)
+    if not ok then return value end
+
+    return converted
+end
+
 function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
@@ -139,69 +205,6 @@ function SubModuleMixin:SetupOptions()
     -- invented here, because inventing them is how you ship a slider that lets
     -- people set a value the client then rejects. Anything Blizzard does not
     -- describe is left out.
-    -- Blizzard's own description of the unit frame settings, read straight from
-    -- EditModeSettingDisplayInfoManager.systemSettingDisplayInfo. It is an array per
-    -- system, each entry carrying setting, name, type, and either minValue/maxValue/
-    -- stepSize or an options list of {value, text}. Reading it does not taint it.
-    local function GetUnitFrameDisplayInfo()
-        if not (Enum and Enum.EditModeSystem) then return nil end
-
-        local mgr = _G['EditModeSettingDisplayInfoManager']
-        if not (mgr and mgr.systemSettingDisplayInfo) then return nil end
-
-        return mgr.systemSettingDisplayInfo[Enum.EditModeSystem.UnitFrame]
-    end
-
-    -- The stored value is not the displayed value.
-    --
-    --   ConvertValueDiffFromMin: stored = shown - minValue
-    --   ConvertValueDefault:     stored = (shown - minValue) / stepSize
-    --
-    -- Blizzard picks one per setting and hands it over as entry.ConvertValue, so it
-    -- is called rather than reimplemented - getting this wrong silently writes
-    -- nonsense into the layout.
-    --
-    -- The forDisplay direction runs self:ClampValue, which lives on the dialog's
-    -- slider rather than on the data. A proxy supplies it, so Blizzard's arithmetic
-    -- is still what runs.
-    -- Only converted when the stored value clearly is not already the real one.
-    --
-    -- The live values say the stored form is absolute. FrameWidth is described as
-    -- minValue 72, maxValue 144, ConvertValueDiffFromMin, and /df log raidopts read it
-    -- back as 98 - applying DiffFromMin would make that 170, past the maximum, and pin
-    -- the slider at the far end. FrameHeight reads 44 against 36 to 72, RowSize 5,
-    -- Transparency and IconSize 100: every one of them already inside its own range.
-    --
-    -- ConvertValue exists for Blizzard's own slider widget, whose internal value is not
-    -- the setting value. Reading the setting straight off the system frame skips that
-    -- widget entirely, so there is nothing to undo.
-    --
-    -- It is still used as a fallback for any setting whose stored value does land
-    -- outside its range, rather than assuming this holds everywhere. Identical bounds
-    -- in classic_era, classic_anniversary and classic, so this reasoning covers Era,
-    -- TBC and MoP alike.
-    local function ConvertSettingValue(info, value, forDisplay)
-        if not info then return value end
-
-        local minV, maxV = info.minValue, info.maxValue
-        local inRange = minV and maxV and value and value >= minV and value <= maxV
-
-        if inRange or not info.ConvertValue then return value end
-
-        local host = info
-        if forDisplay and not info.ClampValue then
-            host = setmetatable({
-                ClampValue = function(selfRef, v)
-                    return math.max(selfRef.minValue or v, math.min(selfRef.maxValue or v, v))
-                end
-            }, {__index = info})
-        end
-
-        local ok, converted = pcall(info.ConvertValue, host, value, forDisplay)
-        if not ok then return value end
-
-        return converted
-    end
 
     -- One AceConfig entry per setting the raid system actually has.
     --
@@ -789,9 +792,32 @@ end
 -- five to a line, combined groups take RowSize, and the display type decides whether the
 -- flow is vertical or horizontal.
 local function GetRaidPreviewLayout()
+    -- Display values, not stored ones.
+    --
+    -- The preview draws in pixels, so it needs what the slider shows, and the two are
+    -- not the same number - see ConvertSettingValue. Reading them raw is what made the
+    -- preview frames the wrong size while the real ones were right.
+    --
+    -- Dropdowns and checkboxes have no ConvertValue, so this is a no-op for them and
+    -- their enum values come through untouched.
+    local displayInfo = GetUnitFrameDisplayInfo()
+
     local function setting(key)
         if not (Enum and Enum.EditModeUnitFrameSetting) then return nil end
-        return addonTable:GetRaidEditModeSettingBySetting(Enum.EditModeUnitFrameSetting[key])
+
+        local id = Enum.EditModeUnitFrameSetting[key]
+        if id == nil then return nil end
+
+        local stored = addonTable:GetRaidEditModeSettingBySetting(id)
+        if stored == nil then return nil end
+
+        if displayInfo then
+            for _, info in ipairs(displayInfo) do
+                if info.setting == id then return ConvertSettingValue(info, stored, true) end
+            end
+        end
+
+        return stored
     end
 
     local displayType = setting('RaidGroupDisplayType')
