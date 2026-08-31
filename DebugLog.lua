@@ -1996,11 +1996,22 @@ function DF:LogRaidOptions(tag)
         local mgr = _G['CompactRaidFrameManager']
         local enabled = mgr and mgr.container and mgr.container.enabled
         local isShown = CompactRaidFrameManager_GetSetting and CompactRaidFrameManager_GetSetting('IsShown')
-        local shouldShow = ShouldShowRaidFrames and ShouldShowRaidFrames()
+        -- Tracked separately from its result: the function returns nil rather than false
+        -- for "no", so a nil on its own cannot tell "the client says no" from "the function
+        -- is not there". Reading them apart is what stops the verdict below from blaming
+        -- the addon for a player who simply is not in a raid.
+        local haveShouldShow = (ShouldShowRaidFrames ~= nil)
+        local shouldShow
+        if haveShouldShow then
+            local okShow, res = pcall(ShouldShowRaidFrames)
+            shouldShow = okShow and res or nil
+        end
+
+        local inRaid = (IsInRaid and IsInRaid()) and true or false
 
         DF:Log(tag, 'visibility terms: ShouldShowRaidFrames=%s container.enabled=%s GetSetting("IsShown")=%s',
-               tostring(shouldShow), tostring(enabled), tostring(isShown))
-        DF:Log(tag, 'group: inRaid=%s members=%s inCombat=%s', tostring(IsInRaid and IsInRaid()),
+               haveShouldShow and tostring(shouldShow) or 'ABSENT', tostring(enabled), tostring(isShown))
+        DF:Log(tag, 'group: inRaid=%s members=%s inCombat=%s', tostring(inRaid),
                tostring((GetNumGroupMembers and GetNumGroupMembers()) or 0), tostring(InCombatLockdown()))
 
         -- CompactRaidFrameContainerMixin:ReadyToUpdate gates LayoutFrames, and TryUpdate
@@ -2049,10 +2060,12 @@ function DF:LogRaidOptions(tag)
         DF:Log(tag, 'group frames: %d (visible %d)   members: %d (visible %d, with unit %d)', groups, groupsVisible,
                members, membersVisible, withUnit)
 
-        if not container:IsShown() and enabled == false then
+        if not container:IsShown() and not inRaid then
+            DF:Log(tag, 'VERDICT: nothing to show - not in a raid, so a hidden container is correct')
+        elseif not container:IsShown() and enabled == false then
             DF:Log(tag, 'VERDICT: container.enabled is false - IsShown was switched off and never restored')
-        elseif not container:IsShown() and shouldShow == false then
-            DF:Log(tag, 'VERDICT: the client says raid frames do not belong here - not in a raid, or turned off')
+        elseif not container:IsShown() and haveShouldShow and not shouldShow then
+            DF:Log(tag, 'VERDICT: ShouldShowRaidFrames says no - raid frames do not belong in this situation')
         elseif ready == false then
             DF:Log(tag, 'VERDICT: ReadyToUpdate is false, so LayoutFrames never runs and TryUpdate is a no-op - ' ..
                        'groupMode or the sort function was never set')
