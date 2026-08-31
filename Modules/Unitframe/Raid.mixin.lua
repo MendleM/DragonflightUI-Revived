@@ -183,6 +183,38 @@ function SubModuleMixin:SetupOptions()
     -- correctness, they simply are not what runs.
     local blizzRaidSettings = {}
 
+    -- Our profile is the source of truth for these; Blizzard's system frame is only where
+    -- the value is pushed so it takes effect.
+    --
+    -- Blizzard's layout cannot keep them, which the defaults table above explains, so the
+    -- value has to live here or not at all. Reading Blizzard's live value while nothing is
+    -- stored seeds the first read, so upgrading moves nobody's frames.
+    --
+    -- Defined next to blizzRaidSettings because the GROUP handlers are what the widgets
+    -- call, and they are the only ones that must not miss this.
+    local function BlizzRaidProfileTable()
+        local profile = Module.db and Module.db.profile
+        return profile and profile.raid and profile.raid.blizzSettings
+    end
+
+    local function GetBlizzRaidStored(setting)
+        local saved = BlizzRaidProfileTable()
+        local key = tostring(setting)
+        if saved and saved[key] ~= nil then return saved[key] end
+
+        return addonTable:GetRaidEditModeSettingBySetting(setting)
+    end
+
+    local function SetBlizzRaidStored(setting, value)
+        local saved = BlizzRaidProfileTable()
+        if saved then saved[tostring(setting)] = value end
+
+        addonTable:SetRaidEditModeSettingBySetting(setting, value)
+    end
+
+    self.GetBlizzRaidStored = GetBlizzRaidStored
+    self.SetBlizzRaidStored = SetBlizzRaidStored
+
     -- Returns how many entries it added, so the caller can tell "not ready yet" from
     -- "nothing to offer" and stop retrying once it has worked.
     local function BuildRaidEditModeArgs(args)
@@ -248,30 +280,10 @@ function SubModuleMixin:SetupOptions()
                     editmode = true
                 }
 
-                -- Our profile is the source of truth; Blizzard's system frame is only
-                -- where the value gets pushed so it takes effect. Reading Blizzard's live
-                -- value while nothing is stored seeds the first read, so upgrading does
-                -- not move anybody's frames.
-                local settingKey = tostring(setting)
-
-                local function SavedTable()
-                    local profile = Module.db and Module.db.profile
-                    return profile and profile.raid and profile.raid.blizzSettings
-                end
-
-                local function GetStored()
-                    local saved = SavedTable()
-                    if saved and saved[settingKey] ~= nil then return saved[settingKey] end
-
-                    return addonTable:GetRaidEditModeSettingBySetting(setting)
-                end
-
-                local function SetStored(value)
-                    local saved = SavedTable()
-                    if saved then saved[settingKey] = value end
-
-                    addonTable:SetRaidEditModeSettingBySetting(setting, value)
-                end
+                -- Same two helpers the group handlers use. These per-option ones are not
+                -- what the widgets call, but they must not disagree with the ones that are.
+                local function GetStored() return GetBlizzRaidStored(setting) end
+                local function SetStored(value) SetBlizzRaidStored(setting, value) end
 
                 if info.type == types.Checkbox then
                     option.type = 'toggle'
@@ -403,7 +415,7 @@ function SubModuleMixin:SetupOptions()
             -- it back off the system frame rather than computing it.
             local blizz = blizzRaidSettings[sub]
             if blizz then
-                local stored = addonTable:GetRaidEditModeSettingBySetting(blizz.setting)
+                local stored = GetBlizzRaidStored(blizz.setting)
 
                 if blizz.kind == 'toggle' then return (stored or 0) ~= 0 end
 
@@ -445,7 +457,7 @@ function SubModuleMixin:SetupOptions()
                     stored = value and 1 or 0
                 end
 
-                addonTable:SetRaidEditModeSettingBySetting(blizz.setting, stored)
+                SetBlizzRaidStored(blizz.setting, stored)
 
                 -- Re-applied so the preview follows. Frame width, height, row size, the
                 -- group display type and the raid size all change how it has to be laid
