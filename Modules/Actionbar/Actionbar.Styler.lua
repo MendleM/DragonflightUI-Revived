@@ -357,9 +357,11 @@ function Module.ChangeBackpack()
     Module.HookBagBarLayout()
 end
 
+-- Returns true when the row was actually anchored, false when it had to be skipped.
+-- ReanchorBagRow uses that to retry, so a skip is never the end of the story.
 function Module.AnchorBagSlots()
-    if not (MainMenuBarBackpackButton and _G['CharacterBag0Slot']) then return end
-    if Helper:IsCombatLocked() then return end
+    if not (MainMenuBarBackpackButton and _G['CharacterBag0Slot']) then return false end
+    if Helper:IsCombatLocked() then return false end
 
     -- The backpack goes back onto our own holder first.
     --
@@ -393,6 +395,8 @@ function Module.AnchorBagSlots()
     elseif KeyRingButton then
         KeyRingButton:Hide()
     end
+
+    return true
 end
 
 -- Re-assert our bag row after Blizzard has laid its own out.
@@ -427,14 +431,54 @@ end
 -- counts as a change, so the row gets laid out again for no visible reason.
 --
 -- Verified byte-identical in classic_era, classic_anniversary and classic.
+-- Re-anchor, and keep trying for a short while if the game will not let us.
+--
+-- Moving these buttons is protected, so AnchorBagSlots refuses to touch them in
+-- combat. Reloading mid-fight therefore comes up with Blizzard's spacing, and
+-- PLAYER_REGEN_ENABLED alone does not repair it: DFUI reads combat as
+--
+--   InCombatLockdown() or UnitAffectingCombat('player')
+--
+-- and the second half is the server-side flag, which is still set at the moment
+-- PLAYER_REGEN_ENABLED arrives. A single attempt there loses the race and nothing
+-- tries again, which is why the row stayed wrong for the rest of the session.
+--
+-- So retry on a slow timer until it takes, bounded so a genuinely missing frame
+-- cannot spin forever, and single-chained so several triggers firing at once do
+-- not stack timers on each other.
+--
+-- Deliberately not Helper:RunOutOfCombat: that queues into the post-combat
+-- RefreshConfig pass and announces itself in chat, far too much machinery for six
+-- SetPoint calls, and BagBarExpandToggled runs off BAG_UPDATE_DELAYED, so it fires
+-- while looting mid-fight.
+local REANCHOR_RETRY_DELAY = 0.5
+local REANCHOR_MAX_RETRIES = 20 -- ten seconds, enough for the combat flag to clear
+local reanchorRetries = 0
+local reanchorRetryQueued = false
+
+local function ReanchorAttempt()
+    if Module.AnchorBagSlots() then
+        reanchorRetries = 0
+        return
+    end
+
+    if reanchorRetryQueued or reanchorRetries >= REANCHOR_MAX_RETRIES then return end
+
+    reanchorRetries = reanchorRetries + 1
+    reanchorRetryQueued = true
+
+    C_Timer.After(REANCHOR_RETRY_DELAY, function()
+        reanchorRetryQueued = false
+        ReanchorAttempt()
+    end)
+end
+
+-- The entry point every hook and event uses. Each fresh trigger gets a fresh
+-- budget, otherwise one exhausted run would make every later trigger give up
+-- immediately for the rest of the session.
 local function ReanchorBagRow()
-    -- Moving these buttons is protected, so AnchorBagSlots no-ops in combat and the
-    -- PLAYER_REGEN_ENABLED handler below picks the work up when the fight ends.
-    --
-    -- Deliberately not Helper:RunOutOfCombat: that queues into the post-combat
-    -- RefreshConfig pass and announces itself in chat, which is a lot of machinery
-    -- for six SetPoint calls that nothing else depends on.
-    Module.AnchorBagSlots()
+    reanchorRetries = 0
+    ReanchorAttempt()
 end
 
 function Module.HookBagBarLayout()
