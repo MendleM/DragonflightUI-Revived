@@ -1404,7 +1404,11 @@ local function ArmSeedWatcher()
 
         DF:LogTaintedGlobals('seed')
 
-        print(PREFIX .. 'party taint seed captured - run |cffffff78/df log seed|r')
+        -- Captured, not announced. This watcher is armed on every load, so the print
+        -- that used to sit here greeted every player who joined a group with a line
+        -- about taint seeds - a diagnostic aimed at whoever is debugging this addon,
+        -- shown to everyone else. The report is in the buffer and in SavedVariables
+        -- either way; /df log seed prints it on request.
     end)
 end
 
