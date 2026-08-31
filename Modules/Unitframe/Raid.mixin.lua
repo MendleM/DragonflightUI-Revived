@@ -50,6 +50,7 @@ function SubModuleMixin:SetDefaults()
         x = 0,
         y = 0,
         calibrated = false,
+        anchorNormalised = false,
         -- Visibility, and every key AddStateTable offers has to be here.
         --
         -- A missing default means getOption returns nil, and the settings list feeds
@@ -1103,6 +1104,41 @@ function SubModuleMixin:Update()
     -- frames go through the same pair, so a bad anchor behaves the same everywhere.
     local parent, legal, chain = Helper:ResolveAnchorParent(holder, state)
     if not legal then Helper:WarnIllegalAnchor(holder, chain) end
+
+    -- The holder has to hang by a corner, not by its middle.
+    --
+    -- The calibration above adopts whatever anchor Blizzard's container carried, and that
+    -- is usually CENTER. Now that the holder is exactly as large as the raid, a CENTER
+    -- anchor means the raid grows in all four directions at once - park it at the left
+    -- edge and half of it goes off screen as people join. Anchored TOPLEFT the top left
+    -- corner stays put and the raid grows right and down, which is the only direction
+    -- there is room for.
+    --
+    -- Converted once per profile, keeping the frames exactly where they are: the offset of
+    -- the old anchor point from TOPLEFT is subtracted, so only the direction of growth
+    -- changes, never the current position.
+    if not state.anchorNormalised then
+        local w, h = holder:GetWidth() or 0, holder:GetHeight() or 0
+        local fromTopLeft = {
+            TOPLEFT = {0, 0},
+            TOP = {w / 2, 0},
+            TOPRIGHT = {w, 0},
+            LEFT = {0, -h / 2},
+            CENTER = {w / 2, -h / 2},
+            RIGHT = {w, -h / 2},
+            BOTTOMLEFT = {0, -h},
+            BOTTOM = {w / 2, -h},
+            BOTTOMRIGHT = {w, -h}
+        }
+
+        local delta = fromTopLeft[state.anchor or 'TOPLEFT']
+        if delta then
+            state.x = (state.x or 0) - delta[1]
+            state.y = (state.y or 0) - delta[2]
+            state.anchor = 'TOPLEFT'
+            state.anchorNormalised = true
+        end
+    end
 
     holder:ClearAllPoints()
     holder:SetPoint(state.anchor or 'TOPLEFT', parent, state.anchorParent or 'TOPLEFT', state.x or 0, state.y or 0)
