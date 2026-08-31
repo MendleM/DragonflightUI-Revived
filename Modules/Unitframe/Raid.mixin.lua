@@ -794,35 +794,43 @@ function SubModuleMixin:Setup()
     -- built, and if not, which half of this gate stopped it. HasLoadedCUFProfiles is a
     -- Blizzard global and CompactUnitFrameProfiles is the pre-Edit-Mode profile system,
     -- neither of which is guaranteed to be there now that raid frames are a system.
-    local cufOk = type(HasLoadedCUFProfiles) == 'function' and HasLoadedCUFProfiles() and true or false
-
     addonTable.RaidInitDiag = {
         hasLoadedCUFProfilesFn = type(HasLoadedCUFProfiles),
-        hasLoadedCUFProfiles = cufOk,
         profilesTable = CompactUnitFrameProfiles ~= nil,
         variablesLoaded = CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded or false,
         initRan = false
     }
 
     local function initRaidTracked()
+        if addonTable.RaidInitDiag.initRan then return end
         addonTable.RaidInitDiag.initRan = true
         initRaid()
     end
 
-    if cufOk and CompactUnitFrameProfiles and CompactUnitFrameProfiles.variablesLoaded then
-        initRaidTracked()
-    else
+    -- The CompactUnitFrameProfiles gate that used to be here is gone.
+    --
+    -- It required HasLoadedCUFProfiles() and CompactUnitFrameProfiles.variablesLoaded,
+    -- and /df log raidopts showed why nothing ever appeared: on 1.15.9
+    -- CompactUnitFrameProfiles does not exist at all, so the condition could never
+    -- become true and the fallback sat waiting for COMPACT_UNIT_FRAME_PROFILES_LOADED,
+    -- an event that never fires. initRan stayed false and the selection was never built.
+    --
+    -- That gate also no longer guards anything. It was there for the
+    -- CompactRaidFrameManager_SetSetting and ResizeFrame_SavePosition calls, which
+    -- drove the pre-Edit-Mode raid manager and have been removed. What initRaid needs
+    -- now is our own XML holder and the Editmode module, both of which are already
+    -- there by the time Setup runs.
+    --
+    -- PLAYER_ENTERING_WORLD is still worth waiting on as a second attempt, because the
+    -- raid container registers itself with the Edit Mode manager during load.
+    initRaidTracked()
+
+    if not addonTable.RaidInitDiag.initRan then
         local waitFrame = CreateFrame('Frame')
-        waitFrame:RegisterEvent("COMPACT_UNIT_FRAME_PROFILES_LOADED")
-        waitFrame:RegisterEvent("VARIABLES_LOADED")
-        waitFrame:SetScript("OnEvent", function(waitFrame, event, arg1)
-            --
-            -- print(event)
-            waitFrame:UnregisterEvent(event);
-            if type(HasLoadedCUFProfiles) == 'function' and HasLoadedCUFProfiles() and CompactUnitFrameProfiles and
-                CompactUnitFrameProfiles.variablesLoaded then
-                initRaidTracked()
-            end
+        waitFrame:RegisterEvent('PLAYER_ENTERING_WORLD')
+        waitFrame:SetScript('OnEvent', function(watcherSelf)
+            watcherSelf:UnregisterAllEvents()
+            initRaidTracked()
         end)
     end
 end

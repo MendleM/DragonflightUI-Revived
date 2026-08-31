@@ -1856,9 +1856,9 @@ function DF:LogRaidOptions(tag)
     -- SubModuleMixin:Setup stopped it if not.
     local diag = addonTable and addonTable.RaidInitDiag
     if diag then
-        DF:Log(tag, 'raid edit mode init: ran=%s HasLoadedCUFProfiles=%s(%s) CompactUnitFrameProfiles=%s variablesLoaded=%s',
-               tostring(diag.initRan), tostring(diag.hasLoadedCUFProfiles), tostring(diag.hasLoadedCUFProfilesFn),
-               tostring(diag.profilesTable), tostring(diag.variablesLoaded))
+        DF:Log(tag, 'raid edit mode init: ran=%s (HasLoadedCUFProfiles=%s CompactUnitFrameProfiles=%s variablesLoaded=%s)',
+               tostring(diag.initRan), tostring(diag.hasLoadedCUFProfilesFn), tostring(diag.profilesTable),
+               tostring(diag.variablesLoaded))
     else
         DF:Log(tag, 'raid edit mode init: Setup never reached this point')
     end
@@ -1870,8 +1870,15 @@ function DF:LogRaidOptions(tag)
                tostring(holder:IsShown()), tostring(holder:IsVisible()), holder:GetWidth() or 0,
                holder:GetHeight() or 0, holder:GetNumPoints(), tostring(holder.DFEditModeSelection ~= nil))
 
-        local secure, blame = issecurevariable('DragonflightUIRaidMoveFrame')
-        DF:Log(tag, 'DragonflightUIRaidMoveFrame global secure=%s blame=%s', tostring(secure), tostring(blame or '-'))
+        -- Reported next to the party holder on purpose. Party's is the one that is
+        -- known to work, so on its own "secure=false" says nothing: it could be normal
+        -- for a holder declared in this addon's XML, or it could be the taint the
+        -- party comment warns about. Only the comparison tells them apart.
+        local raidSecure, raidBlame = issecurevariable('DragonflightUIRaidMoveFrame')
+        local partySecure, partyBlame = issecurevariable('DragonflightUIPartyMoveFrame')
+
+        DF:Log(tag, 'holder globals: raid secure=%s blame=%s | party secure=%s blame=%s', tostring(raidSecure),
+               tostring(raidBlame or '-'), tostring(partySecure), tostring(partyBlame or '-'))
     else
         DF:Log(tag, 'DragonflightUIRaidMoveFrame: ABSENT - Load.xml did not create it')
     end
