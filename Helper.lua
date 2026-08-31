@@ -457,31 +457,36 @@ local function GetRaidSystemFrame()
     return _G['CompactRaidFrameContainer']
 end
 
--- One raid frame Edit Mode setting, by Enum.EditModeUnitFrameSetting key name.
+-- The registered raid system frame, for the options builder.
 --
--- Takes the name rather than the value so the options table does not have to guard
--- every entry against a flavour that lacks that setting - unknown keys are simply
--- skipped here.
-function addonTable:SetRaidEditModeSetting(settingKey, value)
-    if not (Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSystemIndices) then return false end
+-- Exposed because the options are built from Blizzard's own display info and have to
+-- ask HasSetting per entry: whatever the raid system actually supports on this
+-- flavour is what gets offered, rather than a hardcoded list.
+function addonTable:GetRaidSystemFrameForOptions()
+    return GetRaidSystemFrame()
+end
 
-    local setting = Enum.EditModeUnitFrameSetting[settingKey]
+-- One raid frame Edit Mode setting, by setting id.
+--
+-- Ids rather than Enum key names, because the caller now walks Blizzard's display
+-- info table, which already carries the id in entry.setting. Values are the STORED
+-- form; sliders are converted by the caller through Blizzard's own ConvertValue.
+function addonTable:SetRaidEditModeSettingBySetting(setting, value)
+    if not (Enum and Enum.EditModeUnitFrameSystemIndices) then return false end
     if setting == nil then return false end
 
     addonTable:SyncUnitFrameEditModeSetting(Enum.EditModeUnitFrameSystemIndices.Raid, setting, value,
-                                            GetRaidSystemFrame(), 'raid frame ' .. settingKey)
+                                            GetRaidSystemFrame(), 'raid frame setting ' .. tostring(setting))
     return true
 end
 
--- The value Blizzard currently holds for a raid setting, or nil when it has none.
+-- The stored value Blizzard currently holds, or nil when the system has no such
+-- setting.
 --
--- Read from the registered system frame, which is the same source Blizzard's own
--- appliers use, so the options always show what is actually in effect rather than a
--- copy that can drift. Reading a Blizzard table does not taint it.
-function addonTable:GetRaidEditModeSetting(settingKey)
-    if not (Enum and Enum.EditModeUnitFrameSetting) then return nil end
-
-    local setting = Enum.EditModeUnitFrameSetting[settingKey]
+-- Read from the registered system frame, the same source Blizzard's own appliers use,
+-- so the options show what is actually in effect rather than a copy that can drift.
+-- Reading a Blizzard table does not taint it.
+function addonTable:GetRaidEditModeSettingBySetting(setting)
     if setting == nil then return nil end
 
     local frame = GetRaidSystemFrame()
@@ -494,6 +499,14 @@ function addonTable:GetRaidEditModeSetting(settingKey)
     if not ok then return nil end
 
     return val
+end
+
+-- Kept for the options layer's existence check, which asks for this by name before
+-- building anything.
+function addonTable:SetRaidEditModeSetting(settingKey, value)
+    if not (Enum and Enum.EditModeUnitFrameSetting) then return false end
+
+    return addonTable:SetRaidEditModeSettingBySetting(Enum.EditModeUnitFrameSetting[settingKey], value)
 end
 
 -- SetBlizzEditmodeFrameSetting / GetBlizzEditmodeFrameSettingBool used to live

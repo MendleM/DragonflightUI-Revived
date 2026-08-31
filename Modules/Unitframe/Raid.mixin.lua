@@ -124,86 +124,126 @@ function SubModuleMixin:SetupOptions()
     -- invented here, because inventing them is how you ship a slider that lets
     -- people set a value the client then rejects. Anything Blizzard does not
     -- describe is left out.
-    local EDIT_MODE_RAID_SETTINGS = {
-        {key = 'FrameWidth', kind = 'range', name = 'Frame width', order = 20.1},
-        {key = 'FrameHeight', kind = 'range', name = 'Frame height', order = 20.2},
-        {key = 'RaidGroupDisplayType', kind = 'select', name = 'Groups', order = 20.3},
-        {key = 'DisplayBorder', kind = 'toggle', name = 'Show border', order = 20.4},
-        {key = 'SortPlayersBy', kind = 'select', name = 'Sort players by', order = 20.5},
-        {key = 'RowSize', kind = 'range', name = 'Row size', order = 20.6},
-        {key = 'ViewRaidSize', kind = 'select', name = 'Raid size shown', order = 20.7},
-        {key = 'Opacity', kind = 'range', name = 'Opacity', order = 20.8},
-        {key = 'IconSize', kind = 'range', name = 'Icon size', order = 20.9}
-    }
-
-    -- Blizzard's description of one setting: min, max, step for a slider, or the
-    -- list of choices for a dropdown. Returns nil when this client does not have
-    -- that setting, which is how flavours that lack it drop out.
-    local function GetRaidSettingDisplayInfo(settingKey)
-        if not (Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeSystem) then return nil end
-
-        local setting = Enum.EditModeUnitFrameSetting[settingKey]
-        if setting == nil then return nil end
+    -- Blizzard's own description of the unit frame settings, read straight from
+    -- EditModeSettingDisplayInfoManager.systemSettingDisplayInfo. It is an array per
+    -- system, each entry carrying setting, name, type, and either minValue/maxValue/
+    -- stepSize or an options list of {value, text}. Reading it does not taint it.
+    local function GetUnitFrameDisplayInfo()
+        if not (Enum and Enum.EditModeSystem) then return nil end
 
         local mgr = _G['EditModeSettingDisplayInfoManager']
-        if not (mgr and mgr.GetSettingDisplayInfo) then return nil end
+        if not (mgr and mgr.systemSettingDisplayInfo) then return nil end
 
-        local ok, info = pcall(mgr.GetSettingDisplayInfo, mgr, Enum.EditModeSystem.UnitFrame, setting)
-        if not ok then return nil end
-
-        return info
+        return mgr.systemSettingDisplayInfo[Enum.EditModeSystem.UnitFrame]
     end
 
+    -- The stored value is not the displayed value.
+    --
+    --   ConvertValueDiffFromMin: stored = shown - minValue
+    --   ConvertValueDefault:     stored = (shown - minValue) / stepSize
+    --
+    -- Blizzard picks one per setting and hands it over as entry.ConvertValue, so it
+    -- is called rather than reimplemented - getting this wrong silently writes
+    -- nonsense into the layout.
+    --
+    -- The forDisplay direction runs self:ClampValue, which lives on the dialog's
+    -- slider rather than on the data. A proxy supplies it, so Blizzard's arithmetic
+    -- is still what runs.
+    local function ConvertSettingValue(info, value, forDisplay)
+        if not (info and info.ConvertValue) then return value end
+
+        local host = info
+        if forDisplay and not info.ClampValue then
+            host = setmetatable({
+                ClampValue = function(selfRef, v)
+                    return math.max(selfRef.minValue or v, math.min(selfRef.maxValue or v, v))
+                end
+            }, {__index = info})
+        end
+
+        local ok, converted = pcall(info.ConvertValue, host, value, forDisplay)
+        if not ok then return value end
+
+        return converted
+    end
+
+    -- One AceConfig entry per setting the raid system actually has.
+    --
+    -- Driven entirely off Blizzard's table: the label is Blizzard's localised name,
+    -- the slider bounds are Blizzard's, the dropdown values are Blizzard's enums. The
+    -- earlier version of this hardcoded English labels and a guessed value scheme,
+    -- and produced an empty panel because none of the guesses matched.
+    --
+    -- HasSetting on the registered system frame decides what appears, so a flavour
+    -- without a given setting simply does not show it.
     local function BuildRaidEditModeArgs(args)
-        if not addonTable.SetRaidEditModeSetting then return end
+        if not (addonTable.SetRaidEditModeSetting and Enum and Enum.EditModeSettingDisplayType) then return end
 
-        for _, entry in ipairs(EDIT_MODE_RAID_SETTINGS) do
-            local info = GetRaidSettingDisplayInfo(entry.key)
+        local displayInfo = GetUnitFrameDisplayInfo()
+        if not displayInfo then return end
 
-            -- No description from Blizzard means either the setting does not exist on
-            -- this flavour or its shape is unknown. Either way, not offered.
-            if info then
+        local raidFrame = addonTable.GetRaidSystemFrameForOptions and addonTable:GetRaidSystemFrameForOptions()
+        if not (raidFrame and raidFrame.HasSetting) then return end
+
+        local types = Enum.EditModeSettingDisplayType
+        local order = 20
+
+        for _, info in ipairs(displayInfo) do
+            local setting = info.setting
+
+            -- Both return values checked: a failed pcall hands back an error string,
+            -- which is truthy, so testing only the second one would treat every
+            -- failure as "yes, it has this setting".
+            local hasIt = false
+            if setting ~= nil then
+                local ok, has = pcall(raidFrame.HasSetting, raidFrame, setting)
+                hasIt = ok and has and true or false
+            end
+
+            if hasIt then
+                order = order + 0.01
+
                 local option = {
-                    name = entry.name,
-                    desc = 'Blizzard Edit Mode setting, applied immediately and stored in your Edit Mode layout.',
-                    order = entry.order,
+                    name = info.name or tostring(setting),
+                    desc = 'Blizzard Edit Mode setting. Applied at once and kept in your Edit Mode layout.',
+                    order = order,
                     editmode = true
                 }
 
-                if entry.kind == 'toggle' then
+                local function GetStored() return addonTable:GetRaidEditModeSettingBySetting(setting) end
+                local function SetStored(value) addonTable:SetRaidEditModeSettingBySetting(setting, value) end
+
+                if info.type == types.Checkbox then
                     option.type = 'toggle'
-                    option.get = function() return (addonTable:GetRaidEditModeSetting(entry.key) or 0) ~= 0 end
-                    option.set = function(_, value)
-                        addonTable:SetRaidEditModeSetting(entry.key, value and 1 or 0)
-                    end
-                elseif entry.kind == 'range' then
+                    option.get = function() return (GetStored() or 0) ~= 0 end
+                    option.set = function(_, value) SetStored(value and 1 or 0) end
+                elseif info.type == types.Slider then
                     option.type = 'range'
                     option.min = info.minValue or 0
                     option.max = info.maxValue or 100
                     option.step = info.stepSize or 1
-                    option.get = function() return addonTable:GetRaidEditModeSetting(entry.key) end
-                    option.set = function(_, value) addonTable:SetRaidEditModeSetting(entry.key, value) end
-                elseif entry.kind == 'select' then
-                    -- Blizzard hands the choices back as an ordered list of display
-                    -- strings; the value is the index minus one, matching the enums.
+                    option.get = function() return ConvertSettingValue(info, GetStored() or 0, true) end
+                    option.set = function(_, value) SetStored(ConvertSettingValue(info, value, false)) end
+                elseif info.type == types.Dropdown then
+                    -- {value, text} pairs, and the enum value is the key AceConfig
+                    -- stores - not the list position.
                     local values = {}
-                    for i, text in ipairs(info.options or {}) do values[i - 1] = text end
+                    for _, choice in ipairs(info.options or {}) do
+                        if choice.value ~= nil then values[choice.value] = choice.text or tostring(choice.value) end
+                    end
 
-                    -- No choices means nothing sensible to show, so the entry is
-                    -- dropped rather than rendered as an empty dropdown. Written as a
-                    -- guard instead of a goto: this runs on Lua 5.1, where goto and
-                    -- labels do not exist.
+                    -- Guard rather than a goto: this is Lua 5.1, which has neither
+                    -- goto nor labels.
                     if next(values) ~= nil then
                         option.type = 'select'
                         option.values = values
-                        option.get = function() return addonTable:GetRaidEditModeSetting(entry.key) end
-                        option.set = function(_, value) addonTable:SetRaidEditModeSetting(entry.key, value) end
+                        option.get = GetStored
+                        option.set = function(_, value) SetStored(value) end
                     end
                 end
 
-                -- option.type is only set on the branches that produced something
-                -- usable, so this drops the ones that did not.
-                if option.type then args[entry.key] = option end
+                -- Only the branches that produced something usable set a type.
+                if option.type then args['blizzRaid' .. tostring(setting)] = option end
             end
         end
     end
