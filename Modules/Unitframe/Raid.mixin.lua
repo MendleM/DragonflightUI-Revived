@@ -254,9 +254,34 @@ function SubModuleMixin:SetupOptions()
             if hasIt then
                 order = order + 0.01
 
+                -- Said out loud, per setting, where it does and does not show up.
+                --
+                -- The preview is built from DFEditModePreviewRaidTemplate, whose UpdateState
+                -- reads seven fields. Sort order, the profile template and icon size are
+                -- not among them, and row size is fixed at five unless the groups are
+                -- combined - that last one is Blizzard's own rule, mirrored from
+                -- UpdateRaidContainerFlow. All of them still apply to the real raid frames.
+                --
+                -- Blizzard hides settings that do not apply through ShouldShowSetting, but
+                -- this settings list has no dynamic hidden support, so saying it is the
+                -- honest option: a control that silently does nothing is worse than one
+                -- that explains itself.
+                local NOTES = {
+                    RowSize = ' Only applies when Groups is set to one of the combined options.',
+                    SortPlayersBy = ' Affects the real raid frames; the preview does not reorder.',
+                    IconSize = ' Affects the real raid frames; not shown in the preview.'
+                }
+
+                local note = ''
+                if Enum and Enum.EditModeUnitFrameSetting then
+                    for key, text in pairs(NOTES) do
+                        if Enum.EditModeUnitFrameSetting[key] == setting then note = text end
+                    end
+                end
+
                 local option = {
                     name = info.name or tostring(setting),
-                    desc = 'Blizzard Edit Mode setting. Applied at once and kept in your Edit Mode layout.',
+                    desc = 'Blizzard Edit Mode setting. Applied at once and kept in your Edit Mode layout.' .. note,
                     order = order,
                     editmode = true
                 }
@@ -786,7 +811,8 @@ local function GetRaidPreviewLayout()
         perLine = combined and math.max(rowSize, 1) or 5,
         horizontal = horizontal,
         combined = combined,
-        displayBorder = (setting('DisplayBorder') or 0) ~= 0
+        displayBorder = (setting('DisplayBorder') or 0) ~= 0,
+        opacity = setting('Opacity')
     }
 end
 
@@ -875,6 +901,12 @@ function SubModuleMixin:UpdateRaidPreview(holder)
             frame:ClearAllPoints()
             frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', x, -y)
             frame:SetSize(layout.frameWidth, layout.frameHeight)
+
+            -- Opacity is not one of the seven fields the template's UpdateState reads, but
+            -- it is the one remaining setting the preview can honour honestly: it is a
+            -- plain alpha on the frame.
+            if layout.opacity then frame:SetAlpha(math.max(layout.opacity, 1) / 100) end
+
             frame:Show()
 
             maxX = math.max(maxX, x + layout.frameWidth)
