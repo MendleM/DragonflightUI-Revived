@@ -70,6 +70,7 @@ DF.ChangelogData = {
                     'Pet frame no longer jumps to default coordinates when summoning a pet.',
                     'Raid frames appear in an actual raid, and the raid settings survive a reload.',
                     'Raid frame settings also apply to raid-style party frames.',
+                    'The raid frame placeholder matches the frames, and the raid grows right and down instead of outwards.',
                     'Focus target is visible on TBC and MoP, and no longer errors on layout updates.',
                     'Era: faction icon sits on target frame properly.',
                     'No more error when reloading during combat from target-of-target not being built yet.'

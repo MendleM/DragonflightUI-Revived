@@ -29,6 +29,7 @@ Complete stability and architecture overhaul: permanent decoupling from Blizzard
 - Raid frames are configurable from DragonflightUI at last - raid size, frame width and height, group split, border, sort order, template, opacity, icon size - under Unitframes ▸ Raid Frame and in this addon's own edit mode, with a preview. No more disabling the addon to reach Blizzard's Edit Mode.
 - Raid frames appear in an actual raid, and the raid settings now survive a reload.
 - Raid frame settings also apply to raid-style party frames, which Blizzard keeps as a separate system.
+- The raid frame placeholder now matches the frames, and the raid grows right and down from its corner instead of outwards from its middle.
 - Fixed "Use Raid-Style Party Frames" (Issue #14) switching immediately and living through a `/reload`.
 - Found and removed the party frame taint seed - two fields this addon wrote onto Blizzard's `PartyFrame` that Blizzard itself reads on every visibility check.
 - Party member names and health/mana text unified to the FRIZQT outline font.
