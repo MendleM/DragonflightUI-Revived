@@ -1907,6 +1907,29 @@ function DF:LogRaidOptions(tag)
                tostring(holder:IsShown()), tostring(holder:IsVisible()), holder:GetWidth() or 0,
                holder:GetHeight() or 0, holder:GetNumPoints(), tostring(holder.DFEditModeSelection ~= nil))
 
+        -- Which anchor the holder actually uses, and what the profile says it should be.
+        --
+        -- The stored anchor starts as TOPLEFT but Raid.mixin's one-time calibration
+        -- overwrites it with whatever Blizzard's container happened to carry, so the
+        -- default in the defaults table is not what a live profile holds. Resizing the
+        -- holder only leaves the frames where they are while the anchor is a corner, which
+        -- is why this has to be visible rather than assumed.
+        if holder:GetNumPoints() > 0 then
+            local point, relativeTo, relativePoint, ox, oy = holder:GetPoint(1)
+            DF:Log(tag, '  holder point: %s -> %s %s (%.0f,%.0f)', tostring(point),
+                   tostring((relativeTo and relativeTo.GetName and relativeTo:GetName()) or 'nil'),
+                   tostring(relativePoint), ox or 0, oy or 0)
+        end
+
+        local gotUf, ufModule = pcall(DF.GetModule, DF, 'Unitframe', true)
+        local raidState = gotUf and ufModule and ufModule.db and ufModule.db.profile and ufModule.db.profile.raid
+        if raidState then
+            DF:Log(tag, '  profile raid anchor: %s -> %s %s (%s,%s) frame=%s scale=%s calibrated=%s',
+                   tostring(raidState.anchor), tostring(raidState.anchorFrame), tostring(raidState.anchorParent),
+                   tostring(raidState.x), tostring(raidState.y), tostring(raidState.customAnchorFrame),
+                   tostring(raidState.scale), tostring(raidState.calibrated))
+        end
+
         -- Reported next to the party holder on purpose. Party's is the one that is
         -- known to work, so on its own "secure=false" says nothing: it could be normal
         -- for a holder declared in this addon's XML, or it could be the taint the
