@@ -7,7 +7,7 @@ May 2026). Current builds report version `0.44.0`.
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
 
-## 0.44.0 — The Definitive Refactor & Stability Overhaul (26 August 2026)
+## 0.44.0/0.44.1 — The Definitive Refactor & Stability Overhaul (26 August - 31 August 2026)
 
 Complete stability and architecture overhaul: permanent decoupling from Blizzard Edit Mode, combat reload visual preservation, robust TBC totem positioning, solid ChatFrame anchoring, and instant live Darkmode switching.
 

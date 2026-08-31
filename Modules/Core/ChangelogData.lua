@@ -24,9 +24,9 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
-        version = '0.44.0',
+        version = '0.44.0 / 0.44.1',
         title = 'The Definitive Refactor & Stability Overhaul',
-        date = '26 August 2026',
+        date = '26 August - 31 August 2026',
         intro = 'Complete stability overhaul: permanent decoupling from Blizzard Edit Mode, combat reload visual preservation, robust TBC totem positioning, solid ChatFrame anchoring, and instant live Darkmode switching.',
         sections = {
             {
