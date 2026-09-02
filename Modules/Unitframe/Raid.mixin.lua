@@ -651,6 +651,26 @@ function SubModuleMixin:Setup()
             showFunction = function()
                 f:Show()
 
+                -- Blizzard's real raid frames only get involved when there is a raid.
+                --
+                -- Every route into them ends at CompactRaidFrameContainer:TryUpdate, whose
+                -- first line is CompactPartyFrame:RefreshMembers() - and that writes
+                -- optionTable on every compact party member from our execution.
+                -- CompactUnitFrame_UpdateAll reads that field before the frame:Hide() the
+                -- client refuses in combat, so merely opening this panel used to break the
+                -- party frames for the rest of the session. /df log seed caught it twice:
+                -- once through ApplyRaidFlowPrereqs -> SetGroupMode, and once through
+                -- EditModeManagerFrame:UpdateRaidContainerFlow, which calls TryUpdate at
+                -- EditModeManager.lua:479.
+                --
+                -- Outside a raid there is nothing there to arrange, and the placeholder comes
+                -- from our own DFEditModePreviewRaidTemplate anyway - UpdateRaidPreview
+                -- already covers the case where the real container is empty. So skip it.
+                if not (IsInRaid and IsInRaid()) then
+                    C_Timer.After(0, function() self:Update() end)
+                    return
+                end
+
                 local ok, err = pcall(function()
                     if CompactRaidFrameManager_SetSetting then
                         -- Remember what the player had first. IsShown is their own
@@ -707,6 +727,11 @@ function SubModuleMixin:Setup()
                 -- all, so closing the selection left a raid with no frames and no
                 -- error for the rest of the session. It lives in cachedSettings with
                 -- no CVar behind it, which is why a reload appeared to fix it.
+                -- Nothing to restore if the show path never forced anything, which is the
+                -- case whenever it ran outside a raid. Touching Blizzard's frames here would
+                -- reintroduce exactly the taint the show path now avoids.
+                if self.RaidFramesWereShown == nil then return end
+
                 local ok, err = pcall(function()
                     if CompactRaidFrameManager_SetSetting then
                         -- Blizzard's own CompactRaidFrameManager_GetSettingBeforeLoad

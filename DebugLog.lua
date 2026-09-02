@@ -170,12 +170,18 @@ function DF:Log(tag, msg, ...)
     local key = tostring(tag) .. '\0' .. text
     if key == lastKey and lastIndex and log[lastIndex] then
         lastCount = lastCount + 1
-        log[lastIndex] = string.format('%7.2f [%s] %s  (x%d)', GetTime() % 100000, tostring(tag), text, lastCount)
+        log[lastIndex] = string.format('%s %7.2f [%s] %s  (x%d)', date('%H:%M:%S'), GetTime() % 100000, tostring(tag),
+                                      text, lastCount)
         if echoToChat then print(PREFIX .. log[lastIndex]) end
         return log[lastIndex]
     end
 
-    local entry = string.format('%7.2f [%s] %s', GetTime() % 100000, tostring(tag), text)
+    -- Wall clock alongside the uptime.
+    --
+    -- GetTime() only answers "how long has the client been running", which tells a reader
+    -- nothing hours later - and reports arrive with several dumps in them, from different
+    -- sessions, with no way to tell which came first.
+    local entry = string.format('%s %7.2f [%s] %s', date('%H:%M:%S'), GetTime() % 100000, tostring(tag), text)
 
     if #log < MAX_ENTRIES then
         log[#log + 1] = entry
@@ -1185,8 +1191,10 @@ function DF:LogCopy(filter)
         return
     end
 
-    local header = string.format('DragonflightUI %s | %s | %d entries%s', DF:GetVersion(),
-                                 (GetBuildInfo and select(1, GetBuildInfo())) or '?', #matching,
+    -- Date and time in the header too, so a pasted dump can be placed without asking.
+    local header = string.format('DragonflightUI %s | %s | %s | %d entries%s', DF:GetVersion(),
+                                 (GetBuildInfo and select(1, GetBuildInfo())) or '?',
+                                 date('%Y-%m-%d %H:%M:%S'), #matching,
                                  filter and (' matching "' .. filter .. '"') or '')
 
     local text = header .. '\n\n' .. table.concat(matching, '\n')
