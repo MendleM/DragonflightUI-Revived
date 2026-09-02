@@ -1546,6 +1546,25 @@ function DF:LogPartyTaint(tag)
             if LogFrameFieldTaint(tag, 'pooled member ' .. n, pf) == 0 then
                 DF:Log(tag, 'pooled member %d clean', n)
             end
+
+            -- lockColor on the bars, which is a Blizzard field this addon writes.
+            --
+            -- SetupModern sets healthbar.lockColor and manabar.lockColor to stop Blizzard
+            -- re-tinting our art, and Blizzard reads statusbar.lockColor in UnitFrame.lua at
+            -- 750, 757 and 873, manaBar.lockColor at 472 and 501. A field written from here
+            -- and read there hands our taint to Blizzard's own execution, and whatever it
+            -- writes next - .unit, by way of UnitFrame_SetUnit - carries the blame.
+            --
+            -- Checked per bar rather than on the member frame, because the write lands on
+            -- the bar. Styling runs whether or not anyone is grouped, so this shows up solo.
+            for _, barKey in ipairs({'HealthBar', 'ManaBar'}) do
+                local bar = pf[barKey]
+                if bar then
+                    local ok, blame = issecurevariable(bar, 'lockColor')
+                    DF:Log(tag, '  pooled member %d %s.lockColor: %s%s', n, barKey,
+                           ok and 'secure' or 'INSECURE', (not ok and blame) and (', tainted by ' .. blame) or '')
+                end
+            end
         end
         DF:Log(tag, 'pooled members active: %d (group has %d)', n, GetNumGroupMembers and GetNumGroupMembers() or -1)
     end
