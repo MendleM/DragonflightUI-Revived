@@ -289,6 +289,14 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     end
     local val = enabled and true or false
 
+    -- Before anything is written, and with the wanted value passed in explicitly.
+    --
+    -- Both writes below move the answer: the profile is what the check reads, and the CVar
+    -- is one of the places Blizzard resolves this setting from. Checking afterwards found
+    -- the value already in agreement and stayed silent - which is what unticking the box did.
+    local needsReload = addonTable and addonTable.RaidStylePartyFramesNeedReload and
+                            addonTable:RaidStylePartyFramesNeedReload(val)
+
     local Module = (selfRef and type(selfRef) == 'table' and selfRef.ModuleRef) or DF:GetModule('Unitframe')
     if Module and Module.db and Module.db.profile and Module.db.profile.party then
         Module.db.profile.party.useCompactPartyFrames = val
@@ -302,16 +310,6 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     end
 
     if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
-        -- Asked BEFORE the write, not after.
-        --
-        -- The profile already holds the new value by this point, while Blizzard still holds
-        -- the old one, so the disagreement is visible here. Afterwards it may not be:
-        -- WriteLayout ends in C_EditMode.SaveLayouts, and once the layout carries the new
-        -- value the check can read it back as already applied - which is why unticking the
-        -- box came up silent.
-        local needsReload = addonTable.RaidStylePartyFramesNeedReload and
-                                addonTable:RaidStylePartyFramesNeedReload()
-
         addonTable:SyncRaidStylePartyFrameToBlizzard(val)
 
         -- Asked, not just logged: the frames do not change yet and silence would read as a
