@@ -1395,6 +1395,50 @@ local function LogSeedCandidates()
     end
 end
 
+-- The same trick for optionTable on the compact party frames, which needs no group.
+--
+-- CompactUnitFrame_UpdateAll reads frame.optionTable on its first line, at 433, and calls
+-- CompactUnitFrame_UpdateVisible - which does frame:Hide() on a unitless frame - at 438. So
+-- a dirty optionTable taints every update of those frames before the Hide, and the client
+-- refuses it in combat: the ADDON_ACTION_BLOCKED on CompactPartyFramePet1:Hide(), and the
+-- one stale "offline" member left standing.
+--
+-- These frames exist and are updated whether or not raid-style party frames are in use, so
+-- this is not tied to that setting. And /df log party shows the field dirty while solo,
+-- which is why this watcher can fire without a group - unlike the .unit one above.
+--
+-- CompactUnitFrame_SetUpFrame is what writes optionTable, so hook that and ask straight
+-- after it returns. If the field is dirty at that moment, this call is the one that did it,
+-- and debugstack names whoever asked for it.
+local compactSeedArmed, compactSeedFound = false, false
+
+local function ArmCompactSeedWatcher()
+    if compactSeedArmed or not CompactUnitFrame_SetUpFrame then return end
+    compactSeedArmed = true
+
+    hooksecurefunc('CompactUnitFrame_SetUpFrame', function(frame)
+        if compactSeedFound or not frame then return end
+
+        local name = frame.GetName and frame:GetName()
+        if not (name and name:find('CompactParty', 1, true)) then return end
+
+        local ok, who = issecurevariable(frame, 'optionTable')
+        if ok then return end
+
+        compactSeedFound = true
+        DF:Log('seed', 'FIRST INSECURE .optionTable on %s, tainted by %s', name, tostring(who or '?'))
+        DF:Log('seed', 'stack: %s', tostring(debugstack(2, 30, 0)):gsub('\n', ' | '):sub(1, 3000))
+
+        -- Same question as the other watcher: the stack may be pure Blizzard, in which case
+        -- the execution arrived dirty and something we wrote was read on the way in.
+        LogSeedCandidates()
+
+        LogInsecureFields('compact frame', frame)
+        LogInsecureFields('CompactPartyFrame', _G['CompactPartyFrame'])
+        LogInsecureFields('PartyFrame', _G['PartyFrame'])
+    end)
+end
+
 local function ArmSeedWatcher()
     if seedArmed or not UnitFrame_SetUnit then return end
     seedArmed = true
@@ -2258,12 +2302,17 @@ function DF:HandleLogCommand(rest)
         DF:LogTaintedGlobals('globals')
         DF:LogCopy('globals')
     elseif sub == 'seed' then
-        if seedFound then
+        -- Two watchers, and either one alone is worth reading. The compact one needs no
+        -- group, so say which of them fired instead of sending people off to find friends.
+        if seedFound or compactSeedFound then
             DF:LogCopy('seed')
         else
-            print(PREFIX .. 'no party taint seed captured yet' ..
-                      (seedArmed and ' - the watcher is armed; group up and it will fire.' or
-                          ' - the watcher never armed (UnitFrame_SetUnit missing).'))
+            print(PREFIX .. 'no taint seed captured yet.')
+            print(PREFIX .. '  .unit watcher (needs a group): ' ..
+                      (seedArmed and 'armed' or 'NOT armed - UnitFrame_SetUnit missing'))
+            print(PREFIX .. '  .optionTable watcher (works solo): ' ..
+                      (compactSeedArmed and 'armed, nothing dirty at setup time' or
+                          'NOT armed - CompactUnitFrame_SetUpFrame missing'))
         end
     elseif sub == 'party' then
         DF:LogPartyTaint('party')
@@ -2282,12 +2331,14 @@ InstallCapture()
 -- Blizzard_UnitFrame may not have loaded when this file runs, so arm now if the
 -- function is already there, and again when it arrives.
 ArmSeedWatcher()
+ArmCompactSeedWatcher()
 do
     local armFrame = CreateFrame('Frame')
     armFrame:RegisterEvent('ADDON_LOADED')
     armFrame:RegisterEvent('PLAYER_LOGIN')
     armFrame:SetScript('OnEvent', function(self)
         ArmSeedWatcher()
-        if seedArmed then self:UnregisterAllEvents() end
+        ArmCompactSeedWatcher()
+        if seedArmed and compactSeedArmed then self:UnregisterAllEvents() end
     end)
 end
