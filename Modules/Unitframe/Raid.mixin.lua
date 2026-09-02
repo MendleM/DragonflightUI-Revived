@@ -1190,9 +1190,41 @@ function SubModuleMixin:AddRaidframeRoleIcons()
             end
         end
     end
+    -- Restyle after Blizzard's execution, not inside it.
+    --
+    -- CompactUnitFrame_UpdateRoleIcon is called from CompactUnitFrame_UpdateAll, and that
+    -- same function calls frame:Hide() on compact frames that have no unit - frames the
+    -- client protects in combat. Working from inside the hook puts our taint into that
+    -- execution, and a refused Hide() leaves a dead frame on screen. That is what "one
+    -- offline dummy member instead of three" after a level-up in a party looks like.
+    --
+    -- Blizzard's call sits at UpdateAll:458 while the Hide() is at 438, so this hook is not
+    -- the source of that particular block - the role icon is not even in the level-up path,
+    -- which hangs off PLAYER_ROLES_ASSIGNED. Working inside a secure path is still the
+    -- wrong habit, and stepping out of it costs one frame nobody can see.
+    --
+    -- Coalesced, because UpdateAll runs once per frame per event and a timer per invocation
+    -- would mean a timer per frame. Weak keys for the same reason the action bar hook table
+    -- uses them: a marker field written onto a Blizzard frame taints its table.
+    local pending = setmetatable({}, {__mode = 'k'})
+    local drainQueued = false
+
+    local function drain()
+        drainQueued = false
+
+        for f in pairs(pending) do
+            pending[f] = nil
+            -- One bad frame must not take the rest of the queue with it.
+            pcall(updateRoleIcons, f)
+        end
+    end
+
     hooksecurefunc("CompactUnitFrame_UpdateRoleIcon", function(f)
-        --
-        -- print('CompactUnitFrame_UpdateRoleIcon')
-        updateRoleIcons(f)
+        if not f then return end
+        pending[f] = true
+
+        if drainQueued then return end
+        drainQueued = true
+        C_Timer.After(0, drain)
     end)
 end
