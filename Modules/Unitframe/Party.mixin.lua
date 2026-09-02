@@ -302,12 +302,22 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     end
 
     if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
+        -- Asked BEFORE the write, not after.
+        --
+        -- The profile already holds the new value by this point, while Blizzard still holds
+        -- the old one, so the disagreement is visible here. Afterwards it may not be:
+        -- WriteLayout ends in C_EditMode.SaveLayouts, and once the layout carries the new
+        -- value the check can read it back as already applied - which is why unticking the
+        -- box came up silent.
+        local needsReload = addonTable.RaidStylePartyFramesNeedReload and
+                                addonTable:RaidStylePartyFramesNeedReload()
+
         addonTable:SyncRaidStylePartyFrameToBlizzard(val)
 
         -- Asked, not just logged: the frames do not change yet and silence would read as a
-        -- broken switch. Only when the two actually disagree, so flipping back and forth to
-        -- the state already applied stays quiet.
-        if addonTable.RaidStylePartyFramesNeedReload and addonTable:RaidStylePartyFramesNeedReload() then
+        -- broken switch. Only when the two actually disagreed, so setting the value it
+        -- already has stays quiet.
+        if needsReload then
             DF:Print('Raid-style party frames: setting saved, it applies on the next reload.')
             StaticPopup_Show('DragonflightUIRaidStylePartyReload')
         end
