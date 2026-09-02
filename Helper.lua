@@ -479,35 +479,47 @@ local function FindManagedLayoutIndex()
     return nil
 end
 
--- Reload once the server has the layout, never before.
+-- Reload once the layout switch has actually landed, and never on a guess.
 --
--- MakeNewLayout ends in C_EditMode.OnLayoutAdded and SelectLayout in
--- C_EditMode.SetActiveLayout; both are round trips. Reloading ahead of the answer
--- discards the result, and the one-attempt flag below would then stop us ever trying
--- again. So this waits for the layouts to come back rather than guessing with a timer.
--- Armed BEFORE the call that changes the layout, because SaveLayouts can fire the event
--- on the spot and a watcher registered afterwards would miss it and never reload.
-local function ReloadWhenLayoutsLand()
-    local watcher = CreateFrame('Frame')
+-- The first version waited for EDIT_MODE_LAYOUTS_UPDATED and checked the active layout
+-- inside the handler. That does not work: MakeNewLayout ends in C_EditMode.OnLayoutAdded
+-- and SelectLayout in C_EditMode.SetActiveLayout, both round trips, while SaveLayouts
+-- fires the event immediately. So the event arrived while a preset was still active, the
+-- handler bowed out, and no second event ever came - layout added, no reload.
+--
+-- Polling the one thing that has to be true instead. It costs a handful of ticks once in
+-- the life of a character, and it cannot reload for nothing: if the switch never lands,
+-- the timeout says so and leaves it to the player.
+local RELOAD_POLL_SECONDS = 0.5
+local RELOAD_POLL_ATTEMPTS = 20
 
-    watcher:SetScript('OnEvent', function(self)
-        -- Only once it actually worked. A refused add or activation leaves a preset
-        -- active, and reloading then would be a loading screen for nothing.
-        if IsActiveLayoutPreset() then return end
+local function ReloadOnceLayoutIsActive()
+    if not (C_Timer and C_Timer.NewTicker) then return end
 
-        self:UnregisterAllEvents()
+    local attempts = 0
+    local ticker
 
-        Helper:RunOutOfCombat('editmode layout reload', function()
-            local reload = (C_UI and C_UI.Reload) or ReloadUI
-            if reload then reload() end
-        end)
+    ticker = C_Timer.NewTicker(RELOAD_POLL_SECONDS, function()
+        attempts = attempts + 1
+
+        if not IsActiveLayoutPreset() then
+            ticker:Cancel()
+
+            Helper:RunOutOfCombat('editmode layout reload', function()
+                local reload = (C_UI and C_UI.Reload) or ReloadUI
+                if reload then reload() end
+            end)
+
+            return
+        end
+
+        if attempts >= RELOAD_POLL_ATTEMPTS then
+            ticker:Cancel()
+            DF:Print('The |cffffff78' .. MANAGED_LAYOUT_NAME ..
+                         '|r Edit Mode layout is saved but the game has not switched to it. Select it in ' ..
+                         'Blizzard\'s Edit Mode, or type |cffffff78/reload|r, and it will take effect.')
+        end
     end)
-
-    -- No event on this flavour means no reload. The layout is still saved and the next
-    -- reload the player does themselves picks it up, so nothing is lost either way.
-    if not pcall(watcher.RegisterEvent, watcher, 'EDIT_MODE_LAYOUTS_UPDATED') then
-        watcher:SetScript('OnEvent', nil)
-    end
 end
 
 -- pending, when given, is the setting that triggered this: {systemIndex, setting, value}.
@@ -535,34 +547,40 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     -- we reload, and if the layout did not come back - no free slot, server refused - a
     -- second attempt would reload again at the next login, and again, forever.
     local charDB = DF.db and DF.db.char
+
+    local function MarkAttempted()
+        if charDB then charDB.raidStyleLayoutAttempted = true end
+    end
+
+    -- The layout already exists - this character made it before, or another one did, or the
+    -- switch to it did not land last time. Select it and stop.
+    --
+    -- Deliberately ahead of the attempt flag. That flag exists to stop a second ADD, which
+    -- is the part that eats a layout slot and cannot be undone; selecting costs nothing and
+    -- has to stay possible, otherwise a spent attempt would leave the layout sitting there
+    -- unused forever. Nor can this loop: the reload below waits for the switch to actually
+    -- land, and once it has, the preset check at the top of this function ends it.
+    local existing = FindManagedLayoutIndex()
+    if existing and EditModeManagerFrame.SelectLayout then
+        local ok, err = pcall(EditModeManagerFrame.SelectLayout, EditModeManagerFrame, existing)
+        if ok then
+            DF:Print('Switching to the |cffffff78' .. MANAGED_LAYOUT_NAME ..
+                         '|r Edit Mode layout, which can store the raid-style party frame setting. Reloading.')
+            ReloadOnceLayoutIsActive()
+        else
+            DF:Print('Could not switch to the |cffffff78' .. MANAGED_LAYOUT_NAME .. '|r Edit Mode layout: ' ..
+                         tostring(err))
+        end
+
+        return true
+    end
+
     if charDB and charDB.raidStyleLayoutAttempted then
         if not managedLayoutFallbackTold then
             managedLayoutFallbackTold = true
             DF:Print('Your active Edit Mode layout is a preset and cannot store the raid-style party frame ' ..
                          'setting, so DragonflightUI has to re-apply it every login. Switching to a layout of your ' ..
                          'own in Blizzard\'s Edit Mode avoids that, and |cffffff78/df layoutretry|r tries again.')
-        end
-
-        return true
-    end
-
-    local function MarkAttempted()
-        if charDB then charDB.raidStyleLayoutAttempted = true end
-    end
-
-    -- Another character already made it - just switch to it, no second copy.
-    local existing = FindManagedLayoutIndex()
-    if existing and EditModeManagerFrame.SelectLayout then
-        MarkAttempted()
-        ReloadWhenLayoutsLand()
-
-        local ok, err = pcall(EditModeManagerFrame.SelectLayout, EditModeManagerFrame, existing)
-        if ok then
-            DF:Print('Switching to the |cffffff78' .. MANAGED_LAYOUT_NAME ..
-                         '|r Edit Mode layout, which can store the raid-style party frame setting. Reloading.')
-        else
-            DF:Print('Could not switch to the |cffffff78' .. MANAGED_LAYOUT_NAME .. '|r Edit Mode layout: ' ..
-                         tostring(err))
         end
 
         return true
@@ -646,7 +664,6 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     end
 
     MarkAttempted()
-    ReloadWhenLayoutsLand()
 
     local isImported = false
     local made, err = pcall(EditModeManagerFrame.MakeNewLayout, EditModeManagerFrame, newLayout, layoutType,
@@ -660,7 +677,22 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
 
     DF:Print('Added an Edit Mode layout called |cffffff78' .. MANAGED_LAYOUT_NAME ..
                  '|r - a copy of the preset you were on - so the raid-style party frame setting can be stored ' ..
-                 'instead of re-applied every login. Nothing about your interface changes. Reloading.')
+                 'instead of re-applied every login. Nothing about your interface changes.')
+
+    -- MakeNewLayout asks the client to activate it, but only when nothing else is pending:
+    --
+    --   local activateNewLayout = not EditModeUnsavedChangesDialog:HasPendingSelectedLayout();
+    --   C_EditMode.OnLayoutAdded(newLayoutIndex, activateNewLayout, isLayoutImported);
+    --
+    -- So it is a request, not a guarantee. table.insert has already put the layout into
+    -- layoutInfo.layouts by now, so its index can be looked up and the switch made
+    -- explicitly. Selecting an already-active layout is a no-op in SelectLayout.
+    local added = FindManagedLayoutIndex()
+    if added and EditModeManagerFrame.SelectLayout then
+        pcall(EditModeManagerFrame.SelectLayout, EditModeManagerFrame, added)
+    end
+
+    ReloadOnceLayoutIsActive()
 
     return true
 end
