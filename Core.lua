@@ -18,8 +18,11 @@ addonTable.SubModuleMixins = {}
 -- character logs in. See Helper.lua:SanitizeLegacyEditModeAnchors.
 local defaults = {
     profile = {bestnumber = 42},
-    global = {lastSeenVersion = '', editModeLayoutNoticeDismissed = false},
-    char = {editModeAnchorMigration = 0}
+    global = {lastSeenVersion = '', editModeLayoutNoticeDismissed = false, raidStyleNoticeDismissed = false},
+    -- raidStyleLayoutAttempted: one shot at adding an Edit Mode layout that can keep the
+    -- raid-style party setting. Per character, because which layout is active is too, and
+    -- it gates a reload - see Helper.lua:EnsureSaveableEditModeLayout.
+    char = {editModeAnchorMigration = 0, raidStyleLayoutAttempted = false}
 }
 
 -- Lua errors and taint blocks are captured into the debug log; see DebugLog.lua.
