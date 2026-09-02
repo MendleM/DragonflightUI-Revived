@@ -319,6 +319,34 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
     local targetSystemIndex = systemIndex
     local targetSetting = setting
 
+    -- Nothing to do when Blizzard already holds this value, and doing it anyway is
+    -- actively harmful.
+    --
+    -- OnSystemSettingChange below runs Blizzard's own applier from our execution, and for
+    -- UseRaidStylePartyFrames that travels down
+    -- UpdateSystemSettingUseRaidStylePartyFrames -> UpdateRaidAndPartyFrames - which is
+    -- where Blizzard builds the compact party frames and writes optionTable and
+    -- isLootObject on each of them. A field written while our execution is live stays
+    -- tainted and is blamed on us.
+    --
+    -- CompactUnitFrame_UpdateAll reads optionTable on its first line, at 433, and calls
+    -- CompactUnitFrame_UpdateVisible at 438 - so every update of an unused compact party
+    -- frame is tainted before it reaches the frame:Hide() the client refuses in combat.
+    -- That is the ADDON_ACTION_BLOCKED on CompactPartyFramePet1:Hide(), and the single
+    -- stale "offline" member it leaves standing instead of the real group.
+    --
+    -- The value is persisted in the layout, so Blizzard applies it itself at login, from
+    -- its own secure execution. Re-applying it from ours is what re-seeded that taint every
+    -- session: /df log party reported those fields dirty after a plain reload, in no group,
+    -- with the setting never touched. Only a real change goes through the applier now.
+    if systemFrame and systemFrame.GetSettingValue then
+        local ok, current = pcall(systemFrame.GetSettingValue, systemFrame, targetSetting)
+        if ok and current ~= nil then
+            local a, b = tonumber(current), tonumber(val)
+            if (a and b and a == b) or current == val then return end
+        end
+    end
+
     -- PartyFrame.system / PartyFrame.systemIndex are NOT written here any more,
     -- and must not be. They were the party taint seed.
     --
