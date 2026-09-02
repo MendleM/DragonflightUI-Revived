@@ -289,18 +289,17 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     end
     local val = enabled and true or false
 
-    -- Before anything is written, and with the wanted value passed in explicitly.
-    --
-    -- Both writes below move the answer: the profile is what the check reads, and the CVar
-    -- is one of the places Blizzard resolves this setting from. Checking afterwards found
-    -- the value already in agreement and stayed silent - which is what unticking the box did.
-    local needsReload = addonTable and addonTable.RaidStylePartyFramesNeedReload and
-                            addonTable:RaidStylePartyFramesNeedReload(val)
-
     local Module = (selfRef and type(selfRef) == 'table' and selfRef.ModuleRef) or DF:GetModule('Unitframe')
-    if Module and Module.db and Module.db.profile and Module.db.profile.party then
-        Module.db.profile.party.useCompactPartyFrames = val
-    end
+    local party = Module and Module.db and Module.db.profile and Module.db.profile.party
+
+    -- Did the checkbox actually change? Then it needs a reload to show.
+    --
+    -- Nothing more than the old value against the new one. Earlier attempts asked Blizzard
+    -- what it currently applies, which is worthless here: the profile write and the CVar
+    -- write below both change that answer, so the comparison agreed with itself.
+    local needsReload = party ~= nil and (party.useCompactPartyFrames and true or false) ~= val
+
+    if party then party.useCompactPartyFrames = val end
 
     -- Keep CVar in sync if client supports it
     if C_CVar and C_CVar.GetCVar and C_CVar.GetCVar('useCompactPartyFrames') ~= nil then

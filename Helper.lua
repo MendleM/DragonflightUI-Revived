@@ -1044,30 +1044,6 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
                                             layoutOnly)
 end
 
--- Is the raid-style party setting waiting for a reload?
---
--- True when our profile and what the game currently applies disagree. Drives the reload
--- button next to the switch, and it settles by itself once the layout has been applied -
--- so the button goes quiet after the reload rather than staying lit forever.
--- wantedOverride lets the caller ask about a value it has not written yet, which is the
--- only way to get a truthful answer: writing the profile or the CVar both change what this
--- would otherwise read back.
-function addonTable:RaidStylePartyFramesNeedReload(wantedOverride)
-    if not (Enum and Enum.EditModeUnitFrameSetting) then return false end
-
-    local wanted = wantedOverride
-
-    if wanted == nil then
-        local Module = DF and DF.GetModule and DF:GetModule('Unitframe')
-        local profile = Module and Module.db and Module.db.profile
-        wanted = profile and profile.party and profile.party.useCompactPartyFrames
-    end
-
-    if wanted == nil then return false end
-
-    return not BlizzardHoldsSettingValue(_G['PartyFrame'], Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames,
-                                        wanted and 1 or 0)
-end
 
 -- Which frame did Blizzard register for the raid unit frame system?
 --
