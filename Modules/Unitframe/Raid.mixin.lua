@@ -799,6 +799,25 @@ function SubModuleMixin:Setup()
             -- One frame later, for the same reason initRaid waits above: the settings can
             -- still be unreadable while the event is being handled.
             C_Timer.After(0, function()
+                -- Only in an actual raid, and this is not a performance guard.
+                --
+                -- Everything below ends in Blizzard's raid appliers, and SetGroupMode calls
+                -- TryUpdate, which calls CompactPartyFrame:RefreshMembers, which calls
+                -- CompactUnitFrame_SetUpFrame - writing optionTable on every compact party
+                -- member frame from our execution. CompactUnitFrame_UpdateAll reads that
+                -- field on its first line, five lines before the frame:Hide() the client
+                -- refuses in combat, so seeding it there is what breaks the party frames and
+                -- leaves one stale "offline" member behind.
+                --
+                -- /df log seed caught the whole stack with ApplyRaidFlowPrereqs at the
+                -- bottom of it. This code was added to make raid frames appear in a raid,
+                -- and it was doing that work for people who were solo or in a party.
+                --
+                -- Outside a raid none of it is needed: the raid settings only shape raid
+                -- frames and the container has nothing to lay out. Inside one, the compact
+                -- party frame is not the active display anyway.
+                if not (IsInRaid and IsInRaid()) then return end
+
                 Helper:RunOutOfCombat('RaidFlowWatcher', function()
                     -- Push the stored settings back onto Blizzard's system frame first.
                     -- Nothing else does it: the layout the client applies at login is a
@@ -822,10 +841,10 @@ function SubModuleMixin:Setup()
                         end
                     end
 
+                    -- No separate TryUpdate afterwards. SetGroupMode calls it itself, so the
+                    -- extra call only ran RefreshMembers a second time - a second write to
+                    -- optionTable from our execution for no gain.
                     if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
-
-                    local c = _G['CompactRaidFrameContainer']
-                    if c and c.TryUpdate then pcall(c.TryUpdate, c) end
                 end)
             end)
         end)
