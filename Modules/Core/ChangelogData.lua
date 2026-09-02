@@ -32,7 +32,8 @@ DF.ChangelogData = {
             {
                 title = 'Highlights',
                 items = {
-                    'Party frames survive a group member levelling up in combat.',
+                    'Party frames survive a group member levelling up, or an invite, in combat.',
+                    'Raid-style party frames now take effect on the next reload - you are asked when you switch it.',
                     'No more "combat ended - finishing setup" after a group invite, and no frame drop with it.',
                     'Leftover DragonflightUI_Layout is renamed and reused, or removed - the delete-it-yourself popup is gone.',
                     'The raid-style party frame setting is stored where the game can apply it itself.',
@@ -41,7 +42,9 @@ DF.ChangelogData = {
             }, {
                 title = 'Unit Frames',
                 items = {
-                    'Fixed the blocked actions on the party frames that left one stale "offline" member behind. Blizzard\'s applier for the raid-style setting writes optionTable on every compact frame, and run from addon code that field stayed tainted - so the first update wanting to hide an unused frame was refused mid-fight.',
+                    'Fixed the blocked actions on the party frames. Flipping the raid-style switch ran Blizzard\'s own applier for it, and that one reaches into both party displays at once - member.unit on the portrait frames, optionTable on the compact ones. Run from addon code those fields stay tainted for the rest of the session, and the next invite or level-up in combat had its SetAttribute, Hide and SetShown refused. The setting is stored now and the game applies it while loading, which is the only way it can be done safely.',
+                    'The switch therefore needs a reload to take effect, and asks for one when you change it. Every other setting still applies immediately.',
+                    'DragonflightUI never reloads the interface on its own any more: reload() is a protected call and the client refuses it in combat.',
                     'The raid appliers only run inside an actual raid now. Outside one they had nothing to arrange and only seeded that taint.',
                     'Raid-style party frames keep their size again: the raid settings are mirrored onto the party system, which is where CompactUnitFrame reads them from.',
                     'Role icons are restyled after Blizzard\'s own update instead of during it.',
@@ -51,7 +54,7 @@ DF.ChangelogData = {
             }, {
                 title = 'Edit Mode',
                 items = {
-                    'The raid-style party frame setting cannot be stored in a preset layout, so DragonflightUI adds DFUI_Revived_Layout - a copy of the active layout - and switches to it. From then on the game applies the setting itself and this addon never touches it.',
+                    'The raid-style party frame setting cannot be stored in a preset layout, so DragonflightUI adds DFUI_Revived_Layout - a copy of the active layout - and switches to it. From then on the game applies the setting itself and this addon never touches it. If you already use a layout of your own, nothing is added.',
                     'Leftover DragonflightUI_Layout (Issue #27) is repaired, renamed to DFUI_Revived_Layout and reused where a layout is needed, or deleted where it is not. The popup explaining how to delete it by hand, and /df layoutnotice, are gone.',
                     'New: /df layoutretry, for when adding that layout did not work the first time.'
                 }
