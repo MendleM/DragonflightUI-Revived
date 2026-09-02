@@ -833,94 +833,95 @@ function SubModuleMixin:Setup()
         local watcher = CreateFrame('Frame')
         self.RaidFlowWatcher = watcher
 
-        watcher:RegisterEvent('PLAYER_ENTERING_WORLD')
-        watcher:RegisterEvent('GROUP_ROSTER_UPDATE')
-        watcher:SetScript('OnEvent', function()
-            -- One frame later, for the same reason initRaid waits above: the settings can
-            -- still be unreadable while the event is being handled.
-            C_Timer.After(0, function()
-                -- Only in an actual raid, and this is not a performance guard.
-                --
-                -- Everything below ends in Blizzard's raid appliers, and SetGroupMode calls
-                -- TryUpdate, which calls CompactPartyFrame:RefreshMembers, which calls
-                -- CompactUnitFrame_SetUpFrame - writing optionTable on every compact party
-                -- member frame from our execution. CompactUnitFrame_UpdateAll reads that
-                -- field on its first line, five lines before the frame:Hide() the client
-                -- refuses in combat, so seeding it there is what breaks the party frames and
-                -- leaves one stale "offline" member behind.
-                --
-                -- /df log seed caught the whole stack with ApplyRaidFlowPrereqs at the
-                -- bottom of it. This code was added to make raid frames appear in a raid,
-                -- and it was doing that work for people who were solo or in a party.
-                --
-                -- Outside a raid none of it is needed: the raid settings only shape raid
-                -- frames and the container has nothing to lay out. Inside one, the compact
-                -- party frame is not the active display anyway.
-                Helper:DeferOutOfCombat('RaidFlowWatcher', function()
-                    -- Push the stored settings back onto Blizzard's system frame.
-                    --
-                    -- Nothing else does it: the layout the client applies at login can be a
-                    -- preset carrying its own numbers, and a preset cannot hold ours -
-                    -- SaveLayoutChanges refuses to write into one. Without this the profile
-                    -- is never consulted and frame width and friends fall back every reload.
-                    --
-                    -- Not gated on being in a raid. The mirror below is what carries these
-                    -- values to raid-style party frames, and those are used in a party -
-                    -- gating the whole block was a regression that lost them on every login.
-                    local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile
-                    local saved = profile and profile.raid and profile.raid.blizzSettings
+        -- Push the stored settings back onto Blizzard's system frame.
+        --
+        -- Nothing else does it: the layout the client applies at login can be a preset
+        -- carrying its own numbers, and a preset cannot hold ours - SaveLayoutChanges
+        -- refuses to write into one. Without this the profile is never consulted and frame
+        -- width and friends fall back every reload.
+        --
+        -- Once per session is enough. Blizzard fills settingMap when it applies a layout,
+        -- and a roster change does not touch it, so re-pushing all of this every time
+        -- somebody joined the group was work for nothing.
+        local function PushStoredSettings()
+            local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile
+            local saved = profile and profile.raid and profile.raid.blizzSettings
+            if not saved then return end
 
-                    if saved then
-                        for key, value in pairs(saved) do
-                            local setting = tonumber(key)
-                            if setting and value ~= nil then
-                                -- The raid system's own appliers, only in a raid.
-                                --
-                                -- Nearly every one of them funnels into
-                                -- EditModeManagerFrame:UpdateRaidContainerFlow or
-                                -- CompactRaidFrameContainer:SetGroupMode, and both end in
-                                -- TryUpdate, whose first line is
-                                -- CompactPartyFrame:RefreshMembers() - writing optionTable on
-                                -- every compact party member from our execution. ViewRaidSize
-                                -- calls TryUpdate outright, at EditModeSystemTemplates.lua:1441.
-                                -- Only Opacity is harmless, it just does SetAlpha.
-                                --
-                                -- Outside a raid there is no container to arrange, so this is
-                                -- pure cost. /df log seed caught it through ViewRaidSize.
-                                if IsInRaid and IsInRaid() then
-                                    addonTable:SetRaidEditModeSettingBySetting(setting, value)
-                                end
-
-                                -- The mirror runs regardless, and it is the half that matters
-                                -- in a party: raid-style party frames read their size from the
-                                -- PARTY system - CompactUnitFrame asks
-                                -- GetRaidFrameWidth(frame.groupType), and groupType is the
-                                -- system index. The party appliers end in
-                                -- PartyFrame:UpdatePaddingAndLayout, not TryUpdate, so this is
-                                -- safe. Helper skips SortPlayersBy, the one exception.
-                                if addonTable.MirrorRaidSettingToParty then
-                                    addonTable:MirrorRaidSettingToParty(setting, value)
-                                end
-                            end
-                        end
+            for key, value in pairs(saved) do
+                local setting = tonumber(key)
+                if setting and value ~= nil then
+                    -- The raid system's own appliers, only in a raid.
+                    --
+                    -- Nearly every one of them funnels into
+                    -- EditModeManagerFrame:UpdateRaidContainerFlow or
+                    -- CompactRaidFrameContainer:SetGroupMode, and both end in TryUpdate,
+                    -- whose first line is CompactPartyFrame:RefreshMembers() - writing
+                    -- optionTable on every compact party member from our execution.
+                    -- ViewRaidSize calls TryUpdate outright, at
+                    -- EditModeSystemTemplates.lua:1441. Only Opacity is harmless, it just
+                    -- does SetAlpha.
+                    --
+                    -- Outside a raid there is no container to arrange, so this is pure
+                    -- cost. /df log seed caught it through ViewRaidSize.
+                    if IsInRaid and IsInRaid() then
+                        addonTable:SetRaidEditModeSettingBySetting(setting, value)
                     end
 
-                    -- The flow prerequisites are the part that has to stay out of a party.
-                    --
-                    -- ApplyRaidFlowPrereqs ends in CompactRaidFrameContainer:SetGroupMode,
-                    -- which calls TryUpdate, whose first line is
-                    -- CompactPartyFrame:RefreshMembers() - and that writes optionTable on
-                    -- every compact party member from our execution. UpdateAll reads that
-                    -- field on its first line, before the frame:Hide() the client refuses in
-                    -- combat. /df log seed named this exact stack.
-                    --
-                    -- Outside a raid the container has nothing to lay out anyway, so there is
-                    -- nothing to lose by staying away. No separate TryUpdate afterwards
-                    -- either: SetGroupMode calls it itself.
-                    if not (IsInRaid and IsInRaid()) then return end
+                    -- The mirror runs regardless, and it is the half that matters in a
+                    -- party: raid-style party frames read their size from the PARTY system
+                    -- - CompactUnitFrame asks GetRaidFrameWidth(frame.groupType), and
+                    -- groupType is the system index. The party appliers end in
+                    -- PartyFrame:UpdatePaddingAndLayout, not TryUpdate, so this is safe.
+                    -- Helper skips SortPlayersBy, the one exception.
+                    if addonTable.MirrorRaidSettingToParty then
+                        addonTable:MirrorRaidSettingToParty(setting, value)
+                    end
+                end
+            end
+        end
 
-                    if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
-                end)
+        -- What the container needs before it will lay anything out, and the only reason
+        -- GROUP_ROSTER_UPDATE is watched at all: joining a raid without ever opening our
+        -- edit mode left the container shown and empty, and that cannot be done at login
+        -- because nobody is in a raid yet.
+        --
+        -- Raid only, and that is not a performance guard. ApplyRaidFlowPrereqs ends in
+        -- CompactRaidFrameContainer:SetGroupMode, which calls TryUpdate, whose first line
+        -- is CompactPartyFrame:RefreshMembers() - and that writes optionTable on every
+        -- compact party member from our execution. UpdateAll reads that field on its first
+        -- line, before the frame:Hide() the client refuses in combat. /df log seed named
+        -- this exact stack. No separate TryUpdate afterwards either: SetGroupMode calls it.
+        local function ApplyPrereqs()
+            if not (IsInRaid and IsInRaid()) then return end
+            if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
+        end
+
+        watcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+        watcher:RegisterEvent('GROUP_ROSTER_UPDATE')
+        watcher:SetScript('OnEvent', function(_, event)
+            -- One frame later, for the same reason initRaid waits above: the settings can
+            -- still be unreadable while the event is being handled, and IsInRaid() is only
+            -- dependable once the change has settled.
+            C_Timer.After(0, function()
+                local login = event == 'PLAYER_ENTERING_WORLD'
+
+                -- A group changing outside a raid has nothing here for either half: the
+                -- stored settings went in at login, and there is no raid container to
+                -- arrange. Bailing out before the queue means an invite mid-fight does not
+                -- even leave an entry behind.
+                if not login and not (IsInRaid and IsInRaid()) then return end
+
+                if login then
+                    Helper:DeferOutOfCombat('RaidFlowWatcher', function()
+                        PushStoredSettings()
+                        ApplyPrereqs()
+                    end)
+                else
+                    -- Its own label, or joining a raid would overwrite the login push
+                    -- before it ever ran.
+                    Helper:DeferOutOfCombat('RaidFlowPrereqs', ApplyPrereqs)
+                end
             end)
         end)
     end
