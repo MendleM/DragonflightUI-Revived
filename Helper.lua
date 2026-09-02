@@ -504,17 +504,21 @@ local function FindManagedLayoutIndex()
     return nil
 end
 
--- Reload once the layout switch has actually landed, and never on a guess.
+-- Wait for the layout switch to land, then ask for a reload. Never perform one.
 --
--- The first version waited for EDIT_MODE_LAYOUTS_UPDATED and checked the active layout
--- inside the handler. That does not work: MakeNewLayout ends in C_EditMode.OnLayoutAdded
--- and SelectLayout in C_EditMode.SetActiveLayout, both round trips, while SaveLayouts
--- fires the event immediately. So the event arrived while a preset was still active, the
--- handler bowed out, and no second event ever came - layout added, no reload.
+-- Two earlier attempts at doing it automatically both failed, and the second one failed
+-- badly. Waiting for EDIT_MODE_LAYOUTS_UPDATED did not work because SaveLayouts fires that
+-- event immediately while the activation is still a round trip, so the handler saw a preset
+-- and bowed out. Polling and then calling ReloadUI did work - until it ran during combat:
 --
--- Polling the one thing that has to be true instead. It costs a handful of ticks once in
--- the life of a character, and it cannot reload for nothing: if the switch never lands,
--- the timeout says so and leaves it to the player.
+--   ADDON_ACTION_BLOCKED: DragonflightUI tried to call the protected function 'reload()'
+--
+-- reload() out of a C_Timer callback is always insecure execution, and the client refuses
+-- it in combat. Guarding on IsCombatLocked() would not settle it either, because the timer
+-- can fire in the gap between the guard and the call. So this addon does not reload the UI
+-- at all any more: it says the layout is ready and leaves that one keystroke to the player.
+-- Nothing is lost by waiting - the layout is saved and active, and the next reload or login
+-- picks it up whenever it happens.
 local RELOAD_POLL_SECONDS = 0.5
 local RELOAD_POLL_ATTEMPTS = 20
 
@@ -551,7 +555,7 @@ local function ActivateLayout(index)
     return false, 'no way to set the active layout on this client'
 end
 
-local function ReloadOnceLayoutIsActive()
+local function AskForReloadOnceLayoutIsActive()
     if not (C_Timer and C_Timer.NewTicker) then return end
 
     local attempts = 0
@@ -562,11 +566,9 @@ local function ReloadOnceLayoutIsActive()
 
         if not IsActiveLayoutPreset() then
             ticker:Cancel()
-
-            Helper:DeferOutOfCombat('editmode layout reload', function()
-                local reload = (C_UI and C_UI.Reload) or ReloadUI
-                if reload then reload() end
-            end)
+            TellOnce('layoutReady', 'The |cffffff78' .. MANAGED_LAYOUT_NAME ..
+                         '|r Edit Mode layout is active and holds the raid-style party frame setting. Type ' ..
+                         '|cffffff78/reload|r when it suits you and the game takes over applying it.')
 
             return
         end
@@ -627,8 +629,8 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
             -- and this is never reached again, but if it never lands this would otherwise
             -- announce itself on every single login.
             TellOnce('switching', 'Switching to the |cffffff78' .. MANAGED_LAYOUT_NAME ..
-                         '|r Edit Mode layout, which can store the raid-style party frame setting. Reloading.')
-            ReloadOnceLayoutIsActive()
+                         '|r Edit Mode layout, which can store the raid-style party frame setting.')
+            AskForReloadOnceLayoutIsActive()
         else
             TellOnce('selectFailed',
                      'Could not switch to the |cffffff78' .. MANAGED_LAYOUT_NAME .. '|r Edit Mode layout: ' ..
@@ -760,7 +762,7 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
         return true
     end
 
-    ReloadOnceLayoutIsActive()
+    AskForReloadOnceLayoutIsActive()
 
     return true
 end

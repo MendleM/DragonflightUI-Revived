@@ -528,14 +528,20 @@ function Module:SlashCommand(input)
     end
 
     -- /df layoutretry - hand back the one attempt at adding an Edit Mode layout that can
-    -- store the raid-style party setting, then reload so it runs again on the way up.
+    -- store the raid-style party setting. The attempt runs again on the way back up, so a
+    -- reload is needed - but not in combat: reload() is protected there and the client
+    -- refuses it with ADDON_ACTION_BLOCKED. Typed by the player, so it can simply say so.
     -- See Helper.lua:ResetEditModeLayoutAttempt.
     if cmd == 'layoutretry' then
         if addonTable.ResetEditModeLayoutAttempt and addonTable:ResetEditModeLayoutAttempt() then
-            DF:Print('Edit Mode layout attempt reset - reloading to try again.')
+            if InCombatLockdown() or UnitAffectingCombat('player') then
+                DF:Print('Edit Mode layout attempt reset. Type |cffffff78/reload|r once you are out of combat.')
+            else
+                DF:Print('Edit Mode layout attempt reset - reloading to try again.')
 
-            local reload = (C_UI and C_UI.Reload) or ReloadUI
-            if reload then reload() end
+                local reload = (C_UI and C_UI.Reload) or ReloadUI
+                if reload then reload() end
+            end
         end
         return
     end
