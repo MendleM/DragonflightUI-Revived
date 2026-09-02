@@ -236,6 +236,19 @@ function SubModuleMixin:Setup()
             self:UpdateRangeAndUsable(btn, btn.checksRange or false, btn.inRange or false);
         end)
     end
+
+    -- The three events that can leave the tint wrong without Blizzard repainting the button
+    -- itself: arriving in the world, the slot's contents changing, and the bags settling
+    -- after a loot or a use.
+    --
+    -- Deliberately not ACTIONBAR_UPDATE_USABLE or SPELL_UPDATE_USABLE. Those fire on
+    -- essentially every power tick in combat, and sweeping every button on them would be a
+    -- full rescan per frame. Blizzard repaints the button itself on those, and that already
+    -- reaches us through the per-button hooks.
+    self:RegisterEvent('PLAYER_ENTERING_WORLD')
+    self:RegisterEvent('ACTIONBAR_SLOT_CHANGED')
+    self:RegisterEvent('BAG_UPDATE_DELAYED')
+    self:SetScript('OnEvent', self.OnEvent)
 end
 
 -- On 1.15.9 the ActionButton_UpdateUsable global no longer exists, so the
@@ -285,8 +298,58 @@ function SubModuleMixin:HookButtonUsable(btn)
     if hooked then usableHooked[btn] = true end
 end
 
+-- Nothing ever wired this: CreateFrameFromMixinAndInit only mixes the table in and calls
+-- Init, so the stub that used to live here never ran. Setup registers the events and
+-- points the frame's script at it.
 function SubModuleMixin:OnEvent(event, ...)
-    -- print('event', event, ...)
+    self:RequestUpdateAllButtons()
+end
+
+-- Coalesced to one sweep per frame. Looting fires BAG_UPDATE_DELAYED and
+-- ACTIONBAR_SLOT_CHANGED several times in a row, and they all want the same single pass.
+function SubModuleMixin:RequestUpdateAllButtons()
+    if not self.activate then return end
+    if self.DFSweepPending then return end
+    self.DFSweepPending = true
+
+    C_Timer.After(0, function()
+        self.DFSweepPending = false
+        self:UpdateAllButtons()
+    end)
+end
+
+-- Repaint every button we own, whatever Blizzard is or is not doing.
+--
+-- The per-button hooks only fire when Blizzard repaints, and Blizzard only repaints when
+-- something changes. At login nothing has: a stack that was already empty is still empty,
+-- so no usable or count event ever arrives and the first paint keeps whatever colour it
+-- was handed. Empty stacks stayed bright until something forced a restyle - opening edit
+-- mode was one such thing, which is exactly how this surfaced.
+--
+-- The range hook is no substitute either. It only repaints when the range state flips, and
+-- an item that checks no range never flips.
+function SubModuleMixin:UpdateAllButtons()
+    if not self.activate then return end
+
+    local Module = self.ModuleRef
+    if not Module then return end
+
+    local function sweep(bar)
+        if not (bar and bar.buttonTable) then return end
+
+        for _, btn in ipairs(bar.buttonTable) do
+            self:HookButtonUsable(btn)
+
+            -- pcall for the reason the hooks use one: a single bad button must not take
+            -- the rest of the sweep with it. UpdateRangeAndUsable already skips buttons
+            -- that are hidden or carry no action slot.
+            pcall(self.UpdateRangeAndUsable, self, btn, btn.checksRange or false, btn.inRange or false)
+        end
+    end
+
+    for i = 1, 8 do sweep(Module['bar' .. i]) end
+    sweep(Module.petbar)
+    sweep(Module.stancebar)
 end
 
 function SubModuleMixin:UpdateState(state)
@@ -306,6 +369,11 @@ function SubModuleMixin:Update()
     self.notUsableColor = CreateColorFromRGBHexString(state.notUsableColor)
     self.oorColor = CreateColorFromRGBHexString(state.oorColor)
     self.oomColor = CreateColorFromRGBHexString(state.oomColor)
+
+    -- New colours are worth nothing until something applies them, and the hooks only run
+    -- on a Blizzard repaint. This is also the path that paints correctly after a /reload,
+    -- since Update runs once the profile has been read.
+    self:RequestUpdateAllButtons()
 end
 
 -- Hot path: cache the two static lookups - whether a macro is a
