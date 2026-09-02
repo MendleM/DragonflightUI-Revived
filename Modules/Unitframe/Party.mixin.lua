@@ -225,10 +225,11 @@ StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
 -- Asked right when the switch is flipped, because the frames do not change until a reload
 -- and nothing else would make that obvious.
 --
--- A popup rather than a coloured button next to the checkbox: the settings list only builds
--- its rows in Init, so a button caption cannot change while the page is open, and one that
--- silently keeps the wrong text is worse than no button. This cannot be missed, and the
--- button stays as the way to do it later.
+-- A popup rather than a button on the page. A button was tried and thrown away twice over:
+-- the settings list only builds its rows in Init, so a caption cannot change while the page
+-- is open, and a button that does nothing but reload is what /reload, a logout or restarting
+-- the game already do. This asks once, at the moment it matters, and then stays out of the
+-- way.
 StaticPopupDialogs['DragonflightUIRaidStylePartyReload'] = {
     text = 'The raid-style party frame setting has been saved.\n\n' ..
         'It takes effect after a reload - Blizzard applies it while the interface loads, which is the only way it ' ..
@@ -242,8 +243,7 @@ StaticPopupDialogs['DragonflightUIRaidStylePartyReload'] = {
     preferredIndex = 3,
     OnAccept = function()
         if InCombatLockdown() or UnitAffectingCombat('player') then
-            DF:Print('Cannot reload during combat - use the ' .. (RELOADUI or 'Reload') ..
-                         ' button on this page once the fight is over.')
+            DF:Print('Cannot reload during combat - type |cffffff78/reload|r once the fight is over.')
 
             return
         end
@@ -489,29 +489,7 @@ function SubModuleMixin:SetupOptions()
                 blizzard = true,
                 editmode = true
             },
-            -- The other half of the switch above: it only stores the value, so this is what
-            -- puts it into effect. Lit while the two disagree, quiet once they do not.
-            useCompactPartyFramesReload = {
-                type = 'execute',
-                name = 'Apply raid-style party frames',
-                desc = 'Reloads the interface so the raid-style party frame setting takes effect. Nothing else is ' ..
-                    'lost by reloading - every other setting applies immediately.',
-                btnName = RELOADUI or 'Reload',
-                func = function()
-                    if InCombatLockdown() or UnitAffectingCombat('player') then
-                        DF:Print('Cannot reload during combat - try again once the fight is over.')
 
-                        return
-                    end
-
-                    local reload = (C_UI and C_UI.Reload) or ReloadUI
-                    if reload then reload() end
-                end,
-                group = 'headerStyling',
-                order = 15.5,
-                blizzard = true,
-                editmode = true
-            },
             -- Blizzard's Interface options panel, not the Edit Mode dialog. Named for
             -- what it actually opens: the two are easy to confuse, they hold
             -- different settings, and the Edit Mode ones are offered by this addon
