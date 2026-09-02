@@ -272,6 +272,13 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
 
     if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
         addonTable:SyncRaidStylePartyFrameToBlizzard(val)
+
+        -- Said out loud, because the frames do not change yet and silence would read as a
+        -- broken switch. The value is stored; the game applies it on the way in.
+        if addonTable.RaidStylePartyFramesNeedReload and addonTable:RaidStylePartyFramesNeedReload() then
+            DF:Print('Raid-style party frames: setting saved. Use the |cffffff78' .. (RELOADUI or 'Reload') ..
+                         '|r button next to the checkbox, or type |cffffff78/reload|r, to apply it.')
+        end
     end
 
     -- Only when switching on, and only once per session. Switching back to the
@@ -441,9 +448,41 @@ function SubModuleMixin:SetupOptions()
             useCompactPartyFrames = {
                 type = 'toggle',
                 name = USE_RAID_STYLE_PARTY_FRAMES,
-                desc = OPTION_TOOLTIP_USE_RAID_STYLE_PARTY_FRAMES,
+                desc = OPTION_TOOLTIP_USE_RAID_STYLE_PARTY_FRAMES .. '\n\n' ..
+                    'Takes effect after a reload. Blizzard\'s own switch for this reaches into both party displays ' ..
+                    'at once, and run from addon code it leaves them unable to update during combat - so the value ' ..
+                    'is stored and the game applies it itself on the way in.',
                 group = 'headerStyling',
                 order = 15,
+                blizzard = true,
+                editmode = true
+            },
+            -- The other half of the switch above: it only stores the value, so this is what
+            -- puts it into effect. Lit while the two disagree, quiet once they do not.
+            useCompactPartyFramesReload = {
+                type = 'execute',
+                name = 'Apply raid-style party frames',
+                desc = 'Reloads the interface so the raid-style party frame setting takes effect. Nothing else is ' ..
+                    'lost by reloading - every other setting applies immediately.',
+                btnName = function()
+                    if addonTable.RaidStylePartyFramesNeedReload and addonTable:RaidStylePartyFramesNeedReload() then
+                        return '|cffFF4040' .. (RELOADUI or 'Reload') .. '|r'
+                    end
+
+                    return RELOADUI or 'Reload'
+                end,
+                func = function()
+                    if InCombatLockdown() or UnitAffectingCombat('player') then
+                        DF:Print('Cannot reload during combat - try again once the fight is over.')
+
+                        return
+                    end
+
+                    local reload = (C_UI and C_UI.Reload) or ReloadUI
+                    if reload then reload() end
+                end,
+                group = 'headerStyling',
+                order = 15.5,
                 blizzard = true,
                 editmode = true
             },

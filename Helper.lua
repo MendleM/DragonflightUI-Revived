@@ -832,7 +832,7 @@ end
 -- systemFrame is the frame Blizzard registered for that system, and it is what
 -- OnSystemSettingChange needs: PartyFrame for the party system, CompactRaidFrame-
 -- Container for the raid one.
-function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, systemFrame, label)
+function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, systemFrame, label, layoutOnly)
     if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSetting) then return end
     if setting == nil or value == nil then return end
 
@@ -965,7 +965,33 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
         end
     end
 
-    if EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and systemFrame then
+    -- layoutOnly: store the value and let the game apply it at the next load, instead of
+    -- running Blizzard's applier now.
+    --
+    -- For UseRaidStylePartyFrames the applier cannot be run safely from here at all, and
+    -- this is the measured reason. Flipping the switch produced this, from /df log seed:
+    --
+    --   FIRST INSECURE .unit on <pooled> (unit=party2), tainted by DragonflightUI
+    --     UnitFrame_SetUnit <- PartyMemberFrame:UpdateMember <- PartyFrame:UpdatePartyFrames
+    --     <- RaidFrame:UpdateRaidAndPartyFrames
+    --     <- UpdateSystemSettingUseRaidStylePartyFrames
+    --     <- OnSystemSettingChange <- SyncUnitFrameEditModeSetting <- SetRaidStylePartyFrames
+    --
+    -- That one applier touches BOTH party displays: UpdateRaidAndPartyFrames walks the
+    -- PartyMemberFrames and writes member.unit, and CompactPartyFrame:RefreshMembers writes
+    -- optionTable on every compact frame. Called from our execution, every one of those
+    -- fields stays insecure for the rest of the session - and the next group event to read
+    -- them, an invite or a level-up, has its SetAttribute, Hide and SetShown refused.
+    --
+    -- Ten seconds passed between the seed and the first blocked call in that log, which is
+    -- why this looked so erratic all along: the damage is done when the switch is flipped,
+    -- it only becomes visible later. With one addon and no flip, nothing happened at all.
+    --
+    -- The layout is where the value belongs anyway. Blizzard applies it from there at login,
+    -- out of its own execution, and taints nothing.
+    if layoutOnly then
+        WriteLayout()
+    elseif EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and systemFrame then
         Helper:DeferOutOfCombat(label or 'unit frame edit mode setting', function()
             local ok, err = pcall(EditModeManagerFrame.OnSystemSettingChange, EditModeManagerFrame, systemFrame,
                                   targetSetting, val)
@@ -1010,7 +1036,30 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
                               function() addonTable:EvaluateEditModeLayoutForRaidStyle() end)
     end
 
-    addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, val, partyFrame, 'party raid style setting')
+    -- layoutOnly. This is the one setting whose applier cannot be run from addon code
+    -- without breaking the party frames for the rest of the session - the long comment in
+    -- SyncUnitFrameEditModeSetting has the traced stack. It takes effect on the next load.
+    local layoutOnly = true
+    addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, val, partyFrame, 'party raid style setting',
+                                            layoutOnly)
+end
+
+-- Is the raid-style party setting waiting for a reload?
+--
+-- True when our profile and what the game currently applies disagree. Drives the reload
+-- button next to the switch, and it settles by itself once the layout has been applied -
+-- so the button goes quiet after the reload rather than staying lit forever.
+function addonTable:RaidStylePartyFramesNeedReload()
+    if not (Enum and Enum.EditModeUnitFrameSetting) then return false end
+
+    local Module = DF and DF.GetModule and DF:GetModule('Unitframe')
+    local profile = Module and Module.db and Module.db.profile
+    local wanted = profile and profile.party and profile.party.useCompactPartyFrames
+
+    if wanted == nil then return false end
+
+    return not BlizzardHoldsSettingValue(_G['PartyFrame'], Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames,
+                                        wanted and 1 or 0)
 end
 
 -- Which frame did Blizzard register for the raid unit frame system?
