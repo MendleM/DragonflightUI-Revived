@@ -24,6 +24,69 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.45.0',
+        title = 'Party Frames in Combat & a Quiet Startup',
+        date = '2 September 2026',
+        intro = 'The party frames no longer break when someone levels up mid-fight, the chat spam and frame drop at the end of a fight are gone, and the leftover Edit Mode layout is cleaned up without anyone having to do it by hand.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'Party frames survive a group member levelling up in combat.',
+                    'No more "combat ended - finishing setup" after a group invite, and no frame drop with it.',
+                    'Leftover DragonflightUI_Layout is renamed and reused, or removed - the delete-it-yourself popup is gone.',
+                    'The raid-style party frame setting is stored where the game can apply it itself.',
+                    'Party members get their class colour as soon as the game knows it, instead of staying white.'
+                }
+            }, {
+                title = 'Unit Frames',
+                items = {
+                    'Fixed the blocked actions on the party frames that left one stale "offline" member behind. Blizzard\'s applier for the raid-style setting writes optionTable on every compact frame, and run from addon code that field stayed tainted - so the first update wanting to hide an unused frame was refused mid-fight.',
+                    'The raid appliers only run inside an actual raid now. Outside one they had nothing to arrange and only seeded that taint.',
+                    'Raid-style party frames keep their size again: the raid settings are mirrored onto the party system, which is where CompactUnitFrame reads them from.',
+                    'Role icons are restyled after Blizzard\'s own update instead of during it.',
+                    'Party members are recoloured once their class information arrives.',
+                    'Edit Mode settings that already match are no longer re-applied.'
+                }
+            }, {
+                title = 'Edit Mode',
+                items = {
+                    'The raid-style party frame setting cannot be stored in a preset layout, so DragonflightUI adds DFUI_Revived_Layout - a copy of the active layout - and switches to it. From then on the game applies the setting itself and this addon never touches it.',
+                    'Leftover DragonflightUI_Layout (Issue #27) is repaired, renamed to DFUI_Revived_Layout and reused where a layout is needed, or deleted where it is not. The popup explaining how to delete it by hand, and /df layoutnotice, are gone.',
+                    'New: /df layoutretry, for when adding that layout did not work the first time.'
+                }
+            }, {
+                title = 'Core & Architecture',
+                items = {
+                    'Deferring routine work is separated from recovering a reload that happened mid-fight. A group invite during combat used to queue as unfinished setup, announce itself twice in chat and re-apply the settings of every module once combat dropped - actionbars, bags, unit frames, minimap, chat, tooltips. That was the lag spike at the end of a fight.',
+                    'A roster change outside a raid now does nothing at all rather than being deferred and then doing nothing.',
+                    'Messages about something that cannot be acted on are said once per character instead of at every login.'
+                }
+            }
+        }
+    },
+    {
+        version = '0.44.3',
+        title = 'Action Bar Usability & Consumable Fixes',
+        date = '1 September 2026',
+        intro = 'Fixes for action bar empty consumable items displaying as usable on login.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'Action Bars: fixed empty consumables (count = 0) displaying as colored/usable on login.',
+                    'Action Bars: hooked button usability, update, and count functions for real-time state sync.'
+                }
+            }, {
+                title = 'Action Bars',
+                items = {
+                    'Fixed empty consumables (count = 0) displaying as colored on login instead of grayed out.',
+                    'Hooked UpdateUsable, Update, and UpdateCount on action buttons alongside bag update events for real-time usability sync.'
+                }
+            }
+        }
+    },
+    {
         version = '0.44.2',
         title = 'Stance Bar Fixes & In-Combat Protection',
         date = '1 September 2026',

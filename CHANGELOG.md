@@ -2,10 +2,38 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.44.2`.
+May 2026). Current builds report version `0.45.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.45.0 — Party Frames in Combat & a Quiet Startup (2 September 2026)
+The party frames no longer break when someone levels up mid-fight, the chat spam and frame drop at the end of a fight are gone, and the leftover Edit Mode layout is cleaned up without anyone having to do it by hand.
+**Highlights** — party frames survive a group member levelling up in combat · no more `combat ended - finishing setup` after a group invite, and no frame drop with it · leftover `DragonflightUI_Layout` renamed and reused, or removed · the raid-style party frame setting is stored where the game can apply it itself · party members get their class colour as soon as the game knows it
+### Unit Frames
+- Fixed the blocked actions on the party frames that left one stale "offline" member behind. Blizzard's applier for the raid-style setting runs `CompactPartyFrame:RefreshMembers()`, which writes `optionTable` on every compact frame; run from addon code that field stayed tainted, and `CompactUnitFrame_UpdateAll` reads it five lines before the `frame:Hide()` the client refuses in combat.
+- The raid appliers only run inside an actual raid. Outside one there is no container to arrange, so they were pure cost and seeded that taint.
+- Raid-style party frames keep their size again: raid settings are mirrored onto the party system, which is where `CompactUnitFrame` reads them from via `GetRaidFrameWidth(frame.groupType)`.
+- Role icons are restyled after Blizzard's own update instead of during it.
+- Party members are recoloured once their class information arrives instead of staying white.
+- Edit Mode settings that already hold the wanted value are no longer re-applied.
+### Edit Mode
+- A preset layout cannot store the raid-style party frame setting, so DragonflightUI adds `DFUI_Revived_Layout` — a copy of the active layout — and switches to it. The game then applies the setting itself at login and this addon never touches it again.
+- Leftover `DragonflightUI_Layout` (Issue #27) is repaired, renamed to `DFUI_Revived_Layout` and reused where a layout is needed, or deleted where it is not. The popup with delete instructions and `/df layoutnotice` are gone.
+- New: `/df layoutretry`, for when adding that layout did not work the first time.
+### Core & Architecture
+- Deferring routine work is separated from recovering a reload that happened mid-fight. A group invite during combat used to queue as unfinished setup, announce itself twice in chat, and re-apply the settings of every module once combat dropped — actionbars, bags, unit frames, minimap, chat, tooltips. That was the lag spike at the end of a fight.
+- A roster change outside a raid now does nothing at all, rather than being deferred and then doing nothing.
+- Messages about a condition nobody can act on are said once per character instead of at every login.
+## 0.44.3 — Action Bar Usability & Consumable Fixes (1 September 2026)
+
+Targeted fixes for action bar empty consumable items displaying as usable on login.
+
+**Highlights** — Action Bars: fixed empty consumables (count = 0) displaying as colored/usable on login · hooked button usability, update, and count functions for real-time state sync
+
+### Action Bars
+- Fixed empty consumables (count = 0) displaying as fully usable/colored on login until Edit Mode was toggled.
+- Hooked `UpdateUsable`, `Update`, and `UpdateCount` on action buttons and registered bag update events (`BAG_UPDATE`, `BAG_UPDATE_DELAYED`) so depleted items gray out immediately.
 
 ## 0.44.2 — Stance Bar Fixes & In-Combat Protection (1 September 2026)
 
