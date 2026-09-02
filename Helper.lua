@@ -230,33 +230,90 @@ local function AnchorMigrationDone()
     return db ~= nil and (db.editModeAnchorMigration or 0) >= ANCHOR_MIGRATION_VERSION
 end
 
-local function MigrateLegacyLayoutName()
+-- Keep and rename it where it is needed, delete it where it is not.
+--
+-- Needed means the active layout is a preset, which cannot store the setting - then this
+-- leftover is the layout that can, and EnsureSaveableEditModeLayout below activates it
+-- instead of adding another one. Not needed means the player is already working on a
+-- layout of their own, so the setting has a home and this one is pure clutter in the
+-- dropdown - which is what the old delete-it-yourself popup was about.
+--
+-- The layout the player is currently on is never deleted, whatever else is true.
+--
+-- Deleting goes through Blizzard's DeleteLayout, which needs an index into
+-- EditModeManagerFrame.layoutInfo.layouts - presets .. saved. That index is found by
+-- NAME in that very table, never guessed and never taken from C_EditMode.GetLayouts(),
+-- which returns the saved ones alone. Confusing those two spaces is what deletes
+-- somebody else's layout on the server for good. Blizzard's own DeleteLayout also
+-- refuses to touch a preset, which is a second net under the first.
+local function HandleLegacyLayout()
     if not AnchorMigrationDone() then return end
-    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
 
-    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
-    if not (ok and layoutInfo and layoutInfo.layouts) then return end
+    local info = EditModeManagerFrame and EditModeManagerFrame.layoutInfo
+    if not (info and info.layouts) then return end
 
-    local legacy, nameTaken
-    for _, layout in ipairs(layoutInfo.layouts) do
+    local presetType = Enum.EditModeLayoutType and Enum.EditModeLayoutType.Preset
+    if not presetType then return end
+
+    local legacyIndex, nameTaken
+    for index, layout in ipairs(info.layouts) do
         if layout.layoutName == LEGACY_LAYOUT_NAME then
-            legacy = layout
+            legacyIndex = index
         elseif layout.layoutName == MANAGED_LAYOUT_NAME then
             nameTaken = true
         end
     end
 
-    -- Nothing to rename, or something already holds the new name. Two layouts sharing
-    -- one name would leave the player unable to tell them apart in the dropdown, so the
-    -- old one keeps its name and just goes unused.
-    if not legacy or nameTaken then return end
+    if not legacyIndex then return end
 
-    legacy.layoutName = MANAGED_LAYOUT_NAME
+    -- One question decides it: is a layout needed at all?
+    --
+    -- The active layout being a preset is what makes one necessary, because a preset
+    -- cannot keep the setting. Then this is the layout that can, so it is kept and
+    -- renamed - whatever else the player happens to own. Sitting on a layout of their own
+    -- means the setting already has a home and this one has no job left, so it goes.
+    --
+    -- Read off layoutInfo directly rather than through IsActiveLayoutPreset, which is
+    -- declared further down the file and would not be in scope here.
+    local activeLayout = info.activeLayout and info.layouts[info.activeLayout]
+    local activeIsPreset = activeLayout ~= nil and activeLayout.layoutType == presetType
+    local isActive = info.activeLayout == legacyIndex
 
-    if pcall(C_EditMode.SaveLayouts, layoutInfo) then
-        DF:Print('Renamed the leftover Edit Mode layout |cff8080ff' .. LEGACY_LAYOUT_NAME .. '|r to |cffffff78' ..
-                     MANAGED_LAYOUT_NAME .. '|r. Nothing about your interface changes - it is a normal layout now, ' ..
-                     'and DragonflightUI can keep Blizzard settings in it instead of re-applying them every login.')
+    if not isActive and not activeIsPreset and EditModeManagerFrame.DeleteLayout then
+        if pcall(EditModeManagerFrame.DeleteLayout, EditModeManagerFrame, legacyIndex) then
+            DF:Print('Removed the leftover Edit Mode layout |cff8080ff' .. LEGACY_LAYOUT_NAME ..
+                         '|r. You are on a layout of your own, so it had no purpose any more.')
+        end
+
+        return
+    end
+
+    -- Kept, so give it a name that says where it came from. Skipped when something
+    -- already holds that name, because two identically named layouts in the dropdown
+    -- cannot be told apart.
+    if nameTaken then return end
+    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
+
+    -- Renamed on the plain table, the same way the anchor migration writes, rather than
+    -- through Blizzard's RenameLayout - that one drags PrepareSystemsForSave across every
+    -- registered system behind it. Matching by name means the narrower index space of
+    -- C_EditMode.GetLayouts() does not matter here.
+    local ok, savedLayouts = pcall(C_EditMode.GetLayouts)
+    if not (ok and savedLayouts and savedLayouts.layouts) then return end
+
+    for _, layout in ipairs(savedLayouts.layouts) do
+        if layout.layoutName == LEGACY_LAYOUT_NAME then
+            layout.layoutName = MANAGED_LAYOUT_NAME
+
+            if pcall(C_EditMode.SaveLayouts, savedLayouts) then
+                DF:Print('Renamed the leftover Edit Mode layout |cff8080ff' .. LEGACY_LAYOUT_NAME ..
+                             '|r to |cffffff78' .. MANAGED_LAYOUT_NAME ..
+                             '|r. Nothing about your interface changes - DragonflightUI keeps Blizzard settings ' ..
+                             'in it now instead of re-applying them every login.')
+            end
+
+            return
+        end
     end
 end
 
@@ -268,9 +325,9 @@ legacyEditModeWatcher:SetScript('OnEvent', function(self)
     Helper:RunOutOfCombat('editmode legacy cleanup', function()
         local anchorsSettled = addonTable:SanitizeLegacyEditModeAnchors()
 
-        -- After the anchors, because the rename is what makes the old layout reusable and
-        -- the anchors are what made it unusable. Cheap and idempotent once it has run.
-        MigrateLegacyLayoutName()
+        -- After the anchors, because those are what made the old layout unusable and this
+        -- decides whether to keep it. Idempotent once it has run.
+        HandleLegacyLayout()
 
         -- The raid-style layout check rides along here because it waits on the same
         -- thing: layoutInfo being loaded. By the time this fires it always is, so a
@@ -415,7 +472,7 @@ function addonTable:EnsureSaveableEditModeLayout()
     -- Before looking for our layout, in case it is the old one under its old name. This
     -- can run ahead of the watcher when layoutInfo was already loaded at our setup, and
     -- without it that character would get a fresh copy while the renamed one sat unused.
-    MigrateLegacyLayoutName()
+    HandleLegacyLayout()
 
     -- One attempt per character, ever. Recorded before the reload so it survives it.
     --
