@@ -1235,9 +1235,13 @@ end
 -- issecurevariable can see what taintLog cannot. Its second return is the addon
 -- that dirtied the field, so walking the party frames and their interesting
 -- fields turns "something tainted this" into a name and a key.
+-- unitExists is in the list because CompactUnitFrame_UpdateVisible both writes and reads
+-- it, one line above the frame:Hide() that got blocked. If that field is dirty, every trip
+-- through UpdateVisible is dirty with it, and the block needs no addon anywhere in the
+-- stack to explain it.
 local PARTY_TAINT_FIELDS = {
-    'unit', 'isLootObject', 'displayedUnit', 'inVehicle', 'optionTable', 'layoutIndex', 'maxBuffs', 'maxDebuffs',
-    'showBuffs', 'showDebuffs', 'shouldShow'
+    'unit', 'unitExists', 'isLootObject', 'displayedUnit', 'inVehicle', 'optionTable', 'layoutIndex', 'maxBuffs',
+    'maxDebuffs', 'showBuffs', 'showDebuffs', 'shouldShow'
 }
 
 -- Fields on a frame object, whether or not it has a name in _G.
@@ -1583,6 +1587,15 @@ function DF:LogPartyTaint(tag)
     for i = 1, 5 do
         LogFrameTaint(tag, 'CompactPartyFrameMember' .. i)
         LogFrameTaint(tag, 'PartyMemberFrame' .. i)
+
+        -- The pet slots, which the member walk above skipped.
+        --
+        -- These are the frames the report actually named: ADDON_ACTION_BLOCKED on
+        -- CompactPartyFramePet1:Hide() out of CompactUnitFrame_UpdateVisible. A refused
+        -- Hide() leaves a unitless frame on screen, which is what "one offline dummy
+        -- member instead of three" was. Their updateAllEvent is UNIT_PET, so they are
+        -- updated on their own schedule and can be dirty while everything else reads clean.
+        LogFrameTaint(tag, 'CompactPartyFramePet' .. i)
     end
 
     -- The shared seed, and the reason to look here at all.
