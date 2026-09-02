@@ -493,6 +493,39 @@ end
 local RELOAD_POLL_SECONDS = 0.5
 local RELOAD_POLL_ATTEMPTS = 20
 
+-- Make a layout the active one, and say so when it does not work.
+--
+-- EditModeManagerFrameMixin:SelectLayout wraps the real call in UI housekeeping:
+--
+--   self:ClearSelectedSystem();
+--   C_EditMode.SetActiveLayout(layoutIndex);
+--   self:NotifyChatOfLayoutChange();
+--
+-- ClearSelectedSystem touches parts of a manager frame this addon never opens, and if it
+-- throws, SetActiveLayout on the line below it never runs - the layout is saved and
+-- nothing switches, with no error to show for it. So the mixin is tried first, because it
+-- keeps Blizzard's own bookkeeping in step, and C_EditMode.SetActiveLayout is the fallback
+-- when it fails. That is the call that actually changes the layout.
+local function ActivateLayout(index)
+    if not index then return false, 'no layout index' end
+
+    if EditModeManagerFrame and EditModeManagerFrame.SelectLayout then
+        local ok, err = pcall(EditModeManagerFrame.SelectLayout, EditModeManagerFrame, index)
+        if ok then return true end
+
+        DF:Debug(DF, 'editmode layout: SelectLayout failed (' .. tostring(err) .. '), using SetActiveLayout')
+    end
+
+    if C_EditMode and C_EditMode.SetActiveLayout then
+        local ok, err = pcall(C_EditMode.SetActiveLayout, index)
+        if ok then return true end
+
+        return false, tostring(err)
+    end
+
+    return false, 'no way to set the active layout on this client'
+end
+
 local function ReloadOnceLayoutIsActive()
     if not (C_Timer and C_Timer.NewTicker) then return end
 
@@ -561,8 +594,8 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     -- unused forever. Nor can this loop: the reload below waits for the switch to actually
     -- land, and once it has, the preset check at the top of this function ends it.
     local existing = FindManagedLayoutIndex()
-    if existing and EditModeManagerFrame.SelectLayout then
-        local ok, err = pcall(EditModeManagerFrame.SelectLayout, EditModeManagerFrame, existing)
+    if existing then
+        local ok, err = ActivateLayout(existing)
         if ok then
             DF:Print('Switching to the |cffffff78' .. MANAGED_LAYOUT_NAME ..
                          '|r Edit Mode layout, which can store the raid-style party frame setting. Reloading.')
@@ -688,8 +721,12 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     -- layoutInfo.layouts by now, so its index can be looked up and the switch made
     -- explicitly. Selecting an already-active layout is a no-op in SelectLayout.
     local added = FindManagedLayoutIndex()
-    if added and EditModeManagerFrame.SelectLayout then
-        pcall(EditModeManagerFrame.SelectLayout, EditModeManagerFrame, added)
+    local activated, activateErr = ActivateLayout(added)
+    if not activated then
+        DF:Print('The layout is saved, but switching to it failed: ' .. tostring(activateErr) ..
+                     '. Select |cffffff78' .. MANAGED_LAYOUT_NAME .. '|r in Blizzard\'s Edit Mode to finish.')
+
+        return true
     end
 
     ReloadOnceLayoutIsActive()
