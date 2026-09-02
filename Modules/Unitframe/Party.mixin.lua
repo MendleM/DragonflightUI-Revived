@@ -222,6 +222,37 @@ StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
     end
 }
 
+-- Asked right when the switch is flipped, because the frames do not change until a reload
+-- and nothing else would make that obvious.
+--
+-- A popup rather than a coloured button next to the checkbox: the settings list only builds
+-- its rows in Init, so a button caption cannot change while the page is open, and one that
+-- silently keeps the wrong text is worse than no button. This cannot be missed, and the
+-- button stays as the way to do it later.
+StaticPopupDialogs['DragonflightUIRaidStylePartyReload'] = {
+    text = 'The raid-style party frame setting has been saved.\n\n' ..
+        'It takes effect after a reload - Blizzard applies it while the interface loads, which is the only way it ' ..
+        'can be done without leaving the party frames unable to update during combat.\n\n' .. 'Reload now?',
+    button1 = RELOADUI or 'Reload',
+    button2 = LATER or 'Later',
+    showAlert = true,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+    OnAccept = function()
+        if InCombatLockdown() or UnitAffectingCombat('player') then
+            DF:Print('Cannot reload during combat - use the ' .. (RELOADUI or 'Reload') ..
+                         ' button on this page once the fight is over.')
+
+            return
+        end
+
+        local reload = (C_UI and C_UI.Reload) or ReloadUI
+        if reload then reload() end
+    end
+}
+
 function addonTable:ShowRaidStylePartyNotice(force)
     if not force then
         if raidStyleNoticeShown then return false end
@@ -273,11 +304,12 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
         addonTable:SyncRaidStylePartyFrameToBlizzard(val)
 
-        -- Said out loud, because the frames do not change yet and silence would read as a
-        -- broken switch. The value is stored; the game applies it on the way in.
+        -- Asked, not just logged: the frames do not change yet and silence would read as a
+        -- broken switch. Only when the two actually disagree, so flipping back and forth to
+        -- the state already applied stays quiet.
         if addonTable.RaidStylePartyFramesNeedReload and addonTable:RaidStylePartyFramesNeedReload() then
-            DF:Print('Raid-style party frames: setting saved. Use the |cffffff78' .. (RELOADUI or 'Reload') ..
-                         '|r button next to the checkbox, or type |cffffff78/reload|r, to apply it.')
+            DF:Print('Raid-style party frames: setting saved, it applies on the next reload.')
+            StaticPopup_Show('DragonflightUIRaidStylePartyReload')
         end
     end
 
@@ -464,13 +496,7 @@ function SubModuleMixin:SetupOptions()
                 name = 'Apply raid-style party frames',
                 desc = 'Reloads the interface so the raid-style party frame setting takes effect. Nothing else is ' ..
                     'lost by reloading - every other setting applies immediately.',
-                btnName = function()
-                    if addonTable.RaidStylePartyFramesNeedReload and addonTable:RaidStylePartyFramesNeedReload() then
-                        return '|cffFF4040' .. (RELOADUI or 'Reload') .. '|r'
-                    end
-
-                    return RELOADUI or 'Reload'
-                end,
+                btnName = RELOADUI or 'Reload',
                 func = function()
                     if InCombatLockdown() or UnitAffectingCombat('player') then
                         DF:Print('Cannot reload during combat - try again once the fight is over.')

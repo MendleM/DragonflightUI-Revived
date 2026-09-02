@@ -713,16 +713,7 @@ function DFSettingsListButtonMixin:Init(node)
         self.Button:SetPoint('LEFT', self.Text, 'RIGHT', 40, 0);
     end
 
-    -- btnName may be a function, so a button can say something about the current state -
-    -- "reload needed" going quiet once it is not. Evaluated on Init, which runs whenever the
-    -- list is built, so reopening the page refreshes it. Plain strings keep working.
-    local btnText = args.btnName
-    if type(btnText) == 'function' then
-        local ok, computed = pcall(btnText)
-        btnText = (ok and computed) or ''
-    end
-
-    self.Button:SetText(btnText);
+    self.Button:SetText(args.btnName);
     self.Button:SetScript('OnClick', function(button, buttonName)
         -- print('OnClick')
         self:TriggerEvent(DFSettingsListElementBaseMixin.Event.OnClick, true)
