@@ -411,6 +411,51 @@ end
 -- plus one setting Blizzard offers itself is an ordinary layout, with or without us.
 local managedLayoutFallbackTold = false
 
+-- Put one system setting into one layout table.
+--
+-- Pulled out to file level so the layout writer below and the new-layout copy above can
+-- share it. Operates on a plain layout table and nothing else - never on
+-- EditModeManagerFrame.layoutInfo, which holds the presets too.
+--
+-- The value has to be the RAW form, the one C_EditMode.SaveLayouts stores, not the
+-- display form the sliders show. For a boolean like UseRaidStylePartyFrames the two are
+-- the same 0 or 1; for anything scaled they are not, and conflating them is what broke
+-- the sliders once already.
+local function SetLayoutSystemSetting(layout, system, systemIndex, setting, value)
+    if not (layout and system and setting ~= nil and value ~= nil) then return end
+
+    layout.systems = layout.systems or {}
+
+    local foundSys = false
+    for _, sys in ipairs(layout.systems) do
+        if sys.system == system and (not systemIndex or sys.systemIndex == systemIndex) then
+            foundSys = true
+            sys.settings = sys.settings or {}
+
+            local foundSetting = false
+            for _, s in ipairs(sys.settings) do
+                if s.setting == setting then
+                    s.value = value
+                    foundSetting = true
+                end
+            end
+
+            if not foundSetting then table.insert(sys.settings, {setting = setting, value = value}) end
+        end
+    end
+
+    if not foundSys then
+        -- The 3 fallback is the party unit frame index, kept from the original writer so
+        -- behaviour does not shift for callers that pass no index.
+        table.insert(layout.systems, {
+            system = system,
+            systemIndex = systemIndex or 3,
+            settings = {{setting = setting, value = value}},
+            isInDefaultPosition = true
+        })
+    end
+end
+
 -- layoutInfo.layouts is the index space SelectLayout and activeLayout speak - presets
 -- first, saved layouts after. Deliberately not C_EditMode.GetLayouts(), which returns
 -- the saved ones alone and is therefore off by the number of presets.
@@ -465,8 +510,12 @@ local function ReloadWhenLayoutsLand()
     end
 end
 
+-- pending, when given, is the setting that triggered this: {systemIndex, setting, value}.
+-- It goes into the new layout before Blizzard stores it, so the very first login on that
+-- layout already agrees with our profile and no applier of ours ever has to run.
+--
 -- Returns true when there is nothing left to do.
-function addonTable:EnsureSaveableEditModeLayout()
+function addonTable:EnsureSaveableEditModeLayout(pending)
     if not IsActiveLayoutPreset() then return true end
 
     -- Before looking for our layout, in case it is the old one under its old name. This
@@ -529,12 +578,22 @@ function addonTable:EnsureSaveableEditModeLayout()
     local gotActive, active = pcall(EditModeManagerFrame.GetActiveLayoutInfo, EditModeManagerFrame)
     if not (gotActive and active) then return true end
 
+    -- CopyTable, because MakeNewLayout writes layoutType and layoutName straight onto what
+    -- it is handed - and what it is handed here would otherwise be the live preset.
+    local newLayout = CopyTable(active)
+
+    -- The setting goes in before Blizzard ever sees the layout. Without this the copy
+    -- carries the preset's value, so the next login finds a mismatch again and runs
+    -- Blizzard's applier from our execution one last time - one avoidable taint.
+    if pending and Enum.EditModeSystem then
+        SetLayoutSystemSetting(newLayout, Enum.EditModeSystem.UnitFrame, pending.systemIndex, pending.setting,
+                               pending.value)
+    end
+
     ReloadWhenLayoutsLand()
 
-    -- CopyTable, because MakeNewLayout writes layoutType and layoutName straight onto
-    -- what it is handed - and what it is handed here would otherwise be the live preset.
     local isImported = false
-    local made = pcall(EditModeManagerFrame.MakeNewLayout, EditModeManagerFrame, CopyTable(active), layoutType,
+    local made = pcall(EditModeManagerFrame.MakeNewLayout, EditModeManagerFrame, newLayout, layoutType,
                        MANAGED_LAYOUT_NAME, isImported)
     if not made then return true end
 
@@ -552,18 +611,21 @@ end
 -- answers "not a preset" for every layout - which would skip this silently. So the
 -- write records that it happened and the answer is picked up once the layouts land, on
 -- the same event the legacy-layout watcher already waits for.
-local layoutCheckPending = false
+-- Holds the setting itself, not just a yes, so a layout created later can be born with
+-- the right value in it.
+local pendingLayoutSetting = nil
 
 -- Returns true when there is nothing left to do.
 function addonTable:EvaluateEditModeLayoutForRaidStyle()
-    if not layoutCheckPending then return true end
+    if not pendingLayoutSetting then return true end
 
-    -- No layouts yet, so any answer would be a guess. Leave the flag up.
+    -- No layouts yet, so any answer would be a guess. Leave the payload in place.
     if not (EditModeManagerFrame and EditModeManagerFrame.layoutInfo) then return false end
 
-    layoutCheckPending = false
+    local pending = pendingLayoutSetting
+    pendingLayoutSetting = nil
 
-    return addonTable:EnsureSaveableEditModeLayout()
+    return addonTable:EnsureSaveableEditModeLayout(pending)
 end
 
 -- Write one Edit Mode unit frame setting, and have Blizzard apply it.
@@ -655,35 +717,7 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
     -- the RAW form while the setter above needs the display form. Two different numbers
     -- for the same change; conflating them is what broke the sliders.
     local function EnsureSettingInLayout(layout, val)
-        if not layout then return end
-        layout.systems = layout.systems or {}
-        local foundSys = false
-        for _, sys in ipairs(layout.systems) do
-            if sys.system == targetSystem and (not targetSystemIndex or sys.systemIndex == targetSystemIndex) then
-                foundSys = true
-                sys.settings = sys.settings or {}
-                local foundSetting = false
-                for _, s in ipairs(sys.settings) do
-                    if s.setting == targetSetting then
-                        s.value = val
-                        foundSetting = true
-                    end
-                end
-                if not foundSetting then
-                    table.insert(sys.settings, {setting = targetSetting, value = val})
-                end
-            end
-        end
-        if not foundSys then
-            table.insert(layout.systems, {
-                system = targetSystem,
-                systemIndex = targetSystemIndex or 3,
-                settings = {
-                    {setting = targetSetting, value = val}
-                },
-                isInDefaultPosition = true,
-            })
-        end
+        SetLayoutSystemSetting(layout, targetSystem, targetSystemIndex, targetSetting, val)
     end
 
     -- The live EditModeManagerFrame.layoutInfo.layouts is deliberately not
@@ -788,7 +822,9 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
     -- player's own keeps the value, so a mismatch is a one-off. Only the two together
     -- repeat forever.
     if not BlizzardHoldsSettingValue(partyFrame, setting, val) then
-        layoutCheckPending = true
+        -- Raw and display form are the same 0/1 for this boolean, so val can go straight
+        -- into a layout. That is not true of scaled settings - see SetLayoutSystemSetting.
+        pendingLayoutSetting = {systemIndex = systemIndex, setting = setting, value = val}
         Helper:RunOutOfCombat('party raid style layout check',
                               function() addonTable:EvaluateEditModeLayoutForRaidStyle() end)
     end
