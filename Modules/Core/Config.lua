@@ -527,26 +527,9 @@ function Module:SlashCommand(input)
         return
     end
 
-    -- /df layoutnotice - bring back the leftover-layout notice after it has been
-    -- dismissed for good, and say so when there is nothing to show. force=true
-    -- skips both the dismissed flag and the once-per-session guard, because this
-    -- is the player asking for it. See Helper.lua:ShowLegacyEditModeLayoutNotice.
-    if cmd == 'layoutnotice' then
-        if addonTable.ShowLegacyEditModeLayoutNotice then
-            local force = true
-            if addonTable:ShowLegacyEditModeLayoutNotice(force) then
-                DF:Print('No leftover DragonflightUI Edit Mode layout on this character - nothing to clean up.')
-            else
-                local db = DF.db and DF.db.global
-                if db then db.editModeLayoutNoticeDismissed = false end
-            end
-        end
-        return
-    end
-
     -- /df raidnotice - bring back the explanation of where raid-style party frame
-    -- appearance is configured. Same force semantics as layoutnotice: the player
-    -- asking overrides both the dismissed flag and the once-per-session guard.
+    -- appearance is configured. force=true skips both the dismissed flag and the
+    -- once-per-session guard, because this is the player asking for it.
     -- See Party.mixin.lua:ShowRaidStylePartyNotice.
     if cmd == 'raidnotice' then
         if addonTable.ShowRaidStylePartyNotice then

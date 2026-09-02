@@ -203,69 +203,61 @@ end
 -- Blizzard's own dropdown computes the index correctly, so the player is the safer
 -- tool here.
 local LEGACY_LAYOUT_NAME = 'DragonflightUI_Layout'
-local legacyLayoutNoticeShown = false
+local MANAGED_LAYOUT_NAME = 'DFUI_Revived_Layout'
 
-local function HasLegacyEditModeLayout()
-    if not (C_EditMode and C_EditMode.GetLayouts) then return false end
+-- Rename the leftover layout rather than asking anyone to delete it.
+--
+-- Its name was never the harmful part - the anchorInfo pointing at this addon's frames
+-- was, and SanitizeLegacyEditModeAnchors above resets exactly those. Once that has run
+-- what remains is an ordinary working layout with an awkward name. And a layout that can
+-- hold settings is precisely what EnsureSaveableEditModeLayout further down needs, so it
+-- gets a clearer name and is then reused - instead of a popup walking people through
+-- deleting it so this addon can add a near-identical one straight after.
+--
+-- Written through the plain table and C_EditMode.SaveLayouts, the same way the anchor
+-- migration writes, and matched by NAME rather than index. Blizzard's RenameLayout wants
+-- an index into EditModeManagerFrame.layoutInfo.layouts, which is presets .. saved,
+-- while C_EditMode.GetLayouts() returns the saved ones alone - confusing those two
+-- spaces is what corrupts somebody's layouts on the server for good.
+-- Has every DragonflightUI anchor been cleared out of this character's layouts?
+--
+-- The gate on reusing the old layout. Until this is true it may still carry anchors
+-- pointing at our frames, which is the very thing that made it look broken with the
+-- addon off - so it stays untouched and unused until the repair has finished.
+local function AnchorMigrationDone()
+    local db = DF.db and DF.db.char
 
-    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
-    if not (ok and layoutInfo and layoutInfo.layouts) then return false end
-
-    for _, layout in ipairs(layoutInfo.layouts) do
-        if layout.layoutName == LEGACY_LAYOUT_NAME then return true end
-    end
-
-    return false
+    return db ~= nil and (db.editModeAnchorMigration or 0) >= ANCHOR_MIGRATION_VERSION
 end
 
-StaticPopupDialogs['DragonflightUILegacyLayoutNotice'] = {
-    text = 'DragonflightUI found a leftover Edit Mode layout called |cff8080ff' .. LEGACY_LAYOUT_NAME ..
-        '|r on this character.\n\n' ..
-        'An older version created it and made it active. It is stored on Blizzard\'s server, so this addon cannot ' ..
-        'remove it for you without risking your other layouts. Leaving it active can make the interface look ' ..
-        'broken while DragonflightUI is disabled.\n\n' ..
-        'To remove it:\n' .. '1. Disable DragonflightUI and reload\n' .. '2. Escape, then Edit Mode\n' ..
-        '3. Switch the layout to a preset or one of your own\n' .. '4. Delete ' .. LEGACY_LAYOUT_NAME .. '\n' ..
-        '5. Enable DragonflightUI again\n\n' ..
-        'It is character-specific, so repeat this on any other character that shows this message.',
-    button1 = 'Do not show again',
-    button2 = CLOSE or 'Close',
-    showAlert = true,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-    -- button1 is the only thing that silences it for good. Escape and Close leave
-    -- the flag alone, so closing it by accident brings it back next login - which
-    -- is what was asked for in issue #27.
-    OnAccept = function()
-        local db = DF.db and DF.db.global
-        if db then db.editModeLayoutNoticeDismissed = true end
-        DF:Print('Notice about ' .. LEGACY_LAYOUT_NAME .. ' will not be shown again. ' ..
-                     'Type /df layoutnotice to bring it back.')
-    end
-}
+local function MigrateLegacyLayoutName()
+    if not AnchorMigrationDone() then return end
+    if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
 
--- Returns true when there is nothing left to tell the player.
-function addonTable:ShowLegacyEditModeLayoutNotice(force)
-    if not force then
-        if legacyLayoutNoticeShown then return false end
+    local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
+    if not (ok and layoutInfo and layoutInfo.layouts) then return end
 
-        local db = DF.db and DF.db.global
-        if db and db.editModeLayoutNoticeDismissed then return true end
+    local legacy, nameTaken
+    for _, layout in ipairs(layoutInfo.layouts) do
+        if layout.layoutName == LEGACY_LAYOUT_NAME then
+            legacy = layout
+        elseif layout.layoutName == MANAGED_LAYOUT_NAME then
+            nameTaken = true
+        end
     end
 
-    if not HasLegacyEditModeLayout() then return true end
+    -- Nothing to rename, or something already holds the new name. Two layouts sharing
+    -- one name would leave the player unable to tell them apart in the dropdown, so the
+    -- old one keeps its name and just goes unused.
+    if not legacy or nameTaken then return end
 
-    legacyLayoutNoticeShown = true
-    StaticPopup_Show('DragonflightUILegacyLayoutNotice')
+    legacy.layoutName = MANAGED_LAYOUT_NAME
 
-    -- Also in chat, because the popup can be dismissed before it is read and the
-    -- steps are the part people need again later.
-    DF:Print('Leftover Edit Mode layout |cff8080ff' .. LEGACY_LAYOUT_NAME .. '|r found. Disable DragonflightUI, ' ..
-                 'open Blizzard\'s Edit Mode, switch to another layout, delete it, then enable DragonflightUI again.')
-
-    return false
+    if pcall(C_EditMode.SaveLayouts, layoutInfo) then
+        DF:Print('Renamed the leftover Edit Mode layout |cff8080ff' .. LEGACY_LAYOUT_NAME .. '|r to |cffffff78' ..
+                     MANAGED_LAYOUT_NAME .. '|r. Nothing about your interface changes - it is a normal layout now, ' ..
+                     'and DragonflightUI can keep Blizzard settings in it instead of re-applying them every login.')
+    end
 end
 
 local legacyEditModeWatcher = CreateFrame('Frame')
@@ -275,14 +267,17 @@ legacyEditModeWatcher:SetScript('OnEvent', function(self)
     -- combat. RunOutOfCombat queues by label, so a fight only delays it.
     Helper:RunOutOfCombat('editmode legacy cleanup', function()
         local anchorsSettled = addonTable:SanitizeLegacyEditModeAnchors()
-        local noticeSettled = addonTable:ShowLegacyEditModeLayoutNotice()
+
+        -- After the anchors, because the rename is what makes the old layout reusable and
+        -- the anchors are what made it unusable. Cheap and idempotent once it has run.
+        MigrateLegacyLayoutName()
 
         -- The raid-style layout check rides along here because it waits on the same
         -- thing: layoutInfo being loaded. By the time this fires it always is, so a
         -- write that arrives after this watcher has gone can answer for itself.
         local layoutSettled = addonTable:EvaluateEditModeLayoutForRaidStyle()
 
-        if anchorsSettled and noticeSettled and layoutSettled then self:UnregisterAllEvents() end
+        if anchorsSettled and layoutSettled then self:UnregisterAllEvents() end
     end)
 end)
 -- Not every flavour has this event, and RegisterEvent throws on an unknown one.
@@ -357,18 +352,26 @@ end
 -- pointing at this addon's frames, which left the interface looking broken whenever the
 -- addon was off and could not be cleaned up afterwards - issue #27. A copy of a preset
 -- plus one setting Blizzard offers itself is an ordinary layout, with or without us.
-local MANAGED_LAYOUT_NAME = 'DragonflightUI'
 local managedLayoutFallbackTold = false
 
 -- layoutInfo.layouts is the index space SelectLayout and activeLayout speak - presets
 -- first, saved layouts after. Deliberately not C_EditMode.GetLayouts(), which returns
 -- the saved ones alone and is therefore off by the number of presets.
+--
+-- The legacy name counts too, and has to. C_EditMode.SaveLayouts only refreshes
+-- layoutInfo once EDIT_MODE_LAYOUTS_UPDATED comes back, so right after the rename this
+-- table can still hold the old name - and looking for the new one alone would conclude
+-- there is no layout and add a second, near-identical one. Only accepted once the anchor
+-- repair is done, because that is what makes the old layout safe to sit on.
 local function FindManagedLayoutIndex()
     local info = EditModeManagerFrame and EditModeManagerFrame.layoutInfo
     if not (info and info.layouts) then return nil end
 
+    local legacyCounts = AnchorMigrationDone()
+
     for index, layout in ipairs(info.layouts) do
         if layout.layoutName == MANAGED_LAYOUT_NAME then return index end
+        if legacyCounts and layout.layoutName == LEGACY_LAYOUT_NAME then return index end
     end
 
     return nil
@@ -408,6 +411,11 @@ end
 -- Returns true when there is nothing left to do.
 function addonTable:EnsureSaveableEditModeLayout()
     if not IsActiveLayoutPreset() then return true end
+
+    -- Before looking for our layout, in case it is the old one under its old name. This
+    -- can run ahead of the watcher when layoutInfo was already loaded at our setup, and
+    -- without it that character would get a fresh copy while the renamed one sat unused.
+    MigrateLegacyLayoutName()
 
     -- One attempt per character, ever. Recorded before the reload so it survives it.
     --
