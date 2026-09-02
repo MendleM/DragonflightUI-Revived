@@ -205,6 +205,31 @@ end
 local LEGACY_LAYOUT_NAME = 'DragonflightUI_Layout'
 local MANAGED_LAYOUT_NAME = 'DFUI_Revived_Layout'
 
+-- Say it once per character, then keep quiet.
+--
+-- The messages about a layout being added, renamed or deleted are tied to something having
+-- happened, so they cannot repeat. The ones about something NOT working are not: a spent
+-- attempt on a preset, a switch that will not take, a full layout list. Those conditions
+-- persist, and printing them on every login is exactly the noise people complain about.
+--
+-- Recorded per character because that is the scope of the thing being described - which
+-- layout is active, and whether this character has used its attempt.
+local function TellOnce(key, message)
+    local charDB = DF.db and DF.db.char
+    if not charDB then return end
+
+    charDB.editModeLayoutNotices = charDB.editModeLayoutNotices or {}
+
+    if charDB.editModeLayoutNotices[key] then
+        DF:Debug(DF, 'editmode layout (already told): ' .. message)
+
+        return
+    end
+
+    charDB.editModeLayoutNotices[key] = true
+    DF:Print(message)
+end
+
 -- Rename the leftover layout rather than asking anyone to delete it.
 --
 -- Its name was never the harmful part - the anchorInfo pointing at this addon's frames
@@ -409,7 +434,7 @@ end
 -- pointing at this addon's frames, which left the interface looking broken whenever the
 -- addon was off and could not be cleaned up afterwards - issue #27. A copy of a preset
 -- plus one setting Blizzard offers itself is an ordinary layout, with or without us.
-local managedLayoutFallbackTold = false
+
 
 -- Put one system setting into one layout table.
 --
@@ -548,7 +573,8 @@ local function ReloadOnceLayoutIsActive()
 
         if attempts >= RELOAD_POLL_ATTEMPTS then
             ticker:Cancel()
-            DF:Print('The |cffffff78' .. MANAGED_LAYOUT_NAME ..
+            TellOnce('switchTimedOut',
+                     'The |cffffff78' .. MANAGED_LAYOUT_NAME ..
                          '|r Edit Mode layout is saved but the game has not switched to it. Select it in ' ..
                          'Blizzard\'s Edit Mode, or type |cffffff78/reload|r, and it will take effect.')
         end
@@ -597,11 +623,15 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     if existing then
         local ok, err = ActivateLayout(existing)
         if ok then
-            DF:Print('Switching to the |cffffff78' .. MANAGED_LAYOUT_NAME ..
+            -- Told once as well: when the switch lands there is no preset active next login
+            -- and this is never reached again, but if it never lands this would otherwise
+            -- announce itself on every single login.
+            TellOnce('switching', 'Switching to the |cffffff78' .. MANAGED_LAYOUT_NAME ..
                          '|r Edit Mode layout, which can store the raid-style party frame setting. Reloading.')
             ReloadOnceLayoutIsActive()
         else
-            DF:Print('Could not switch to the |cffffff78' .. MANAGED_LAYOUT_NAME .. '|r Edit Mode layout: ' ..
+            TellOnce('selectFailed',
+                     'Could not switch to the |cffffff78' .. MANAGED_LAYOUT_NAME .. '|r Edit Mode layout: ' ..
                          tostring(err))
         end
 
@@ -609,12 +639,10 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     end
 
     if charDB and charDB.raidStyleLayoutAttempted then
-        if not managedLayoutFallbackTold then
-            managedLayoutFallbackTold = true
-            DF:Print('Your active Edit Mode layout is a preset and cannot store the raid-style party frame ' ..
-                         'setting, so DragonflightUI has to re-apply it every login. Switching to a layout of your ' ..
-                         'own in Blizzard\'s Edit Mode avoids that, and |cffffff78/df layoutretry|r tries again.')
-        end
+        TellOnce('presetFallback',
+                 'Your active Edit Mode layout is a preset and cannot store the raid-style party frame setting, so ' ..
+                     'DragonflightUI has to re-apply it every login. Switching to a layout of your own in ' ..
+                     'Blizzard\'s Edit Mode avoids that, and |cffffff78/df layoutretry|r tries again.')
 
         return true
     end
@@ -640,8 +668,9 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
         -- Still nothing, so MakeNewLayout would only throw again. Leave the attempt
         -- unspent: a later login, with Blizzard's Edit Mode further along, can retry.
         if not EditModeManagerFrame.highestLayoutIndexByType then
-            DF:Print('Blizzard\'s Edit Mode has not finished setting up its layout list, so the |cffffff78' ..
-                         MANAGED_LAYOUT_NAME .. '|r layout could not be added yet. It will be tried again.')
+            -- Debug only: the player cannot act on this, and the attempt is left unspent so
+            -- a later login tries again. Printing it would be noise about our own timing.
+            DF:Debug(DF, 'editmode layout: highestLayoutIndexByType still missing after CreateLayoutTbls')
 
             return true
         end
@@ -650,7 +679,8 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     if EditModeManagerFrame.AreLayoutsFullyMaxed then
         local ok, maxed = pcall(EditModeManagerFrame.AreLayoutsFullyMaxed, EditModeManagerFrame)
         if ok and maxed then
-            DF:Print('All Edit Mode layout slots are full, so DragonflightUI cannot add one for the raid-style ' ..
+            TellOnce('layoutsMaxed',
+                     'All Edit Mode layout slots are full, so DragonflightUI cannot add one for the raid-style ' ..
                          'party frames. Free a slot, or switch to a layout of your own - either lets Blizzard keep ' ..
                          'the setting instead of this addon re-applying it every login.')
 
@@ -663,7 +693,8 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     if C_EditMode and C_EditMode.IsValidLayoutName then
         local ok, valid = pcall(C_EditMode.IsValidLayoutName, MANAGED_LAYOUT_NAME)
         if ok and not valid then
-            DF:Print('The game rejected |cffffff78' .. MANAGED_LAYOUT_NAME ..
+            TellOnce('nameRejected',
+                     'The game rejected |cffffff78' .. MANAGED_LAYOUT_NAME ..
                          '|r as an Edit Mode layout name, so the raid-style party setting cannot be stored.')
 
             return true
@@ -751,7 +782,10 @@ function addonTable:ResetEditModeLayoutAttempt()
     if not charDB then return false end
 
     charDB.raidStyleLayoutAttempted = false
-    managedLayoutFallbackTold = false
+
+    -- The told-once record goes too, otherwise a retry that runs into the same wall would
+    -- fail in silence.
+    charDB.editModeLayoutNotices = nil
 
     return true
 end
