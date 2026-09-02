@@ -1018,9 +1018,21 @@ function SubModuleMixin:SetupModern()
             local tex = healthbar:GetStatusBarTexture()
             local r, g, b = shade, shade, shade
             if tex and state and state.classcolor then
-                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
                 local _, class = UnitClass(unit)
-                r, g, b = DF:GetClassColor(class, 1)
+
+                -- No class yet means the name cache entry has not arrived.
+                --
+                -- GROUP_ROSTER_UPDATE fires before the client has the class for a member,
+                -- so UnitClass answers nil on login and on invite. GetClassColor(nil) hands
+                -- back white, which is the priest colour - so everybody showed up as a
+                -- priest until something repainted them. Use the plain green art until the
+                -- class is known; UNIT_NAME_UPDATE brings us back here once it is.
+                if class then
+                    tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+                    r, g, b = DF:GetClassColor(class, 1)
+                else
+                    tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
+                end
             elseif tex and state and state.gradient then
                 tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
                 r, g, b = Helper:ColorGradiant(Helper:GetUnitHealthPercent(unit))
@@ -1116,22 +1128,48 @@ function SubModuleMixin:SetupModern()
     -- Gradient coloring follows current health, so it needs health events.
     -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would
     -- fire for every unit in a raid.
+    --
+    -- UNIT_NAME_UPDATE shares the watcher but not the gradient gate. It is the client
+    -- saying the name cache entry arrived, which is the moment UnitClass starts answering -
+    -- Blizzard calls CompactUnitFrame_UpdateHealthColor on that same event and says so in a
+    -- comment. Without it a member painted plain for a missing class stayed that way, since
+    -- nothing repaints a bar whose health has not moved.
+    --
+    -- The gate stays on UNIT_HEALTH alone. That one fires constantly in combat for four
+    -- units, and outside gradient mode there is nothing for it to change.
     for _, units in ipairs({{'party1', 'party2'}, {'party3', 'party4'}}) do
-        local healthWatcher = CreateFrame('Frame')
-        healthWatcher:RegisterUnitEvent('UNIT_HEALTH', units[1], units[2])
-        healthWatcher:SetScript('OnEvent', function(_, _, unit)
-            local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
-            if not (state and state.gradient) then return end
+        local unitWatcher = CreateFrame('Frame')
+        unitWatcher:RegisterUnitEvent('UNIT_HEALTH', units[1], units[2])
+        unitWatcher:RegisterUnitEvent('UNIT_NAME_UPDATE', units[1], units[2])
+
+        unitWatcher:SetScript('OnEvent', function(_, event, unit)
+            if event == 'UNIT_HEALTH' then
+                local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
+                if not (state and state.gradient) then return end
+            end
+
             if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
+
             for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
                 local st = memberState[pf]
-                if st and st.styled and (pf.unit == unit or pf.unitToken == unit) then pcall(UpdateBars, pf) end
+
+                -- layoutIndex is the only handle a frame has before Blizzard has put a unit
+                -- on it. PartyFrameMixin:InitializePartyMemberFrames assigns 1 through
+                -- MAX_PARTY_MEMBERS, which maps straight onto party1 through party4.
+                local slot = pf.layoutIndex and ('party' .. pf.layoutIndex)
+
+                if st and st.styled and (pf.unit == unit or pf.unitToken == unit or slot == unit) then
+                    pcall(UpdateBars, pf)
+                end
             end
         end)
     end
 
     local roleWatcher = CreateFrame('Frame')
     roleWatcher:RegisterEvent('GROUP_ROSTER_UPDATE')
+    -- Logging in or reloading while already in a group: GROUP_ROSTER_UPDATE can land before
+    -- the frames have been styled, and a member skipped for that reason is never revisited.
+    roleWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
     if C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid('PLAYER_ROLES_ASSIGNED') then
         roleWatcher:RegisterEvent('PLAYER_ROLES_ASSIGNED')
     end
