@@ -554,9 +554,31 @@ function addonTable:ApplyRaidFlowPrereqs()
     local frame = GetRaidSystemFrame()
     if not frame then return false, 'no registered raid system frame' end
 
+    -- Ask for each applier only when its own prerequisite is actually missing.
+    --
+    -- UpdateSystemSettingRaidGroupDisplayType ends in CompactRaidFrameContainer:SetGroupMode,
+    -- and that calls TryUpdate, whose first line refreshes the compact PARTY frames -
+    -- CompactUnitFrame_SetUpFrame writes optionTable on each of them, from our execution.
+    -- CompactUnitFrame_UpdateAll reads that field before the frame:Hide() the client refuses
+    -- in combat, so calling this when the group mode is already set breaks somebody else's
+    -- frames for nothing. /df log seed named this exact stack.
+    --
+    -- The sort function is harmless by comparison: for the raid system the applier writes
+    -- flowSortFunc on the container, and only the party system's variant goes through
+    -- CompactPartyFrame:SetFlowSortFunction, which is the one that refreshes members.
+    local container = _G['CompactRaidFrameContainer']
+    local haveMode = (container and container.GetGroupMode and container:GetGroupMode()) and true or false
+    local haveSort = (container and container.flowSortFunc) and true or false
+
+    if haveMode and haveSort then return true end
+
     local ok, err = pcall(function()
-        if frame.UpdateSystemSettingRaidGroupDisplayType then frame:UpdateSystemSettingRaidGroupDisplayType() end
-        if frame.UpdateSystemSettingSortPlayersBy then frame:UpdateSystemSettingSortPlayersBy() end
+        if not haveMode and frame.UpdateSystemSettingRaidGroupDisplayType then
+            frame:UpdateSystemSettingRaidGroupDisplayType()
+        end
+        if not haveSort and frame.UpdateSystemSettingSortPlayersBy then
+            frame:UpdateSystemSettingSortPlayersBy()
+        end
     end)
     if not ok then return false, err end
 

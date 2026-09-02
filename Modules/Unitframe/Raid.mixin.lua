@@ -666,19 +666,32 @@ function SubModuleMixin:Setup()
                         CompactRaidFrameManager_SetSetting('IsShown', true)
                     end
 
-                    -- Group mode and sort function first, or TryUpdate below is a no-op.
+                    -- Group mode and sort function first, or the layout below is a no-op.
                     if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
 
                     local c = _G['CompactRaidFrameContainer']
                     if c and c.ApplyToFrames and CompactRaidGroup_UpdateUnits then
                         c:ApplyToFrames('group', CompactRaidGroup_UpdateUnits)
                     end
-                    if c and c.TryUpdate then c:TryUpdate() end
+
+                    -- LayoutFrames, not TryUpdate.
+                    --
+                    -- TryUpdate calls CompactPartyFrame:RefreshMembers() on its first line
+                    -- before it lays anything out, and RefreshMembers calls
+                    -- CompactUnitFrame_SetUpFrame on every compact party member - writing
+                    -- optionTable from our execution. That field is read on the first line of
+                    -- CompactUnitFrame_UpdateAll, before the frame:Hide() the client refuses
+                    -- in combat, so opening this panel was enough to break the party frames
+                    -- for the rest of the session.
+                    --
+                    -- The layout is the only part we wanted. This is TryUpdate minus the
+                    -- party refresh and minus the arena refresh, both of which are somebody
+                    -- else's frames.
+                    if c and c.ReadyToUpdate and c.LayoutFrames and c:ReadyToUpdate() then c:LayoutFrames() end
 
                     if EditModeManagerFrame and EditModeManagerFrame.UpdateRaidContainerFlow then
                         EditModeManagerFrame:UpdateRaidContainerFlow()
                     end
-                    if UpdateRaidAndPartyFrames then UpdateRaidAndPartyFrames() end
                 end)
                 if not ok then geterrorhandler()('DFUI raid preview show: ' .. tostring(err)) end
 
@@ -706,9 +719,11 @@ function SubModuleMixin:Setup()
                         self.RaidFramesWereShown = nil
                     end
 
+                    -- Same reasoning as the show path: lay the raid container out, leave the
+                    -- party and arena frames alone. UpdateRaidAndPartyFrames is gone from
+                    -- here for the same reason - it walks straight into the party setup.
                     local c = _G['CompactRaidFrameContainer']
-                    if c and c.TryUpdate then c:TryUpdate() end
-                    if UpdateRaidAndPartyFrames then UpdateRaidAndPartyFrames() end
+                    if c and c.ReadyToUpdate and c.LayoutFrames and c:ReadyToUpdate() then c:LayoutFrames() end
                 end)
                 if not ok then geterrorhandler()('DFUI raid preview hide: ' .. tostring(err)) end
             end
