@@ -347,7 +347,7 @@ legacyEditModeWatcher:SetScript('OnEvent', function(self)
     -- SaveLayouts drags the whole layout-apply chain behind it, and that ends in
     -- SetPoint on the action bars and unit frames, which the client refuses in
     -- combat. RunOutOfCombat queues by label, so a fight only delays it.
-    Helper:RunOutOfCombat('editmode legacy cleanup', function()
+    Helper:DeferOutOfCombat('editmode legacy cleanup', function()
         local anchorsSettled = addonTable:SanitizeLegacyEditModeAnchors()
 
         -- After the anchors, because those are what made the old layout unusable and this
@@ -563,7 +563,7 @@ local function ReloadOnceLayoutIsActive()
         if not IsActiveLayoutPreset() then
             ticker:Cancel()
 
-            Helper:RunOutOfCombat('editmode layout reload', function()
+            Helper:DeferOutOfCombat('editmode layout reload', function()
                 local reload = (C_UI and C_UI.Reload) or ReloadUI
                 if reload then reload() end
             end)
@@ -964,7 +964,7 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
     end
 
     if EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and systemFrame then
-        Helper:RunOutOfCombat(label or 'unit frame edit mode setting', function()
+        Helper:DeferOutOfCombat(label or 'unit frame edit mode setting', function()
             local ok, err = pcall(EditModeManagerFrame.OnSystemSettingChange, EditModeManagerFrame, systemFrame,
                                   targetSetting, val)
             if not ok then geterrorhandler()('DFUI OnSystemSettingChange: ' .. tostring(err)) end
@@ -1004,7 +1004,7 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
         -- Raw and display form are the same 0/1 for this boolean, so val can go straight
         -- into a layout. That is not true of scaled settings - see SetLayoutSystemSetting.
         pendingLayoutSetting = {systemIndex = systemIndex, setting = setting, value = val}
-        Helper:RunOutOfCombat('party raid style layout check',
+        Helper:DeferOutOfCombat('party raid style layout check',
                               function() addonTable:EvaluateEditModeLayoutForRaidStyle() end)
     end
 
@@ -1322,7 +1322,44 @@ local pendingOrder = {}
 local combatGate
 local loadedInCombat = false
 
+-- The quiet queue, for work that is routine rather than setup.
+--
+-- RunOutOfCombat below does three things at once: it defers the work, it tells the player
+-- the UI is half-built, and when combat drops it follows the whole queue with
+-- DF:RefreshConfig() - which re-applies settings across every module in the addon.
+--
+-- That is right for what it was written for, a reload in the middle of a fight. It is
+-- wrong for anything routine, and routine callers were using it: RaidFlowWatcher on every
+-- GROUP_ROSTER_UPDATE, the vehicle button on every vehicle enter and exit, the minimap on
+-- a CVar change. In a raid that means "combat ended - finishing setup (RaidFlowWatcher)"
+-- after every pull, each one dragging a full RefreshConfig behind it - the lag spike and
+-- the chat spam people reported.
+--
+-- So this queue defers and nothing else: no loadedInCombat, no chat line, no on-screen
+-- notice, no RefreshConfig. It runs on the same PLAYER_REGEN_ENABLED gate, just before
+-- the loud one.
+local pendingQuiet = {}
+local pendingQuietOrder = {}
+
+local function DrainQuietQueue()
+    if #pendingQuietOrder == 0 then return end
+
+    for _, label in ipairs(pendingQuietOrder) do
+        local fn = pendingQuiet[label]
+        pendingQuiet[label] = nil
+
+        if fn then
+            local ok, err = pcall(fn)
+            if not ok then geterrorhandler()('DFUI deferred (' .. label .. '): ' .. tostring(err)) end
+        end
+    end
+
+    table.wipe(pendingQuietOrder)
+end
+
 local function DrainOutOfCombatQueue()
+    DrainQuietQueue()
+
     if #pendingOrder == 0 then return end
 
     local loadingState = addonTable.LoadingState
@@ -1365,6 +1402,18 @@ function Helper.ReapplyAfterCombat()
     if addonTable.LoadingState then addonTable.LoadingState:Complete() end
 end
 
+local function EnsureCombatGate()
+    if combatGate then return end
+
+    combatGate = CreateFrame('Frame')
+    combatGate:RegisterEvent('PLAYER_REGEN_ENABLED')
+    combatGate:SetScript('OnEvent', function()
+        -- PLAYER_REGEN_ENABLED fires as lockdown lifts; the next frame is
+        -- safely out of it
+        C_Timer.After(0, DrainOutOfCombatQueue)
+    end)
+end
+
 function Helper:QueueOutOfCombat(label, fn)
     loadedInCombat = true
 
@@ -1378,15 +1427,7 @@ function Helper:QueueOutOfCombat(label, fn)
     -- addon
     if addonTable.LoadingState then addonTable.LoadingState:ShowWaiting(pendingOrder) end
 
-    if not combatGate then
-        combatGate = CreateFrame('Frame')
-        combatGate:RegisterEvent('PLAYER_REGEN_ENABLED')
-        combatGate:SetScript('OnEvent', function()
-            -- PLAYER_REGEN_ENABLED fires as lockdown lifts; the next frame is
-            -- safely out of it
-            C_Timer.After(0, DrainOutOfCombatQueue)
-        end)
-    end
+    EnsureCombatGate()
 end
 
 -- Did this session start (or reload) mid-combat? Anything that wants to explain
@@ -1395,7 +1436,35 @@ function Helper:LoadedInCombat()
     return loadedInCombat
 end
 
+-- Run now when it is safe, otherwise once combat drops - quietly.
+--
+-- For work that happens over and over in normal play: roster updates, vehicle seats, a
+-- CVar flipping, a setting being written. It defers and that is all. Nothing is said to
+-- the player, because nothing is wrong, and no RefreshConfig follows it, because one
+-- deferred call does not mean the whole interface needs rebuilding.
+--
+-- Use RunOutOfCombat instead when a module could not finish setting itself up at all -
+-- that is a half-built UI, and it is worth both the explanation and the re-apply.
+function Helper:DeferOutOfCombat(label, fn)
+    if not Helper:IsCombatLocked() then
+        fn()
+
+        return
+    end
+
+    if not pendingQuiet[label] then table.insert(pendingQuietOrder, label) end
+    pendingQuiet[label] = fn
+
+    if #perfLog < 400 then perfLog[#perfLog + 1] = 'deferred ' .. label .. ' quietly to end of combat' end
+
+    EnsureCombatGate()
+end
+
 -- Run now when it is safe, otherwise once combat drops.
+--
+-- The loud one: it marks the session as having loaded in combat, tells the player, and has
+-- DF:RefreshConfig() run once the queue is done. Reserved for module setup that the client
+-- refused outright - see DeferOutOfCombat for everything routine.
 function Helper:RunOutOfCombat(label, fn)
     if not Helper:IsCombatLocked() then
         fn()

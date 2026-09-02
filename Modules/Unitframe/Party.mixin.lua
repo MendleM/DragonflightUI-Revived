@@ -287,7 +287,7 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     end
 
     -- Safely trigger Blizzard updates out of combat on a clean tick
-    Helper:RunOutOfCombat('RaidStylePartyFrames', function()
+    Helper:DeferOutOfCombat('RaidStylePartyFrames', function()
         C_Timer.After(0, function()
             if InCombatLockdown() then return end
             -- EditModeManagerFrame:UpdateSystem, not PartyFrame:UpdateSystem.

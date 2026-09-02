@@ -856,7 +856,7 @@ function SubModuleMixin:Setup()
                 -- Outside a raid none of it is needed: the raid settings only shape raid
                 -- frames and the container has nothing to lay out. Inside one, the compact
                 -- party frame is not the active display anyway.
-                Helper:RunOutOfCombat('RaidFlowWatcher', function()
+                Helper:DeferOutOfCombat('RaidFlowWatcher', function()
                     -- Push the stored settings back onto Blizzard's system frame.
                     --
                     -- Nothing else does it: the layout the client applies at login can be a

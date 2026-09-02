@@ -406,7 +406,7 @@ function SubModuleMixin:Update()
     -- in its own right.
     if self:IsDisabled() then
         f:Hide()
-        Helper:RunOutOfCombat('VehicleLeaveDisable', function() btn:Hide() end)
+        Helper:DeferOutOfCombat('VehicleLeaveDisable', function() btn:Hide() end)
         return
     end
 
@@ -415,7 +415,7 @@ function SubModuleMixin:Update()
     -- Toggling back on should not wait for the next vehicle event to take
     -- effect. Out of combat only: showing and enabling this button is a
     -- protected call, and a settings change is not worth an error over.
-    Helper:RunOutOfCombat('VehicleLeaveRefresh', function() self:OnEvent('DFUI_SETTINGS_CHANGED') end)
+    Helper:DeferOutOfCombat('VehicleLeaveRefresh', function() self:OnEvent('DFUI_SETTINGS_CHANGED') end)
 
     -- f:UpdateStateHandler(state)
 end

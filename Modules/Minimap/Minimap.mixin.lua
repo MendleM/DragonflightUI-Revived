@@ -129,7 +129,7 @@ end
 local rotateMinimapWatcher = CreateFrame('Frame')
 rotateMinimapWatcher:SetScript('OnEvent', function()
     if not HasEditModeRotateSetting() then return end
-    Helper:RunOutOfCombat('minimap rotate reassert', function()
+    Helper:DeferOutOfCombat('minimap rotate reassert', function()
         SubModuleMixin.ApplyRotateMinimap()
     end)
 end)
