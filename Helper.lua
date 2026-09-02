@@ -523,32 +523,46 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
     -- without it that character would get a fresh copy while the renamed one sat unused.
     HandleLegacyLayout()
 
-    -- One attempt per character, ever. Recorded before the reload so it survives it.
+    -- One attempt per character, and the flag goes down only immediately before the call
+    -- that changes something - never up here.
     --
-    -- Without this a layout that fails to come back - name taken, no free slot, server
-    -- said no - would have us reload at the next login, and the one after, forever. A
-    -- reload loop is the one outcome here that is worse than the taint.
+    -- Setting it on the way in burns the single attempt on every early return below, and
+    -- several of those are conditions that say nothing about whether it would work:
+    -- layoutInfo not loaded yet, an Enum missing on this flavour, a pcall that threw. That
+    -- is how this ended up reporting "already tried" on a character that had no layout.
+    --
+    -- What it does have to cover is the reload: once SelectLayout or MakeNewLayout has run
+    -- we reload, and if the layout did not come back - no free slot, server refused - a
+    -- second attempt would reload again at the next login, and again, forever.
     local charDB = DF.db and DF.db.char
     if charDB and charDB.raidStyleLayoutAttempted then
         if not managedLayoutFallbackTold then
             managedLayoutFallbackTold = true
             DF:Print('Your active Edit Mode layout is a preset and cannot store the raid-style party frame ' ..
                          'setting, so DragonflightUI has to re-apply it every login. Switching to a layout of your ' ..
-                         'own in Blizzard\'s Edit Mode avoids that.')
+                         'own in Blizzard\'s Edit Mode avoids that, and |cffffff78/df layoutretry|r tries again.')
         end
 
         return true
     end
-    if charDB then charDB.raidStyleLayoutAttempted = true end
+
+    local function MarkAttempted()
+        if charDB then charDB.raidStyleLayoutAttempted = true end
+    end
 
     -- Another character already made it - just switch to it, no second copy.
     local existing = FindManagedLayoutIndex()
     if existing and EditModeManagerFrame.SelectLayout then
+        MarkAttempted()
         ReloadWhenLayoutsLand()
 
-        if pcall(EditModeManagerFrame.SelectLayout, EditModeManagerFrame, existing) then
+        local ok, err = pcall(EditModeManagerFrame.SelectLayout, EditModeManagerFrame, existing)
+        if ok then
             DF:Print('Switching to the |cffffff78' .. MANAGED_LAYOUT_NAME ..
                          '|r Edit Mode layout, which can store the raid-style party frame setting. Reloading.')
+        else
+            DF:Print('Could not switch to the |cffffff78' .. MANAGED_LAYOUT_NAME .. '|r Edit Mode layout: ' ..
+                         tostring(err))
         end
 
         return true
@@ -565,18 +579,31 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
         end
     end
 
+    -- Every abort from here down says what happened. They used to be silent, which left
+    -- "nothing happened and no message" as the only symptom of a fix that never ran.
     if C_EditMode and C_EditMode.IsValidLayoutName then
         local ok, valid = pcall(C_EditMode.IsValidLayoutName, MANAGED_LAYOUT_NAME)
-        if ok and not valid then return true end
+        if ok and not valid then
+            DF:Print('The game rejected |cffffff78' .. MANAGED_LAYOUT_NAME ..
+                         '|r as an Edit Mode layout name, so the raid-style party setting cannot be stored.')
+
+            return true
+        end
     end
 
     local layoutType = Enum.EditModeLayoutType and Enum.EditModeLayoutType.Account
     if not (layoutType and EditModeManagerFrame.MakeNewLayout and EditModeManagerFrame.GetActiveLayoutInfo) then
+        DF:Debug(DF, 'editmode layout: MakeNewLayout/GetActiveLayoutInfo/LayoutType.Account not available')
+
         return true
     end
 
     local gotActive, active = pcall(EditModeManagerFrame.GetActiveLayoutInfo, EditModeManagerFrame)
-    if not (gotActive and active) then return true end
+    if not (gotActive and active) then
+        DF:Debug(DF, 'editmode layout: GetActiveLayoutInfo gave nothing to copy')
+
+        return true
+    end
 
     -- CopyTable, because MakeNewLayout writes layoutType and layoutName straight onto what
     -- it is handed - and what it is handed here would otherwise be the live preset.
@@ -590,12 +617,18 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
                                pending.value)
     end
 
+    MarkAttempted()
     ReloadWhenLayoutsLand()
 
     local isImported = false
-    local made = pcall(EditModeManagerFrame.MakeNewLayout, EditModeManagerFrame, newLayout, layoutType,
-                       MANAGED_LAYOUT_NAME, isImported)
-    if not made then return true end
+    local made, err = pcall(EditModeManagerFrame.MakeNewLayout, EditModeManagerFrame, newLayout, layoutType,
+                            MANAGED_LAYOUT_NAME, isImported)
+    if not made then
+        DF:Print('Could not add the |cffffff78' .. MANAGED_LAYOUT_NAME .. '|r Edit Mode layout: ' .. tostring(err) ..
+                     '. |cffffff78/df layoutretry|r tries again.')
+
+        return true
+    end
 
     DF:Print('Added an Edit Mode layout called |cffffff78' .. MANAGED_LAYOUT_NAME ..
                  '|r - a copy of the preset you were on - so the raid-style party frame setting can be stored ' ..
@@ -611,6 +644,21 @@ end
 -- answers "not a preset" for every layout - which would skip this silently. So the
 -- write records that it happened and the answer is picked up once the layouts land, on
 -- the same event the legacy-layout watcher already waits for.
+-- Hand the one attempt back, for /df layoutretry.
+--
+-- The attempt is spent whether or not a layout appeared, because that is what keeps a
+-- failed one from reloading the game on a loop. When it did fail there has to be a way
+-- back in that does not involve editing SavedVariables with the game shut down.
+function addonTable:ResetEditModeLayoutAttempt()
+    local charDB = DF.db and DF.db.char
+    if not charDB then return false end
+
+    charDB.raidStyleLayoutAttempted = false
+    managedLayoutFallbackTold = false
+
+    return true
+end
+
 -- Holds the setting itself, not just a yes, so a layout created later can be born with
 -- the right value in it.
 local pendingLayoutSetting = nil

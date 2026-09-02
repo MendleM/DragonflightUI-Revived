@@ -527,6 +527,19 @@ function Module:SlashCommand(input)
         return
     end
 
+    -- /df layoutretry - hand back the one attempt at adding an Edit Mode layout that can
+    -- store the raid-style party setting, then reload so it runs again on the way up.
+    -- See Helper.lua:ResetEditModeLayoutAttempt.
+    if cmd == 'layoutretry' then
+        if addonTable.ResetEditModeLayoutAttempt and addonTable:ResetEditModeLayoutAttempt() then
+            DF:Print('Edit Mode layout attempt reset - reloading to try again.')
+
+            local reload = (C_UI and C_UI.Reload) or ReloadUI
+            if reload then reload() end
+        end
+        return
+    end
+
     -- /df raidnotice - bring back the explanation of where raid-style party frame
     -- appearance is configured. force=true skips both the dismissed flag and the
     -- once-per-session guard, because this is the player asking for it.
