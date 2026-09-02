@@ -856,13 +856,17 @@ function SubModuleMixin:Setup()
                 -- Outside a raid none of it is needed: the raid settings only shape raid
                 -- frames and the container has nothing to lay out. Inside one, the compact
                 -- party frame is not the active display anyway.
-                if not (IsInRaid and IsInRaid()) then return end
-
                 Helper:RunOutOfCombat('RaidFlowWatcher', function()
-                    -- Push the stored settings back onto Blizzard's system frame first.
-                    -- Nothing else does it: the layout the client applies at login is a
-                    -- preset carrying its own numbers, so without this the profile is never
-                    -- consulted and frame width and friends fall back on every reload.
+                    -- Push the stored settings back onto Blizzard's system frame.
+                    --
+                    -- Nothing else does it: the layout the client applies at login can be a
+                    -- preset carrying its own numbers, and a preset cannot hold ours -
+                    -- SaveLayoutChanges refuses to write into one. Without this the profile
+                    -- is never consulted and frame width and friends fall back every reload.
+                    --
+                    -- Not gated on being in a raid. The mirror below is what carries these
+                    -- values to raid-style party frames, and those are used in a party -
+                    -- gating the whole block was a regression that lost them on every login.
                     local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile
                     local saved = profile and profile.raid and profile.raid.blizzSettings
 
@@ -881,9 +885,20 @@ function SubModuleMixin:Setup()
                         end
                     end
 
-                    -- No separate TryUpdate afterwards. SetGroupMode calls it itself, so the
-                    -- extra call only ran RefreshMembers a second time - a second write to
-                    -- optionTable from our execution for no gain.
+                    -- The flow prerequisites are the part that has to stay out of a party.
+                    --
+                    -- ApplyRaidFlowPrereqs ends in CompactRaidFrameContainer:SetGroupMode,
+                    -- which calls TryUpdate, whose first line is
+                    -- CompactPartyFrame:RefreshMembers() - and that writes optionTable on
+                    -- every compact party member from our execution. UpdateAll reads that
+                    -- field on its first line, before the frame:Hide() the client refuses in
+                    -- combat. /df log seed named this exact stack.
+                    --
+                    -- Outside a raid the container has nothing to lay out anyway, so there is
+                    -- nothing to lose by staying away. No separate TryUpdate afterwards
+                    -- either: SetGroupMode calls it itself.
+                    if not (IsInRaid and IsInRaid()) then return end
+
                     if addonTable.ApplyRaidFlowPrereqs then addonTable:ApplyRaidFlowPrereqs() end
                 end)
             end)

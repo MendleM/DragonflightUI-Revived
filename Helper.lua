@@ -620,6 +620,26 @@ function addonTable:MirrorRaidSettingToParty(setting, value)
     if setting == nil or value == nil then return false end
     if not (Enum and Enum.EditModeUnitFrameSystemIndices) then return false end
 
+    -- Every mirrored setting but one is safe, and the exception is worth naming.
+    --
+    -- The appliers this reaches on the party system end in PartyFrame:UpdatePaddingAndLayout
+    -- (EditModeSystemTemplates.lua:1442) or a plain SetAlpha - frame width, height, border,
+    -- template, icon size, opacity all go through
+    -- UpdateCompactRaidFrameContainerSetting, whose party branch never calls TryUpdate.
+    --
+    -- SortPlayersBy is the exception. Its party branch is
+    --
+    --   CompactPartyFrame:SetFlowSortFunction(sortFunc)   -- :1507
+    --
+    -- and CompactPartyFrameMixin:SetFlowSortFunction calls self:RefreshMembers() on its
+    -- second line, which writes optionTable on every compact party member from our
+    -- execution. That field is read on the first line of CompactUnitFrame_UpdateAll, before
+    -- the frame:Hide() the client refuses in combat - the one seed that breaks the party
+    -- frames outright. A sort order is not worth that, so it is skipped.
+    if Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.SortPlayersBy then
+        return false
+    end
+
     local frame = GetPartySystemFrame()
     if not (frame and frame.HasSetting) then return false end
 
