@@ -568,6 +568,34 @@ function addonTable:EnsureSaveableEditModeLayout(pending)
         return true
     end
 
+    -- MakeNewLayout indexes self.highestLayoutIndexByType to work out where the new layout
+    -- goes, and that field is built in exactly one place:
+    --
+    --   EditModeManagerFrameMixin:CreateLayoutTbls()
+    --       self.highestLayoutIndexByType = {};
+    --
+    -- which runs when Blizzard builds its layout dropdown - so only once its Edit Mode has
+    -- been opened. This addon never opens it, so in a normal session the field is nil and
+    -- MakeNewLayout dies on it: "attempt to index field 'highestLayoutIndexByType'".
+    --
+    -- CreateLayoutTbls is a plain pass over layoutInfo.layouts with no UI side effects, so
+    -- Blizzard gets asked to do its own bookkeeping rather than us inventing that field.
+    -- Ahead of AreLayoutsFullyMaxed as well, which counts from the same data.
+    if not EditModeManagerFrame.highestLayoutIndexByType then
+        if EditModeManagerFrame.CreateLayoutTbls then
+            pcall(EditModeManagerFrame.CreateLayoutTbls, EditModeManagerFrame)
+        end
+
+        -- Still nothing, so MakeNewLayout would only throw again. Leave the attempt
+        -- unspent: a later login, with Blizzard's Edit Mode further along, can retry.
+        if not EditModeManagerFrame.highestLayoutIndexByType then
+            DF:Print('Blizzard\'s Edit Mode has not finished setting up its layout list, so the |cffffff78' ..
+                         MANAGED_LAYOUT_NAME .. '|r layout could not be added yet. It will be tried again.')
+
+            return true
+        end
+    end
+
     if EditModeManagerFrame.AreLayoutsFullyMaxed then
         local ok, maxed = pcall(EditModeManagerFrame.AreLayoutsFullyMaxed, EditModeManagerFrame)
         if ok and maxed then
