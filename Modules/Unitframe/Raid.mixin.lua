@@ -874,10 +874,30 @@ function SubModuleMixin:Setup()
                         for key, value in pairs(saved) do
                             local setting = tonumber(key)
                             if setting and value ~= nil then
-                                addonTable:SetRaidEditModeSettingBySetting(setting, value)
+                                -- The raid system's own appliers, only in a raid.
+                                --
+                                -- Nearly every one of them funnels into
+                                -- EditModeManagerFrame:UpdateRaidContainerFlow or
+                                -- CompactRaidFrameContainer:SetGroupMode, and both end in
+                                -- TryUpdate, whose first line is
+                                -- CompactPartyFrame:RefreshMembers() - writing optionTable on
+                                -- every compact party member from our execution. ViewRaidSize
+                                -- calls TryUpdate outright, at EditModeSystemTemplates.lua:1441.
+                                -- Only Opacity is harmless, it just does SetAlpha.
+                                --
+                                -- Outside a raid there is no container to arrange, so this is
+                                -- pure cost. /df log seed caught it through ViewRaidSize.
+                                if IsInRaid and IsInRaid() then
+                                    addonTable:SetRaidEditModeSettingBySetting(setting, value)
+                                end
 
-                                -- Same mirror as the setter, or raid-style party frames come
-                                -- back at the party system's own numbers after a reload.
+                                -- The mirror runs regardless, and it is the half that matters
+                                -- in a party: raid-style party frames read their size from the
+                                -- PARTY system - CompactUnitFrame asks
+                                -- GetRaidFrameWidth(frame.groupType), and groupType is the
+                                -- system index. The party appliers end in
+                                -- PartyFrame:UpdatePaddingAndLayout, not TryUpdate, so this is
+                                -- safe. Helper skips SortPlayersBy, the one exception.
                                 if addonTable.MirrorRaidSettingToParty then
                                     addonTable:MirrorRaidSettingToParty(setting, value)
                                 end
