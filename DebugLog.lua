@@ -1624,6 +1624,36 @@ function DF:LogPartyTaint(tag)
             end
         end
 
+        -- What the party system frame itself answers, and whether the layout can keep it.
+        --
+        -- Two things decide whether this addon has to apply the setting at all. If
+        -- PartyFrame already reports the wanted value, applying it again is pointless and
+        -- taints the compact party frames for nothing - Blizzard writes optionTable on each
+        -- of them from inside our call. And if the active layout is a preset, or there is no
+        -- saved layout at all, the value cannot be persisted on Blizzard's side, so it will
+        -- never be there at login and we are forced to apply it every session.
+        local pf = _G['PartyFrame']
+        if pf and pf.GetSettingValue and Enum and Enum.EditModeUnitFrameSetting then
+            local setting = Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames
+            local hasIt, has = pcall(pf.HasSetting, pf, setting)
+            local okVal, value = pcall(pf.GetSettingValue, pf, setting)
+
+            DF:Log(tag, 'PartyFrame setting UseRaidStylePartyFrames: HasSetting=%s value=%s (read ok=%s)',
+                   tostring(hasIt and has), tostring(value), tostring(okVal))
+        else
+            DF:Log(tag, 'PartyFrame setting UseRaidStylePartyFrames: no GetSettingValue on the frame')
+        end
+
+        if C_EditMode and C_EditMode.GetLayouts then
+            local gotLayouts, layoutInfo = pcall(C_EditMode.GetLayouts)
+            local saved = (gotLayouts and layoutInfo and layoutInfo.layouts) and #layoutInfo.layouts or -1
+            local isPreset = EditModeManagerFrame.IsActiveLayoutPreset and
+                                 select(2, pcall(EditModeManagerFrame.IsActiveLayoutPreset, EditModeManagerFrame))
+
+            DF:Log(tag, 'edit mode layout: preset=%s saved (non-preset) layouts=%s', tostring(isPreset),
+                   tostring(saved))
+        end
+
         -- The call itself, which is what ShouldShow actually asks.
         if EditModeManagerFrame.UseRaidStylePartyFrames then
             local ok, value = pcall(EditModeManagerFrame.UseRaidStylePartyFrames, EditModeManagerFrame)
