@@ -37,7 +37,14 @@ DF.ChangelogData = {
                     'No more "combat ended - finishing setup" after a group invite, and no frame drop with it.',
                     'Leftover DragonflightUI_Layout is renamed and reused, or removed - the delete-it-yourself popup is gone.',
                     'The raid-style party frame setting is stored where the game can apply it itself.',
-                    'Party members get their class colour as soon as the game knows it, instead of staying white.'
+                    'Party members get their class colour as soon as the game knows it, instead of staying white.',
+                    'Disabling the Action Bar module in settings no longer blocks mouse clicks across the screen.'
+                }
+            }, {
+                title = 'Action Bars',
+                items = {
+                    'Fixed mouse clicks being blocked across the screen when the Action Bar module was disabled in settings.',
+                    'Micro menu and bag bar holder frames no longer span full-screen and are properly hidden when deactivated.'
                 }
             }, {
                 title = 'Unit Frames',
