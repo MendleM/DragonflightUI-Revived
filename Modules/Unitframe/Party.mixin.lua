@@ -18,17 +18,11 @@ local function TextStatusBar_UpdateTextString(f)
 end
 
 -- The health and mana readouts that sit INSIDE the bars (Interface -> Status
--- Text, off by default). The ones the classic reskin creates inherit
--- TextStatusBarText, which is sized for Blizzard's bars - ours are 10 and 7
--- pixels tall, so the numbers spilled out of them.
+-- Text, off by default).
 --
--- "Blizzard's own strings on the pooled frames" used to be the other half of
--- that sentence, and there are none. See EnsureBarStatusText.
-local STATUS_TEXT_KEYS = {'TextString', 'LeftText', 'RightText', 'DFTextString', 'DFLeftText', 'DFRightText'}
-
--- The pooled bars have every part of the status text machinery except somewhere
--- to put it. They inherit TextStatusBar, call InitializeTextStatusBar, set
--- `cvar = "statusText"` and `textLockable = 1`, and the mixin re-runs
+-- The pooled bars have every part of Blizzard's status text machinery except
+-- somewhere to put it. They inherit TextStatusBar, call InitializeTextStatusBar,
+-- set `cvar = "statusText"` and `textLockable = 1`, and the mixin re-runs
 -- UpdateTextString on every value change, on CVAR_UPDATE and on mouseover. But
 -- UpdateTextString opens with
 --
@@ -38,19 +32,11 @@ local STATUS_TEXT_KEYS = {'TextString', 'LeftText', 'RightText', 'DFTextString',
 -- and on 1.15.9 no unit frame has one. The TextStatusBar template carries only
 -- scripts and a mixin - no FontStrings - and in the whole client only
 -- Blizzard_PetBattleUI and the personal resource display declare a TextString.
--- Player, target and party bars all inherit the behaviour and none of them
--- supply the string, so the readouts were never being hidden or mis-sized:
--- there was nothing for the numbers to land in.
 --
--- That is why the earlier pass here did not fix it. FitBarStatusText resizes
--- the strings, and on a pooled frame all six keys are nil, so it had nothing to
--- resize and reported no error.
---
--- Supplying the three strings is the entire fix. Blizzard's own code then fills
--- them on every value change, shows and hides them from the Status Text option,
--- switches between numeric, percentage and both, and reveals them on mouseover
--- through lockShow. LeftText and RightText matter: the "both" display mode
--- writes the percentage and the value into them rather than into TextString.
+-- Handing Blizzard the missing string is what this used to do, and it worked -
+-- at the cost of a field of ours on a protected frame that Blizzard reads on
+-- every update. That was the party taint. The strings are ours now, kept off the
+-- bars entirely; see CreateBarStatusText and UpdateBarStatusText below.
 local function GetDFUIUnitframeFont()
     local newFont = 'Fonts\\FRIZQT__.ttf'
     local locale = GetLocale()
@@ -66,8 +52,30 @@ local function GetDFUIUnitframeFont()
     return newFont
 end
 
-local function EnsureBarStatusText(bar)
-    if not (bar and bar.CreateFontString) or bar.TextString then return end
+-- Why these strings are not handed to Blizzard.
+--
+-- Supplying bar.TextString was the whole fix above, and it was also a taint seed of
+-- the first order. TextStatusBarMixin:UpdateTextString opens with
+--
+--     local textString = self.TextString;
+--
+-- at TextStatusBar.lua:85, and that line runs at the end of every health and power
+-- update. A field written by an addon and read back there hands our taint to
+-- Blizzard's own execution - so everything it wrote next came out insecure too:
+-- statusbar.currValue, statusbar.disconnected, healthbar.unit, and finally
+-- member.unit through UnitFrame_SetUnit. That is what refused SetAttribute, Show
+-- and Hide on pooled party members in combat.
+--
+-- The strings therefore live in memberState, keyed by the frame, and are filled by
+-- UpdateBarStatusText below - a reading of Blizzard's own display logic, from our
+-- own execution. Blizzard's UpdateTextString still runs on these bars and still
+-- finds self.TextString nil, which is exactly the state every other unit frame on
+-- 1.15.9 is in.
+--
+-- CreateFontString does not count: it parents a region to the bar without writing a
+-- named field onto it, and Blizzard never looks the children up.
+local function CreateBarStatusText(bar)
+    if not (bar and bar.CreateFontString) then return nil end
 
     local function make(point, x)
         local fs = bar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
@@ -76,26 +84,121 @@ local function EnsureBarStatusText(bar)
         return fs
     end
 
-    bar.TextString = make('CENTER', 0)
-    bar.LeftText = make('LEFT', 2)
-    bar.RightText = make('RIGHT', -2)
-
-    -- Nothing has changed value yet, so ask for the first fill rather than
-    -- waiting for the member to take damage.
-    if bar.UpdateTextString then bar:UpdateTextString() end
+    return {center = make('CENTER', 0), left = make('LEFT', 2), right = make('RIGHT', -2)}
 end
 
-local function FitBarStatusText(bar)
-    if not bar or not bar.GetHeight then return end
+local function FitBarStatusText(bar, texts)
+    if not (bar and bar.GetHeight and texts) then return end
 
     local size = ((bar:GetHeight() or 10) >= 12) and 10 or 9
     local fontFile = GetDFUIUnitframeFont()
 
-    for _, key in ipairs(STATUS_TEXT_KEYS) do
-        local text = bar[key]
-        if text and text.SetFont then
-            text:SetFont(fontFile, size, 'OUTLINE')
+    for _, fs in pairs(texts) do
+        if fs and fs.SetFont then fs:SetFont(fontFile, size, 'OUTLINE') end
+    end
+end
+
+-- Blizzard's TextStatusBarMixin:UpdateTextStringWithValues, in the parts that apply
+-- to a party health or power bar.
+--
+-- Left out on purpose: prefix and alwaysPrefix (never set on these bars), pauseUpdates
+-- and controlsShownState (they decide whether to hide the BAR, which is Blizzard's
+-- business and not a text concern), and numericDisplayTransformFunc (unused here).
+-- The rest is the same order of decisions Blizzard makes, so the Status Text option
+-- and its display modes keep behaving as players expect.
+-- C_CVar.GetCVar is the documented form; the bare global is an alias that still works
+-- and is what Blizzard's own TextStatusBar.lua uses on 1.15.9. Prefer the namespaced
+-- one and fall back, the same shape as EditmodePreview.mixin.lua.
+--
+-- The CVars themselves are not deprecated: statusText and statusTextDisplay are still
+-- where the Status Text option lives. What was replaced is the old interface options
+-- panel, by the Settings API - and Settings writes these very CVars.
+local function ReadCVar(name)
+    if C_CVar and C_CVar.GetCVar then return C_CVar.GetCVar(name) end
+    if GetCVar then return GetCVar(name) end
+    return nil
+end
+
+local function UpdateBarStatusText(bar, texts, breakUpLargeNumbers, mouseover)
+    if not (bar and texts and bar.GetValue) then return end
+
+    local center, left, right = texts.center, texts.left, texts.right
+    local function hideAll()
+        for _, fs in pairs(texts) do
+            if fs then
+                fs:SetText('')
+                fs:Hide()
+            end
         end
+    end
+
+    left:SetText('')
+    right:SetText('')
+    left:Hide()
+    right:Hide()
+
+    local value = bar:GetValue()
+    local _, valueMax = bar:GetMinMaxValues()
+    if not (value and valueMax) or valueMax <= 0 then
+        hideAll()
+        return
+    end
+
+    -- Blizzard's gate: the statusText CVar, or a mouseover that lifted lockShow.
+    -- forceHideText is Blizzard's own opt-out and is honoured, not overwritten.
+    local cvarOn = ReadCVar('statusText') == '1'
+    local locked = (bar.lockShow or 0) > 0
+    if bar.forceHideText or not (cvarOn or locked or mouseover or bar.forceShow) then
+        hideAll()
+        return
+    end
+
+    if value == 0 and bar.zeroText then
+        center:SetText(bar.zeroText)
+        center:Show()
+        return
+    end
+
+    local valueDisplay, valueMaxDisplay
+    if bar.capNumericDisplay then
+        valueDisplay, valueMaxDisplay = AbbreviateLargeNumbers(value), AbbreviateLargeNumbers(valueMax)
+    elseif breakUpLargeNumbers then
+        valueDisplay, valueMaxDisplay = BreakUpLargeNumbers(value), BreakUpLargeNumbers(valueMax)
+    else
+        valueDisplay, valueMaxDisplay = tostring(value), tostring(valueMax)
+    end
+
+    local numeric = bar.disableMaxValue and valueDisplay or (valueDisplay .. ' / ' .. valueMaxDisplay)
+    local percent = math.ceil((value / valueMax) * 100) .. '%'
+
+    -- Same precedence Blizzard uses: the bar's own overrides beat the CVar.
+    local mode = ReadCVar('statusTextDisplay') or 'NUMERIC'
+    if bar.showNumeric and bar.showPercentage then
+        mode = 'BOTH'
+    elseif bar.showNumeric then
+        mode = 'NUMERIC'
+    elseif bar.showPercentage then
+        mode = 'PERCENT'
+    end
+    if bar.disablePercentages and mode == 'PERCENT' then mode = 'NUMERIC' end
+
+    if mode == 'BOTH' then
+        -- Blizzard splits this across LeftText and RightText, and only shows the
+        -- percentage on the left for mana or a non-power bar.
+        if not bar.disablePercentages and (not bar.powerToken or bar.powerToken == 'MANA') then
+            left:SetText(percent)
+            left:Show()
+        end
+        right:SetText(valueDisplay)
+        right:Show()
+        center:SetText('')
+        center:Hide()
+    elseif mode == 'PERCENT' then
+        center:SetText(percent)
+        center:Show()
+    else
+        center:SetText(numeric)
+        center:Show()
     end
 end
 
@@ -974,12 +1077,36 @@ function SubModuleMixin:SetupModern()
             st.manaMask = manaMask
         end
 
-        -- Create before fitting: there is nothing to size until these exist.
-        EnsureBarStatusText(pf.HealthBar)
-        EnsureBarStatusText(pf.ManaBar)
+        -- Create before fitting: there is nothing to size until these exist. Kept in
+        -- memberState rather than on the bars - the comment at CreateBarStatusText has
+        -- the reason.
+        st.healthText = st.healthText or CreateBarStatusText(pf.HealthBar)
+        st.manaText = st.manaText or CreateBarStatusText(pf.ManaBar)
 
-        FitBarStatusText(pf.HealthBar)
-        FitBarStatusText(pf.ManaBar)
+        FitBarStatusText(pf.HealthBar, st.healthText)
+        FitBarStatusText(pf.ManaBar, st.manaText)
+
+        -- Mouseover reveals the readout even with Status Text off. Blizzard does this
+        -- with lockShow, but ShowStatusBarText bails on `if ( self and self.TextString )`
+        -- - which is nil now - so the flag never moves and we track it ourselves.
+        --
+        -- HookScript, not a script replacement: it appends to the frame's handler list
+        -- without writing a field onto the frame.
+        if not st.mouseHooked and pf.HookScript then
+            st.mouseHooked = true
+            pf:HookScript('OnEnter', function()
+                local own = memberState[pf]
+                if not own then return end
+                own.mouseover = true
+                pcall(UpdateBars, pf)
+            end)
+            pf:HookScript('OnLeave', function()
+                local own = memberState[pf]
+                if not own then return end
+                own.mouseover = false
+                pcall(UpdateBars, pf)
+            end)
+        end
 
         -- NOTE: lifting the bars above PartyMemberOverlay was tried here to
         -- test whether the overlay art was dimming them. It made the bars
@@ -1128,7 +1255,12 @@ function SubModuleMixin:SetupModern()
             end
             if tex and tex.SetDesaturated then tex:SetDesaturated(not connected) end
             healthbar:SetStatusBarColor(r * shade, g * shade, b * shade, 1)
-            EnsureMask(healthbar, memberState[pf] and memberState[pf].hpMask)
+
+            local st = memberState[pf]
+            EnsureMask(healthbar, st and st.hpMask)
+            if st and st.healthText then
+                UpdateBarStatusText(healthbar, st.healthText, state and state.breakUpLargeNumbers, st.mouseover)
+            end
         end
     end
 
@@ -1147,7 +1279,13 @@ function SubModuleMixin:SetupModern()
             if manabar.SetStatusBarDesaturated then manabar:SetStatusBarDesaturated(false) end
             if tex and tex.SetDesaturated then tex:SetDesaturated(false) end
             manabar:SetStatusBarColor(shade, shade, shade, 1)
-            EnsureMask(manabar, memberState[pf] and memberState[pf].manaMask)
+
+            local st = memberState[pf]
+            EnsureMask(manabar, st and st.manaMask)
+            if st and st.manaText then
+                local profile = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
+                UpdateBarStatusText(manabar, st.manaText, profile and profile.breakUpLargeNumbers, st.mouseover)
+            end
         end
     end
 
@@ -1310,10 +1448,20 @@ function SubModuleMixin:SetupModern()
     -- UNIT_* events, which must always be unit-filtered on this client.
     roleWatcher:RegisterEvent('UNIT_DISPLAYPOWER')
     roleWatcher:RegisterEvent('UNIT_CONNECTION')
+
+    -- Interface -> Status Text, and its display mode. Blizzard's own bars redraw from
+    -- TextStatusBar's CVAR_UPDATE handler, which now finds no TextString on these, so
+    -- the readouts are ours to refresh.
+    roleWatcher:RegisterEvent('CVAR_UPDATE')
+
     roleWatcher:SetScript('OnEvent', function(_, event, unit)
         if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
-        local barsOnly = (event == 'UNIT_DISPLAYPOWER' or event == 'UNIT_CONNECTION')
-        if barsOnly and not (unit and unit:find('party', 1, true)) then return end
+
+        local barsOnly = (event == 'UNIT_DISPLAYPOWER' or event == 'UNIT_CONNECTION' or event == 'CVAR_UPDATE')
+
+        -- CVAR_UPDATE carries a CVar name in the same argument slot, not a unit, so the
+        -- unit filter below would throw it away. It concerns every member equally.
+        if barsOnly and event ~= 'CVAR_UPDATE' and not (unit and unit:find('party', 1, true)) then return end
         for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
             if memberState[pf] and memberState[pf].styled then
                 if not barsOnly then pcall(UpdateRoleIcon, pf) end
