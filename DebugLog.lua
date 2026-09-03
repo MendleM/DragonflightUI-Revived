@@ -1439,8 +1439,12 @@ local function LogRaidStyleChain(tag)
     if emm and emm.layoutInfo then
         local active = emm.layoutInfo.activeLayout
         local layout = emm.layoutInfo.layouts and emm.layoutInfo.layouts[active]
-        DF:Log(tag, 'raid style chain 4/5 active layout index=%s name=%s type=%s (1=preset)', tostring(active),
-               tostring(layout and layout.layoutName), tostring(layout and layout.layoutType))
+        -- Enum.EditModeLayoutType: Preset 0, Account 1, Character 2. Named rather than
+        -- numbered, because reading 1 as "preset" sent this investigation sideways once.
+        local kinds = {[0] = 'preset', [1] = 'account', [2] = 'character'}
+        local kind = layout and layout.layoutType
+        DF:Log(tag, 'raid style chain 4/5 active layout index=%s name=%s type=%s (%s)', tostring(active),
+               tostring(layout and layout.layoutName), tostring(kind), kinds[kind] or 'unknown')
     end
 
     local pf, cpf = _G['PartyFrame'], _G['CompactPartyFrame']
