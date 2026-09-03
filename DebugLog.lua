@@ -1371,6 +1371,84 @@ local function LogShouldShowReadPath(tag)
     end
 end
 
+-- Every station the raid-style setting passes through, in order.
+--
+-- "Gruppe als Schlachtzug anzeigen" is stored rather than applied - the applier taints
+-- both party displays when it is run from addon code - so it is meant to take effect on
+-- the next load. When it does not, the question is which station dropped it:
+--
+--   1. our profile          party.useCompactPartyFrames
+--   2. the CVar             useCompactPartyFrames
+--   3. the saved layout     C_EditMode.GetLayouts() -> systems -> settings
+--   4. the system frame     PartyFrame.settingMap, filled by Blizzard when it applies
+--                           a layout - and only then
+--   5. the frames           which of the two party displays is actually up
+--
+-- Station 4 was the only one ever reported, and a value there proves nothing about
+-- whether it came from station 3.
+local function LogRaidStyleChain(tag)
+    local sys = Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame
+    local idx = Enum and Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Party
+    local setting = Enum and Enum.EditModeUnitFrameSetting and
+                        Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames
+
+    if not (sys and idx and setting) then
+        DF:Log(tag, 'raid style chain: Enum values missing, cannot walk it')
+        return
+    end
+
+    local mod = DF:GetModule('Unitframe', true)
+    local party = mod and mod.db and mod.db.profile and mod.db.profile.party
+    DF:Log(tag, 'raid style chain 1/5 profile useCompactPartyFrames=%s',
+           tostring(party and party.useCompactPartyFrames))
+
+    local cvar = (C_CVar and C_CVar.GetCVar and C_CVar.GetCVar('useCompactPartyFrames')) or
+                     (GetCVar and GetCVar('useCompactPartyFrames'))
+    DF:Log(tag, 'raid style chain 2/5 CVar useCompactPartyFrames=%s', tostring(cvar))
+
+    -- The saved layouts, which is what WriteLayout writes and what the game reads back at
+    -- login. GetLayouts returns the player's own layouts only, no presets.
+    if C_EditMode and C_EditMode.GetLayouts then
+        local ok, li = pcall(C_EditMode.GetLayouts)
+        if ok and li and li.layouts then
+            if #li.layouts == 0 then
+                DF:Log(tag, 'raid style chain 3/5 no saved layouts - nothing can hold the value')
+            end
+            for i, layout in ipairs(li.layouts) do
+                local stored, sawSystem = nil, false
+                for _, s in ipairs(layout.systems or {}) do
+                    if s.system == sys and s.systemIndex == idx then
+                        sawSystem = true
+                        for _, entry in ipairs(s.settings or {}) do
+                            if entry.setting == setting then stored = entry.value end
+                        end
+                    end
+                end
+                DF:Log(tag, 'raid style chain 3/5 saved layout %d "%s": party system=%s stored value=%s', i,
+                       tostring(layout.layoutName), tostring(sawSystem), tostring(stored))
+            end
+        else
+            DF:Log(tag, 'raid style chain 3/5 GetLayouts failed')
+        end
+    end
+
+    -- Which layout the game is actually on. This index space is presets first, saved
+    -- layouts after - so it does not line up with the numbering above, and that is the
+    -- point: a value written into a saved layout that is not the active one never applies.
+    local emm = _G['EditModeManagerFrame']
+    if emm and emm.layoutInfo then
+        local active = emm.layoutInfo.activeLayout
+        local layout = emm.layoutInfo.layouts and emm.layoutInfo.layouts[active]
+        DF:Log(tag, 'raid style chain 4/5 active layout index=%s name=%s type=%s (1=preset)', tostring(active),
+               tostring(layout and layout.layoutName), tostring(layout and layout.layoutType))
+    end
+
+    local pf, cpf = _G['PartyFrame'], _G['CompactPartyFrame']
+    DF:Log(tag, 'raid style chain 5/5 PartyFrame shown=%s / CompactPartyFrame shown=%s -> displaying %s',
+           tostring(pf and pf:IsShown()), tostring(cpf and cpf:IsShown()),
+           (cpf and cpf:IsShown()) and 'raid style' or 'portrait frames')
+end
+
 local function LogFrameFieldTaint(tag, label, frame)
     local dirty = 0
 
@@ -1874,6 +1952,7 @@ function DF:LogPartyTaint(tag)
         end
 
         LogShouldShowReadPath(tag)
+        LogRaidStyleChain(tag)
     end
 end
 
