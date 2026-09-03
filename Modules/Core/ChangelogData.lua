@@ -33,7 +33,8 @@ DF.ChangelogData = {
                 title = 'Highlights',
                 items = {
                     'Party frames survive a group member levelling up, or an invite, in combat.',
-                    'Raid-style party frames now take effect on the next reload - you are asked when you switch it.',
+                    '"Show party as raid" works at all now. It takes effect on the next reload and asks for one when you switch it.',
+                    'A tick that disagrees with your Edit Mode layout is corrected instead of lying to you.',
                     'No more "combat ended - finishing setup" after a group invite, and no frame drop with it.',
                     'Leftover DragonflightUI_Layout is renamed and reused, or removed - the delete-it-yourself popup is gone.',
                     'The raid-style party frame setting is stored where the game can apply it itself.',
@@ -49,6 +50,10 @@ DF.ChangelogData = {
             }, {
                 title = 'Unit Frames',
                 items = {
+                    'Fixed "Show party as raid" doing nothing at all. The value was stored by reading it back off Blizzard\'s system frame first, which is only correct after Blizzard\'s own setter has run - and on this path that setter is deliberately never run. So the old value was stored as if it were the new one, every time. The layout kept saying 0 no matter what the checkbox said, and the reload had nothing to apply.',
+                    'The switch no longer runs Blizzard\'s appliers. Flipping it used to call EditModeManagerFrame:UpdateSystem and six more Blizzard functions to make the change visible at once. That ran every applier the system has, from our execution, which tainted settingMap, systemInfo and dirtySettings on PartyFrame, optionTable on all ten compact frames and member.unit on all four pooled ones - and it applied the OLD value, because it reads the layout and not our profile.',
+                    'The checkbox now describes what the frames are doing. If the two disagree - which everyone carries forward who ticked the box on an older build - the tick is moved to match the layout and you are told once per character. The layout wins, because it is what the game applies and also where Blizzard\'s own Edit Mode writes this setting.',
+                    'Fixed the third cause of the blocked actions: the health and mana readouts inside the party bars. On 1.15.9 no unit frame ships a TextString, so this addon supplied one - which is what made the numbers appear, and a taint seed. Blizzard reads self.TextString at the end of every health and power update, so currValue, disconnected and finally member.unit were written insecure by Blizzard\'s own code as a result. The strings are ours now and kept off the bars; Status Text and all its display modes still work, mouseover included.',
                     'Fixed the second cause of those blocked actions, the one that outlived the fix below. The party health and power bars carried lockColor, Blizzard\'s own opt-out for re-tinting a bar - and setting it writes a field onto a protected frame that Blizzard reads back on every health and power event. That read handed our taint to Blizzard, and the member.unit written next carried the blame. It hit all four pooled member frames, in use or not, which is why it only ever showed on the portrait-style party frames and never on the raid-style ones. Colour and power art are re-asserted with a hook now, and nothing of this addon is left on the frame.',
                     'Fixed the blocked actions on the party frames. Flipping the raid-style switch ran Blizzard\'s own applier for it, and that one reaches into both party displays at once - member.unit on the portrait frames, optionTable on the compact ones. Run from addon code those fields stay tainted for the rest of the session, and the next invite or level-up in combat had its SetAttribute, Hide and SetShown refused. The setting is stored now and the game applies it while loading, which is the only way it can be done safely.',
                     'The switch therefore needs a reload to take effect, and asks for one when you change it. Every other setting still applies immediately.',
@@ -71,7 +76,9 @@ DF.ChangelogData = {
                 items = {
                     'Deferring routine work is separated from recovering a reload that happened mid-fight. A group invite during combat used to queue as unfinished setup, announce itself twice in chat and re-apply the settings of every module once combat dropped - actionbars, bags, unit frames, minimap, chat, tooltips. That was the lag spike at the end of a fight.',
                     'A roster change outside a raid now does nothing at all rather than being deferred and then doing nothing.',
-                    'Messages about something that cannot be acted on are said once per character instead of at every login.'
+                    'Messages about something that cannot be acted on are said once per character instead of at every login.',
+                    'Two "already hooked" markers this addon wrote onto Blizzard\'s frames now live in our own table. They only ever answered a question about us, and any field of ours on a frame Blizzard reads is a taint seed waiting for the read.',
+                    'Failures while saving an Edit Mode layout are reported instead of swallowed by a pcall.'
                 }
             }
         }
