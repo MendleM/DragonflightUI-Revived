@@ -8,10 +8,10 @@
 	<Frame name="DragonflightUIVehicleLeaveButton" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate">
 		<Size x="32" y="32" />
 	</Frame>
-	<Frame name="DragonflightUIMicroMenuBar" inherits="DragonflightUIMicroMenuFrameTemplate" setAllPoints="true">
+	<Frame name="DragonflightUIMicroMenuBar" inherits="DragonflightUIMicroMenuFrameTemplate" hidden="true">
 		<Size x="235" y="40" />
 	</Frame>
-	<Frame name="DragonflightUIBagBar" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" setAllPoints="true">
+	<Frame name="DragonflightUIBagBar" inherits="SecureFrameTemplate,SecureHandlerEnterLeaveTemplate" hidden="true">
 		<Size x="200" y="37" />
 	</Frame>
 </Ui>
