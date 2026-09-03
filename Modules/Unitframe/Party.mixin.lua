@@ -435,44 +435,35 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
         pcall(fakeParty.Update, fakeParty)
     end
 
-    -- Safely trigger Blizzard updates out of combat on a clean tick
-    Helper:DeferOutOfCombat('RaidStylePartyFrames', function()
-        C_Timer.After(0, function()
-            if InCombatLockdown() then return end
-            -- EditModeManagerFrame:UpdateSystem, not PartyFrame:UpdateSystem.
-            --
-            -- Two different functions with different arguments. The manager's
-            -- version takes a system FRAME and looks the systemInfo up out of the
-            -- active layout; the frame's own version takes that systemInfo table
-            -- and iterates systemInfo.settings. This used to call the frame
-            -- version with a setting enum, so it indexed a number and threw
-            -- inside the pcall on every single toggle, without a word.
-            if EditModeManagerFrame and EditModeManagerFrame.UpdateSystem and PartyFrame then
-                local forceFullUpdate = true
-                local ok, err = pcall(EditModeManagerFrame.UpdateSystem, EditModeManagerFrame, PartyFrame,
-                                      forceFullUpdate)
-                if not ok then geterrorhandler()('DFUI PartyFrame UpdateSystem: ' .. tostring(err)) end
-            end
-            if PartyFrame and PartyFrame.UpdatePartyFrames then
-                pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
-            end
-            if CompactPartyFrame and CompactPartyFrame.UpdateVisibility then
-                pcall(CompactPartyFrame.UpdateVisibility, CompactPartyFrame)
-            end
-            if CompactPartyFrame and CompactPartyFrame.UpdateLayout then
-                pcall(CompactPartyFrame.UpdateLayout, CompactPartyFrame)
-            end
-            if UIParent_UpdateRaidAndPartyFrames then
-                pcall(UIParent_UpdateRaidAndPartyFrames)
-            end
-            if CompactRaidFrameManager_UpdateShown then
-                pcall(CompactRaidFrameManager_UpdateShown, CompactRaidFrameManager)
-            end
-            if CompactRaidFrameContainer_UpdateDisplayedUnits then
-                pcall(CompactRaidFrameContainer_UpdateDisplayedUnits, CompactRaidFrameContainer)
-            end
-        end)
-    end)
+    -- No Blizzard update is kicked off from here, and none may be.
+    --
+    -- What used to stand here was a block of them, on a deferred tick out of combat:
+    -- EditModeManagerFrame:UpdateSystem(PartyFrame, forceFullUpdate), then
+    -- PartyFrame:UpdatePartyFrames, CompactPartyFrame:UpdateVisibility and UpdateLayout,
+    -- UIParent_UpdateRaidAndPartyFrames, CompactRaidFrameManager_UpdateShown and
+    -- CompactRaidFrameContainer_UpdateDisplayedUnits - an attempt to make the switch take
+    -- effect at once. It did the opposite of that, twice over.
+    --
+    -- It tainted everything. UpdateSystem with forceFullUpdate runs EVERY applier the
+    -- system has, ours being the execution, and /df log seed caught it exactly:
+    --
+    --   FIRST INSECURE .unit on <pooled> (unit=party1)
+    --     UnitFrame_SetUnit <- UpdateMember <- UpdatePartyFrames
+    --     <- UpdateRaidAndPartyFrames <- UpdateSystemSettingUseRaidStylePartyFrames
+    --     <- UpdateSystemSetting <- UpdateSystem <- EditModeManager:1398
+    --     <- pcall <- Party.mixin.lua:452
+    --
+    -- followed by PartyFrame.settingMap, .systemInfo, .savedSystemInfo, .dirtySettings and
+    -- .hasActiveChanges insecure, .optionTable and .isLootObject on all ten compact frames,
+    -- and member.unit on all four pooled ones. Blizzard then reads settingMap on every
+    -- ShouldShow, which every group event asks - so the taint came straight back.
+    --
+    -- And it applied nothing. UpdateSystem reads the value out of the ACTIVE LAYOUT, not
+    -- out of our profile, so it re-applied the old value with great ceremony. That is why
+    -- the switch appeared to do nothing at all while still breaking the frames.
+    --
+    -- The setting is stored, and the game applies it at the next load out of its own
+    -- execution. The popup above says so.
 end
 
 function SubModuleMixin:SetupOptions()
