@@ -1267,6 +1267,110 @@ local PARTY_TAINT_FIELDS = {
 local PARTY_TAINT_METHODS = {'UpdateOnlineStatus', 'UpdateMember', 'UpdateArt', 'UpdatePet', 'Show', 'Hide',
                              'SetShown', 'SetPoint', 'SetAttribute'}
 
+-- Everything PartyFrameMixin:ShouldShow touches, in the order Blizzard touches it.
+--
+-- ShouldShow runs at PartyFrame.lua:150, four lines before the UpdateMember that writes
+-- member.unit, and the traced seed stack comes in through it:
+--
+--     UnitFrame_SetUnit <- PartyMemberFrame:UpdateMember (168)
+--       <- PartyFrame:UpdatePartyFrames (154)
+--       <- UpdateRaidAndPartyFrames (RaidFrame 261)
+--       <- UIParent_OnEvent, GROUP_ROSTER_UPDATE (UIParent 590)
+--
+-- Blizzard's own chain reads, and any one of these being insecure taints the rest of
+-- that execution - including the .unit written at the end:
+--
+--     ShouldShow -> ShouldShowPartyFrames() and not EditModeManagerFrame:UseRaidStylePartyFrames()
+--     UseRaidStylePartyFrames -> GetSettingValueBool -> GetRegisteredSystemFrame
+--                                (reads EditModeManagerFrame.registeredSystemFrames)
+--     systemFrame:GetSettingValue -> self.systemInfo (IsInitialized)
+--                                 -> self.settingMap[setting].value
+--
+-- The plain field walk above cannot see this: it checks a fixed list of names on the
+-- first level only, and settingMap and systemInfo are neither in that list nor flat.
+-- EditModeSystemMixin:UpdateSettingMap replaces self.settingMap wholesale, and
+-- OnSystemSettingChange is what drives it - so a setting applied from addon code leaves
+-- the whole map insecure, not just the one key that was set.
+local function LogTaintedSlot(tag, label, tbl, key)
+    if type(tbl) ~= 'table' then return false end
+    local ok, who = issecurevariable(tbl, key)
+    if ok then return false end
+    DF:Log(tag, '  SEED %s.%s: INSECURE, tainted by %s', label, key, tostring(who or '?'))
+    return true
+end
+
+local function LogShouldShowReadPath(tag)
+    local found = 0
+
+    -- The two globals the function itself resolves.
+    for _, name in ipairs({'ShouldShowPartyFrames', 'EditModeManagerFrame', 'PartyFrame', 'CompactPartyFrame',
+                           'CompactRaidFrameManager', 'CompactRaidFrameManager_UpdateShown'}) do
+        if _G[name] ~= nil then
+            local ok, who = issecurevariable(name)
+            if not ok then
+                found = found + 1
+                DF:Log(tag, '  SEED global %s: INSECURE, tainted by %s', name, tostring(who or '?'))
+            end
+        end
+    end
+
+    local emm = _G['EditModeManagerFrame']
+    if emm then
+        if LogTaintedSlot(tag, 'EditModeManagerFrame', emm, 'registeredSystemFrames') then found = found + 1 end
+        if LogTaintedSlot(tag, 'EditModeManagerFrame', emm, 'overrideLayoutInfo') then found = found + 1 end
+    end
+
+    local pf = _G['PartyFrame']
+    if pf then
+        for _, key in ipairs({'settingMap', 'systemInfo', 'savedSystemInfo', 'dirtySettings', 'systemNameString'}) do
+            if LogTaintedSlot(tag, 'PartyFrame', pf, key) then found = found + 1 end
+        end
+
+        -- One level in: the map is rebuilt as a whole, but a single entry can be dirty on
+        -- its own, and .value is the field GetSettingValue actually returns.
+        local map = rawget(pf, 'settingMap')
+        if type(map) == 'table' then
+            for setting, entry in pairs(map) do
+                local label = 'PartyFrame.settingMap[' .. tostring(setting) .. ']'
+                if LogTaintedSlot(tag, 'PartyFrame.settingMap', map, setting) then found = found + 1 end
+                if type(entry) == 'table' then
+                    for _, k in ipairs({'value', 'displayValue'}) do
+                        if LogTaintedSlot(tag, label, entry, k) then found = found + 1 end
+                    end
+                end
+            end
+        end
+
+        -- systemInfo.settings is what the map is built from, so a dirty entry here comes
+        -- back on the next rebuild even if the map looks clean right now.
+        local info = rawget(pf, 'systemInfo')
+        if type(info) == 'table' then
+            if LogTaintedSlot(tag, 'PartyFrame.systemInfo', info, 'settings') then found = found + 1 end
+            local settings = info.settings
+            if type(settings) == 'table' then
+                for i, entry in ipairs(settings) do
+                    if LogTaintedSlot(tag, 'PartyFrame.systemInfo.settings', settings, i) then
+                        found = found + 1
+                    end
+                    if type(entry) == 'table' then
+                        for _, k in ipairs({'setting', 'value'}) do
+                            if LogTaintedSlot(tag, 'PartyFrame.systemInfo.settings[' .. i .. ']', entry, k) then
+                                found = found + 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if found == 0 then
+        DF:Log(tag, 'ShouldShow read path: every field and global on it is secure')
+    else
+        DF:Log(tag, 'ShouldShow read path: %d insecure spot(s) - this is what taints UpdateMember', found)
+    end
+end
+
 local function LogFrameFieldTaint(tag, label, frame)
     local dirty = 0
 
@@ -1734,6 +1838,8 @@ function DF:LogPartyTaint(tag)
             local ok, value = pcall(EditModeManagerFrame.UseRaidStylePartyFrames, EditModeManagerFrame)
             DF:Log(tag, 'UseRaidStylePartyFrames() -> %s (call ok=%s)', tostring(value), tostring(ok))
         end
+
+        LogShouldShowReadPath(tag)
     end
 end
 
