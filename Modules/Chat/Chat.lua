@@ -58,6 +58,10 @@ end
 
 local frameTable = {{value = 'UIParent', text = 'UIParent', tooltip = 'descr', label = 'label'}}
 
+-- Which one-time hooks are in place. Ours, so it lives with us rather than as a field
+-- on one of Blizzard's frames - see the comment at the hooks themselves.
+local hookedOnce = {}
+
 local options = {
     type = 'group',
     name = 'DragonflightUI - ' .. mName,
@@ -201,16 +205,23 @@ function Module:OnEnable()
         -- ours immediately after, and ours is the one that ends up in effect. The
         -- SetPoint calls are not visible until the next frame is drawn, so there
         -- is nothing to see in between.
-        if ChatFrame1.ApplySystemAnchor and not ChatFrame1.DFChatAnchorHooked then
-            ChatFrame1.DFChatAnchorHooked = true
+        -- The "already hooked" flags are kept here, not on the frames.
+        --
+        -- ChatFrame1.DFChatAnchorHooked and EditModeManagerFrame.DFChatHooked were fields
+        -- written by this addon onto Blizzard's own frames, and the party seed watcher
+        -- caught the second one: any field of ours on a frame Blizzard reads is a taint
+        -- seed waiting for the read. These two only ever answered "have we hooked yet",
+        -- which is our business and belongs in our own table.
+        if ChatFrame1.ApplySystemAnchor and not hookedOnce.chatAnchor then
+            hookedOnce.chatAnchor = true
             hooksecurefunc(ChatFrame1, 'ApplySystemAnchor', function()
                 Module:ApplySettingsInternal()
             end)
         end
 
         local em = _G['EditModeManagerFrame']
-        if em and em.SetToLayoutAnchor and not em.DFChatHooked then
-            em.DFChatHooked = true
+        if em and em.SetToLayoutAnchor and not hookedOnce.editModeAnchor then
+            hookedOnce.editModeAnchor = true
             hooksecurefunc(em, 'SetToLayoutAnchor', function(_, systemFrame)
                 if systemFrame == ChatFrame1 then Module:ApplySettingsInternal() end
             end)
