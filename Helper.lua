@@ -947,21 +947,46 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
     -- frame through GetSettingValue(setting, useRawValue), rather than converted here.
     -- No arithmetic of ours to get wrong, and it stays correct for the settings that have
     -- no conversion at all.
-    local function WriteLayout()
+    --
+    -- readBackFromBlizzard says whether that setter has actually run for this change. It
+    -- must be passed, not assumed - see the comment on rawVal below.
+    local function WriteLayout(readBackFromBlizzard)
         if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
 
+        -- Reading the raw value off the system frame is only correct AFTER Blizzard's
+        -- setter has converted and stored it. Before that, GetSettingValue hands back what
+        -- Blizzard still holds - the OLD value.
+        --
+        -- On the layoutOnly path that setter is deliberately never run, so this read took
+        -- the old value and wrote it into the layout as if it were the new one. Measured
+        -- with /df log party: profile useCompactPartyFrames=true, both saved layouts still
+        -- at "stored value=0" - before the change, after it, and after a reload. The switch
+        -- could not work, because nothing was ever stored for the next load to apply.
         local rawVal = val
-        if systemFrame and systemFrame.GetSettingValue then
+        if readBackFromBlizzard and systemFrame and systemFrame.GetSettingValue then
             local gotRaw, raw = pcall(systemFrame.GetSettingValue, systemFrame, targetSetting, true)
             if gotRaw and raw ~= nil then rawVal = raw end
         end
 
         local ok, layoutInfo = pcall(C_EditMode.GetLayouts)
-        if ok and layoutInfo and layoutInfo.layouts then
-            for _, layout in ipairs(layoutInfo.layouts) do
-                EnsureSettingInLayout(layout, rawVal)
-            end
-            pcall(C_EditMode.SaveLayouts, layoutInfo)
+        if not (ok and layoutInfo and layoutInfo.layouts) then
+            DF:Debug('WriteLayout: GetLayouts failed, nothing written')
+            return
+        end
+
+        for _, layout in ipairs(layoutInfo.layouts) do
+            EnsureSettingInLayout(layout, rawVal)
+        end
+
+        -- Not silent any more. A save that fails here leaves the setting looking accepted
+        -- while nothing was persisted - the failure mode above, and invisible for a whole
+        -- evening because the pcall swallowed it.
+        local saved, err = pcall(C_EditMode.SaveLayouts, layoutInfo)
+        if saved then
+            DF:Debug(string.format('WriteLayout: setting %s = %s stored in %d layout(s)', tostring(targetSetting),
+                                   tostring(rawVal), #layoutInfo.layouts))
+        else
+            DF:Debug('WriteLayout: SaveLayouts failed: ' .. tostring(err))
         end
     end
 
@@ -990,7 +1015,9 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
     -- The layout is where the value belongs anyway. Blizzard applies it from there at login,
     -- out of its own execution, and taints nothing.
     if layoutOnly then
-        WriteLayout()
+        -- Blizzard's setter is not run on this path, so there is nothing to read back and
+        -- the value handed in is the only truthful one.
+        WriteLayout(false)
     elseif EditModeManagerFrame and EditModeManagerFrame.OnSystemSettingChange and systemFrame then
         Helper:DeferOutOfCombat(label or 'unit frame edit mode setting', function()
             local ok, err = pcall(EditModeManagerFrame.OnSystemSettingChange, EditModeManagerFrame, systemFrame,
@@ -999,10 +1026,11 @@ function addonTable:SyncUnitFrameEditModeSetting(systemIndex, setting, value, sy
 
             -- Inside the same block, so the raw read always happens after Blizzard has
             -- converted and stored it - including when this was deferred out of combat.
-            WriteLayout()
+            WriteLayout(ok)
         end)
     else
-        WriteLayout()
+        -- No setter available, so again nothing has converted anything.
+        WriteLayout(false)
     end
 end
 
