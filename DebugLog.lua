@@ -1581,6 +1581,40 @@ local function ArmSeedWatcher()
         LogInsecureFields('parent', frame.GetParent and frame:GetParent())
         LogInsecureFields('PartyFrame', _G['PartyFrame'])
 
+        -- The bars, because UnitFrame_SetUnit reads fields off them before it writes
+        -- .unit at UnitFrame.lua:178:
+        --
+        --     if ( not healthbar.frequentUpdates ) then ...            -- 161
+        --     if ( manabar and not manabar.frequentUpdates ) then ...  -- 164
+        --     self.unit = unit;                                       -- 178
+        --
+        -- This is the shape lockColor had, and lockColor was only ever found because
+        -- somebody thought to name it. A pairs() walk needs no such luck.
+        LogInsecureFields('member.HealthBar', frame.HealthBar)
+        LogInsecureFields('member.ManaBar', frame.ManaBar)
+        LogInsecureFields('member.PetFrame.HealthBar', frame.PetFrame and frame.PetFrame.HealthBar)
+
+        -- Everything upstream in the same execution. UpdateRaidAndPartyFrames runs
+        --
+        --     PartyFrame:HidePartyFrames();                                     -- 255
+        --     CompactRaidFrameManager_UpdateShown(CompactRaidFrameManager);     -- 258
+        --     PartyFrame:UpdatePartyFrames();                                   -- 261
+        --
+        -- and the stack enters UpdatePartyFrames already tainted. A field read inside
+        -- the 258 call taints the rest of it, and this addon restyles those raid frames
+        -- and pushes Edit Mode settings onto them - so they are the open question, and
+        -- nothing has ever looked at them.
+        for _, name in ipairs({'CompactRaidFrameManager', 'CompactRaidFrameContainer', 'CompactPartyFrame',
+                               'EditModeManagerFrame'}) do
+            LogInsecureFields(name, _G[name])
+        end
+
+        local crfm = _G['CompactRaidFrameManager']
+        if crfm then
+            LogInsecureFields('CompactRaidFrameManager.container', rawget(crfm, 'container'))
+            LogInsecureFields('CompactRaidFrameManager.displayFrame', rawget(crfm, 'displayFrame'))
+        end
+
         -- Named outright, because it is the suspect and it may not survive a
         -- pairs() walk if Blizzard cached it as false.
         local okEvent, blameEvent = issecurevariable(frame, 'OnEvent')
