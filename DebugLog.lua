@@ -1599,15 +1599,19 @@ function DF:LogPartyTaint(tag)
                 DF:Log(tag, 'pooled member %d clean', n)
             end
 
-            -- lockColor on the bars, which is a Blizzard field this addon writes.
+            -- lockColor on the bars: kept as a regression guard, and expected to read
+            -- secure now.
             --
-            -- SetupModern sets healthbar.lockColor and manabar.lockColor to stop Blizzard
-            -- re-tinting our art, and Blizzard reads statusbar.lockColor in UnitFrame.lua at
-            -- 750, 757 and 873, manaBar.lockColor at 472 and 501. A field written from here
-            -- and read there hands our taint to Blizzard's own execution, and whatever it
-            -- writes next - .unit, by way of UnitFrame_SetUnit - carries the blame.
+            -- SetupModern used to set healthbar.lockColor and manabar.lockColor to stop
+            -- Blizzard re-tinting our art. Blizzard reads statusbar.lockColor in
+            -- UnitFrame.lua at 750, 757 and 873, manaBar.lockColor at 472 and 501 - so a
+            -- field written from an addon and read there handed our taint to Blizzard's own
+            -- execution, and whatever it wrote next - .unit, by way of UnitFrame_SetUnit -
+            -- carried the blame. That is what refused SetAttribute, Hide and Show on party
+            -- members mid-combat. The colour is re-asserted from a global hooksecurefunc
+            -- instead; if either of these ever reads INSECURE again, that came back.
             --
-            -- Checked per bar rather than on the member frame, because the write lands on
+            -- Checked per bar rather than on the member frame, because the write landed on
             -- the bar. Styling runs whether or not anyone is grouped, so this shows up solo.
             for _, barKey in ipairs({'HealthBar', 'ManaBar'}) do
                 local bar = pf[barKey]

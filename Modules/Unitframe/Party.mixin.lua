@@ -665,7 +665,7 @@ function SubModuleMixin:SetupModern()
     local subModule = self
     local ATLAS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\uipartyframe'
     local BARS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\'
-    local UpdateRoleIcon, UpdateBars
+    local UpdateRoleIcon, UpdateBars, UpdateHealthBar, UpdateManaBar
 
     -- The pooled PartyFrame anchors itself, so DFUI's position, scale and
     -- anchor settings did nothing at all on 1.15.9 - only the classic path
@@ -931,8 +931,17 @@ function SubModuleMixin:SetupModern()
             healthbar:SetStatusBarColor(1, 1, 1, 1)
             -- UnitFrameHealthBar_Update re-tints this green on every health
             -- event, and that green multiplied into the DF art is what made
-            -- the bars look dark. lockColor is Blizzard's own opt-out.
-            healthbar.lockColor = true
+            -- the bars look dark.
+            --
+            -- Blizzard's own opt-out for that is statusbar.lockColor, and this
+            -- used to set it. It is a field on a protected frame that Blizzard
+            -- reads back at UnitFrame.lua:750, 757 and 873 - so the read handed
+            -- our taint to Blizzard's execution, and the .unit it wrote next by
+            -- way of UnitFrame_SetUnit carried the blame. That is what refused
+            -- SetAttribute, Hide and Show on party members mid-combat.
+            --
+            -- The colour is re-asserted from a global hooksecurefunc below
+            -- instead. Nothing of ours is written onto the frame for it.
 
             local hpMask = healthbar:CreateMaskTexture()
             hpMask:SetPoint('CENTER', healthbar, 'CENTER', 0, 0)
@@ -940,6 +949,7 @@ function SubModuleMixin:SetupModern()
                               'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
             hpMask:SetSize(71, 10)
             healthbar:GetStatusBarTexture():AddMaskTexture(hpMask)
+            st.hpMask = hpMask
         end
 
         local manabar = pf.ManaBar
@@ -949,9 +959,11 @@ function SubModuleMixin:SetupModern()
             manabar:SetPoint('TOPLEFT', 41, -30)
             manabar:SetStatusBarTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Mana')
             manabar:SetStatusBarColor(1, 1, 1, 1)
-            -- Without this, UnitFrameManaBar_UpdateType swaps our art out
-            -- for the plain UI-StatusBar and tints it by power color.
-            manabar.lockColor = true
+            -- manabar.lockColor was set here for the same reason, and dropped
+            -- for the same reason - see the health bar above. It bought more
+            -- than colour here: without it UnitFrameManaBar_UpdateType also
+            -- swaps our art out for the plain UI-StatusBar. Both the art and
+            -- the mask are put back from the hook below.
 
             local manaMask = manabar:CreateMaskTexture()
             manaMask:SetPoint('CENTER', manabar, 'CENTER', 0, 0)
@@ -959,6 +971,7 @@ function SubModuleMixin:SetupModern()
                                 'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
             manaMask:SetSize(74, 7)
             manabar:GetStatusBarTexture():AddMaskTexture(manaMask)
+            st.manaMask = manaMask
         end
 
         -- Create before fitting: there is nothing to size until these exist.
@@ -1041,10 +1054,30 @@ function SubModuleMixin:SetupModern()
         end
     end
 
-    -- With lockColor set, Blizzard no longer swaps the power art per power
-    -- type or greys out offline members, so we own both. Uses
-    -- GetStatusBarTexture():SetTexture so the bar's mask survives.
+    -- Blizzard swaps the power art per power type and greys out offline
+    -- members, so we own both. Uses GetStatusBarTexture():SetTexture so the
+    -- bar's mask survives.
+    --
+    -- Split in two because the hooks below know which bar Blizzard just
+    -- touched, and a health event should not drag the power bar through a
+    -- texture swap it does not need.
     function UpdateBars(pf)
+        UpdateHealthBar(pf)
+        UpdateManaBar(pf)
+    end
+
+    -- Blizzard hands our mask-carrying fill texture back to a plain one when it
+    -- swaps the art (UnitFrameManaBar_UpdateType), and a fill texture without
+    -- the mask is a bar with square corners poking out of the DF frame.
+    local function EnsureMask(bar, mask)
+        if not (bar and mask) then return end
+        local tex = bar:GetStatusBarTexture()
+        if not (tex and tex.AddMaskTexture) then return end
+        if tex.GetNumMaskTextures and tex:GetNumMaskTextures() > 0 then return end
+        pcall(tex.AddMaskTexture, tex, mask)
+    end
+
+    function UpdateHealthBar(pf)
         local unit = pf.unit or pf.unitToken
         if not (unit and UnitExists(unit)) then return end
 
@@ -1055,11 +1088,6 @@ function SubModuleMixin:SetupModern()
 
         local healthbar = pf.HealthBar
         if healthbar then
-            -- (re)assert here too, not just at first styling: frames styled
-            -- before this ran would otherwise keep Blizzard's tint until a
-            -- reload recreated them.
-            healthbar.lockColor = true
-
             -- Retail's plain Bar-Health art is a muted green (49,153,8) and
             -- looks dull next to the player frame. The class-color and
             -- gradient options - which the classic reskin honours but this
@@ -1100,11 +1128,18 @@ function SubModuleMixin:SetupModern()
             end
             if tex and tex.SetDesaturated then tex:SetDesaturated(not connected) end
             healthbar:SetStatusBarColor(r * shade, g * shade, b * shade, 1)
+            EnsureMask(healthbar, memberState[pf] and memberState[pf].hpMask)
         end
+    end
+
+    function UpdateManaBar(pf)
+        local unit = pf.unit or pf.unitToken
+        if not (unit and UnitExists(unit)) then return end
+
+        local shade = UnitIsConnected(unit) and 1 or 0.5
 
         local manabar = pf.ManaBar
         if manabar then
-            manabar.lockColor = true
             local _, powerToken = UnitPowerType(unit)
             local art = POWER_BAR_ART[powerToken] or 'Mana'
             local tex = manabar:GetStatusBarTexture()
@@ -1112,6 +1147,7 @@ function SubModuleMixin:SetupModern()
             if manabar.SetStatusBarDesaturated then manabar:SetStatusBarDesaturated(false) end
             if tex and tex.SetDesaturated then tex:SetDesaturated(false) end
             manabar:SetStatusBarColor(shade, shade, shade, 1)
+            EnsureMask(manabar, memberState[pf] and memberState[pf].manaMask)
         end
     end
 
@@ -1151,6 +1187,52 @@ function SubModuleMixin:SetupModern()
         hooksecurefunc(PartyFrame, 'InitializePartyMemberFrames', styleAll)
     end
     styleAll()
+
+    -- What replaces lockColor.
+    --
+    -- Blizzard re-tints these bars - and swaps the power art - on every health
+    -- and power event. Opting out of that with statusbar.lockColor meant
+    -- writing a field onto a protected frame that Blizzard reads back, which
+    -- tainted its execution and cost us .unit, then SetAttribute, Hide and Show
+    -- on party members in combat. So we let Blizzard paint and paint over it.
+    --
+    -- hooksecurefunc is the safe way round: it restores the taint state after
+    -- the hook returns, so Blizzard carries on as securely as it came in. That
+    -- is the difference to lockColor, which left an insecure value sitting on
+    -- the frame for Blizzard to read on every later pass.
+    --
+    -- Cost is one setter per event on at most four frames, next to the setter
+    -- Blizzard already ran on the same line. Nothing is re-created and nothing
+    -- is re-rendered.
+    local function BarOwner(bar, key)
+        if not bar then return nil end
+        local pf = bar:GetParent()
+        if not pf then return nil end
+        local st = memberState[pf]
+        if not (st and st.styled) then return nil end
+        if pf[key] ~= bar then return nil end
+        return pf
+    end
+
+    if type(UnitFrameHealthBar_Update) == 'function' then
+        hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar)
+            local pf = BarOwner(statusbar, 'HealthBar')
+            if pf then pcall(UpdateHealthBar, pf) end
+        end)
+    end
+
+    -- Both are needed: UpdateType is where the art swap and the power tint
+    -- happen, and it is also called on its own from UNIT_DISPLAYPOWER, while
+    -- Update paints disconnected members grey at UnitFrame.lua:873, after
+    -- UpdateType has already returned.
+    for _, fname in ipairs({'UnitFrameManaBar_UpdateType', 'UnitFrameManaBar_Update'}) do
+        if type(_G[fname]) == 'function' then
+            hooksecurefunc(fname, function(manaBar)
+                local pf = BarOwner(manaBar, 'ManaBar')
+                if pf then pcall(UpdateManaBar, pf) end
+            end)
+        end
+    end
 
     -- Reachable from Update(), so changing a setting re-applies immediately.
     -- Without this the only things that ever restyled a pooled member frame
