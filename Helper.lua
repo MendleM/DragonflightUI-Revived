@@ -1072,6 +1072,108 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
                                             layoutOnly)
 end
 
+-- What the ACTIVE layout stores for the raid-style setting, as a boolean, or nil when it
+-- cannot be determined.
+--
+-- Read from the layout rather than from EditModeManagerFrame:UseRaidStylePartyFrames(),
+-- and the difference matters. That call answers with what Blizzard currently APPLIES,
+-- taken from PartyFrame.settingMap. Between flipping the switch and the reload those two
+-- disagree by design: the layout already holds the new value while the applied state is
+-- still the old one. Reconciling against the applied state would undo the change the
+-- player just made.
+--
+-- GetActiveLayoutInfo is Blizzard's own accessor and covers presets too, so a player on a
+-- preset gets the preset's value rather than nil.
+local function ReadRaidStyleFromActiveLayout()
+    local emm = _G['EditModeManagerFrame']
+    if not (emm and emm.GetActiveLayoutInfo) then return nil end
+
+    local sys = Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame
+    local idx = Enum and Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Party
+    local setting = Enum and Enum.EditModeUnitFrameSetting and
+                        Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames
+    if not (sys and idx and setting) then return nil end
+
+    local ok, layout = pcall(emm.GetActiveLayoutInfo, emm)
+    if not (ok and layout and layout.systems) then return nil end
+
+    for _, entry in ipairs(layout.systems) do
+        if entry.system == sys and entry.systemIndex == idx then
+            for _, s in ipairs(entry.settings or {}) do
+                if s.setting == setting then return s.value == 1 end
+            end
+        end
+    end
+    return nil
+end
+
+-- Bring the checkbox in line with the layout, once per session.
+--
+-- The two could drift apart, and for a long while they always did: WriteLayout stored the
+-- value it read back off Blizzard instead of the new one, so the layout stayed at 0 while
+-- the profile said true. Anyone who ticked the box on an older build carries that pair
+-- forward - a tick that describes nothing, over frames that never changed.
+--
+-- The layout wins, for two reasons. It is what the game actually applies, so following it
+-- keeps the label honest without moving anything on screen. And it is also where
+-- Blizzard's own Edit Mode writes this setting - if the profile won, DFUI would silently
+-- overrule a change the player made there.
+function addonTable:ReconcileRaidStylePartySetting()
+    local Module = DF:GetModule('Unitframe', true)
+    local party = Module and Module.db and Module.db.profile and Module.db.profile.party
+    if not party then return false end
+
+    local stored = ReadRaidStyleFromActiveLayout()
+    if stored == nil then return false end
+
+    local shown = party.useCompactPartyFrames and true or false
+    if shown == stored then return true end
+
+    -- Written straight to the profile. Going through SetRaidStylePartyFrames would treat
+    -- this as a change the player asked for and answer with the reload popup, when in fact
+    -- nothing needs to change - the frames already look the way the layout says.
+    party.useCompactPartyFrames = stored
+
+    if C_CVar and C_CVar.GetCVar and C_CVar.GetCVar('useCompactPartyFrames') ~= nil and SetCVar then
+        pcall(SetCVar, 'useCompactPartyFrames', stored and '1' or '0')
+    end
+
+    TellOnce('raidStyleReconciled',
+             'The |cffffff78Show party as raid|r option did not match your Edit Mode layout and has been corrected ' ..
+                 'to |cffffff78' .. (stored and 'on' or 'off') ..
+                 '|r, which is what your party frames are actually doing. Older versions of this addon could fail ' ..
+                 'to store the setting.')
+    return true
+end
+
+-- Runs the reconcile once the layout can be read, then stops listening.
+--
+-- Two events, because either can be the one that makes the layout available and the order
+-- is not guaranteed: PLAYER_ENTERING_WORLD fires before some systems have registered with
+-- the Edit Mode manager, and EDIT_MODE_LAYOUTS_UPDATED is what hands the layouts over in
+-- the first place. A frame later in both cases, for the same reason the raid options
+-- watcher waits.
+--
+-- Staying registered until a value could actually be read is deliberate. It also means a
+-- later EDIT_MODE_LAYOUTS_UPDATED - the one our own SaveLayouts triggers - can be the one
+-- that satisfies it, and by then layout and profile already agree, so it changes nothing.
+local reconcileWatcher
+function addonTable:WatchRaidStylePartySetting()
+    if reconcileWatcher then return end
+
+    reconcileWatcher = CreateFrame('Frame')
+    reconcileWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+    if C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid('EDIT_MODE_LAYOUTS_UPDATED') then
+        reconcileWatcher:RegisterEvent('EDIT_MODE_LAYOUTS_UPDATED')
+    end
+
+    reconcileWatcher:SetScript('OnEvent', function(watcher)
+        C_Timer.After(0, function()
+            if addonTable:ReconcileRaidStylePartySetting() then watcher:UnregisterAllEvents() end
+        end)
+    end)
+end
+
 
 -- Which frame did Blizzard register for the raid unit frame system?
 --

@@ -1473,6 +1473,13 @@ function SubModuleMixin:Setup()
             setDefaultSubValues('party')
         end
     })
+
+    -- The raid-style checkbox has to describe what the frames are doing, and the two could
+    -- drift: for a long while the setting was never stored, so a tick from an older build
+    -- sits over party frames that never changed. This reads the layout and moves the tick,
+    -- not the frames.
+    if addonTable and addonTable.WatchRaidStylePartySetting then addonTable:WatchRaidStylePartySetting() end
+
     --
     self:RegisterEvent('CVAR_UPDATE')
 
