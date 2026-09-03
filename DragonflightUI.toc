@@ -11,7 +11,7 @@
 ## Author: MendleM, rakStar91, Karl-Heinz Schneider
 ## X-Website: https://github.com/MendleM/DragonflightUI-Revived
 ## X-Curse-Project-ID: 1602557
-## Version: 0.44.2
+## Version: 0.45.0
 ## IconTexture: Interface\Icons\INV_Misc_Head_Dragon_01
 ## X-Date: @project-date-integer@
 ## Category: UI Overhaul

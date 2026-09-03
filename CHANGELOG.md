@@ -2,10 +2,50 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.44.2`.
+May 2026). Current builds report version `0.45.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.45.0 — Party Frames in Combat & a Quiet Startup (2 September 2026)
+The party frames no longer break when someone levels up mid-fight, the chat spam and frame drop at the end of a fight are gone, and the leftover Edit Mode layout is cleaned up without anyone having to do it by hand.
+**Highlights** — party frames survive a group member levelling up, or an invite, in combat · **Show party as raid** works at all now, takes effect on the next reload and asks for one when switched · a tick that disagrees with your layout is corrected instead of lying to you · no more `combat ended - finishing setup` after a group invite, and no frame drop with it · leftover `DragonflightUI_Layout` renamed and reused, or removed · party members get their class colour as soon as the game knows it · mouse clicks no longer blocked when disabling the Action Bar module
+### Action Bars
+- Fixed mouse clicks being completely blocked across the screen when the Action Bar module was deactivated in settings. The micro menu and bag bar holder frames no longer span the full screen and are properly hidden when deactivated.
+### Unit Frames
+- Fixed **Show party as raid** doing nothing at all. The value was written into the Edit Mode layout by reading it back off Blizzard's system frame first — which is only correct after Blizzard's own setter has converted and stored it, and on this path that setter is deliberately never run. So the old value was read and stored as if it were the new one, every time. The layout kept saying `0` no matter what the checkbox said, the reload had nothing to apply, and only the preview in DragonflightUI's own Edit Mode ever changed.
+- The switch no longer runs Blizzard's appliers. Flipping it used to call `EditModeManagerFrame:UpdateSystem(PartyFrame, forceFullUpdate)` and six more Blizzard functions on a deferred tick, meaning to make the change visible at once. It did the opposite twice over: `UpdateSystem` runs *every* applier the system has, from our execution, which left `settingMap`, `systemInfo`, `savedSystemInfo` and `dirtySettings` on `PartyFrame` insecure, plus `optionTable` and `isLootObject` on all ten compact frames and `member.unit` on all four pooled ones — and it applied the *old* value, because it reads the layout rather than our profile. That is why the switch looked inert while still breaking the frames.
+- The checkbox now describes what the frames are doing. If the two disagree — which everyone carries forward who ticked the box on an older build, where the setting was never stored — the tick is moved to match the layout and you are told once per character. The layout wins rather than the profile, because it is what the game actually applies and also where Blizzard's own Edit Mode writes this setting; the other way round would silently overrule a change made there.
+- Fixed the third cause of the blocked actions: the health and mana readouts inside the party bars. On 1.15.9 no unit frame ships a `TextString`, so this addon supplied one — which is exactly what made the numbers appear, and a taint seed of the first order. `TextStatusBarMixin:UpdateTextString` opens with `local textString = self.TextString` and runs at the end of every health and power update, so the read handed our taint to Blizzard, and `currValue`, `disconnected`, `healthbar.unit` and finally `member.unit` were all written insecure by Blizzard's own code as a result. The strings are ours now, kept off the bars entirely, and filled from the same hook that already handles the bar colour. The Status Text option and its numeric, percentage and combined modes all still work, including reveal on mouseover.
+- Fixed the second cause of those blocked actions, the one that outlived the applier fix below. The party health and power bars carried `lockColor`, Blizzard's own opt-out for re-tinting a bar — and setting it means writing a field onto a protected frame that Blizzard reads back on every health and power event. The read handed our taint to its execution, and the `member.unit` written next through `UnitFrame_SetUnit` carried the blame. All four pooled member frames were affected, in use or not, which is why this only ever showed on the portrait-style party frames and never on the raid-style ones. Colour and power art are re-asserted from a global `hooksecurefunc` now, which restores the taint state when it returns.
+- Fixed the blocked actions on the party frames. Flipping the raid-style switch ran Blizzard's own applier for it, and that one reaches into both party displays at once — `member.unit` on the portrait frames via `UpdateRaidAndPartyFrames`, `optionTable` on the compact ones via `CompactPartyFrame:RefreshMembers()`. Run from addon code those fields stay insecure for the rest of the session, and the next invite or level-up in combat had its `SetAttribute`, `Hide` and `SetShown` refused. Ten seconds passed between cause and symptom in the traced log, which is why it looked so erratic.
+- The setting is stored in the Edit Mode layout now and the game applies it while loading, out of its own execution. That means the switch needs a reload to take effect, and it asks for one when you change it. Every other setting still applies immediately.
+- DragonflightUI never reloads the interface on its own any more. `reload()` is a protected call and the client refuses it in combat, which briefly made this addon produce the very error class it was meant to remove.
+- The raid appliers only run inside an actual raid. Outside one there is no container to arrange, so they were pure cost and seeded that taint.
+- Raid-style party frames keep their size again: raid settings are mirrored onto the party system, which is where `CompactUnitFrame` reads them from via `GetRaidFrameWidth(frame.groupType)`.
+- Role icons are restyled after Blizzard's own update instead of during it.
+- Party members are recoloured once their class information arrives instead of staying white.
+- Edit Mode settings that already hold the wanted value are no longer re-applied.
+### Edit Mode
+- A preset layout cannot store the raid-style party frame setting, so DragonflightUI adds `DFUI_Revived_Layout` — a copy of the active layout — and switches to it. The game then applies the setting itself at login and this addon never touches it again. If you already work on a layout of your own, nothing is added.
+- Leftover `DragonflightUI_Layout` (Issue #27) is repaired, renamed to `DFUI_Revived_Layout` and reused where a layout is needed, or deleted where it is not. The popup with delete instructions and `/df layoutnotice` are gone.
+- New: `/df layoutretry`, for when adding that layout did not work the first time.
+### Core & Architecture
+- Deferring routine work is separated from recovering a reload that happened mid-fight. A group invite during combat used to queue as unfinished setup, announce itself twice in chat, and re-apply the settings of every module once combat dropped — actionbars, bags, unit frames, minimap, chat, tooltips. That was the lag spike at the end of a fight.
+- A roster change outside a raid now does nothing at all, rather than being deferred and then doing nothing.
+- Messages about a condition nobody can act on are said once per character instead of at every login.
+- Two "already hooked" markers this addon wrote onto Blizzard's frames — `ChatFrame1.DFChatAnchorHooked` and `EditModeManagerFrame.DFChatHooked` — live in our own table now. They only ever answered a question about us, and any field of ours on a frame Blizzard reads is a taint seed waiting for the read.
+- Failures while saving an Edit Mode layout are reported instead of swallowed. The `pcall` around it hid the bug above for an entire evening of testing.
+
+## 0.44.3 — Action Bar Usability & Consumable Fixes (1 September 2026)
+
+Targeted fixes for action bar empty consumable items displaying as usable on login.
+
+**Highlights** — Action Bars: fixed empty consumables (count = 0) displaying as colored/usable on login · hooked button usability, update, and count functions for real-time state sync
+
+### Action Bars
+- Fixed empty consumables (count = 0) displaying as fully usable/colored on login until Edit Mode was toggled.
+- Hooked `UpdateUsable`, `Update`, and `UpdateCount` on action buttons and registered bag update events (`BAG_UPDATE`, `BAG_UPDATE_DELAYED`) so depleted items gray out immediately.
 
 ## 0.44.2 — Stance Bar Fixes & In-Combat Protection (1 September 2026)
 

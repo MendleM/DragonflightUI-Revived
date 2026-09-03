@@ -43,7 +43,7 @@ function Module:PrePositionActionbarHolders()
         stanceBar:SetPoint(stanceDb.anchor or 'BOTTOM', parent, stanceDb.anchorParent or 'BOTTOM', stanceDb.x or 0, stanceDb.y or 0)
     end
     local microFrame = _G['DragonflightUIMicroMenuBar']
-    local microDb = self.db.profile.micromenu
+    local microDb = self.db.profile.micro
     if microFrame and microDb then
         microFrame:Show()
         microFrame:SetScale(microDb.scale or 1.0)
@@ -71,9 +71,18 @@ function Module:OnInitialize()
         Module:RegisterSettings()
     end)
 
-    self:SetEnabledState(DF.ConfigModule:GetModuleEnabled(mName))
-    self:PrePositionActionbarHolders()
-    Module:HideBlizzardDefaultBars()
+    local isEnabled = DF.ConfigModule:GetModuleEnabled(mName)
+    self:SetEnabledState(isEnabled)
+
+    if isEnabled then
+        self:PrePositionActionbarHolders()
+        Module:HideBlizzardDefaultBars()
+    else
+        local microFrame = _G['DragonflightUIMicroMenuBar']
+        if microFrame then microFrame:Hide() end
+        local bagFrame = _G['DragonflightUIBagBar']
+        if bagFrame then bagFrame:Hide() end
+    end
 end
 
 function Module:OnEnable()
@@ -171,6 +180,10 @@ function Module:EnableOutOfCombat()
 end
 
 function Module:OnDisable()
+    local microFrame = _G['DragonflightUIMicroMenuBar']
+    if microFrame then microFrame:Hide() end
+    local bagFrame = _G['DragonflightUIBagBar']
+    if bagFrame then bagFrame:Hide() end
 end
 
 function Module:ApplySettings(sub, key)

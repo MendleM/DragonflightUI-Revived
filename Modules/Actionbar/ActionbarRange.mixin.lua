@@ -236,6 +236,19 @@ function SubModuleMixin:Setup()
             self:UpdateRangeAndUsable(btn, btn.checksRange or false, btn.inRange or false);
         end)
     end
+
+    -- The three events that can leave the tint wrong without Blizzard repainting the button
+    -- itself: arriving in the world, the slot's contents changing, and the bags settling
+    -- after a loot or a use.
+    --
+    -- Deliberately not ACTIONBAR_UPDATE_USABLE or SPELL_UPDATE_USABLE. Those fire on
+    -- essentially every power tick in combat, and sweeping every button on them would be a
+    -- full rescan per frame. Blizzard repaints the button itself on those, and that already
+    -- reaches us through the per-button hooks.
+    self:RegisterEvent('PLAYER_ENTERING_WORLD')
+    self:RegisterEvent('ACTIONBAR_SLOT_CHANGED')
+    self:RegisterEvent('BAG_UPDATE_DELAYED')
+    self:SetScript('OnEvent', self.OnEvent)
 end
 
 -- On 1.15.9 the ActionButton_UpdateUsable global no longer exists, so the
@@ -251,22 +264,92 @@ end
 local usableHooked = setmetatable({}, {__mode = 'k'})
 
 function SubModuleMixin:HookButtonUsable(btn)
-    if not btn or usableHooked[btn] or type(btn.UpdateUsable) ~= 'function' then return end
-    usableHooked[btn] = true
+    if not btn or usableHooked[btn] then return end
 
-    hooksecurefunc(btn, 'UpdateUsable', function(b)
+    local function repaint(b, label)
         if not self.activate then return end
         -- Never let a repaint break the click that triggered it.
         local ok, err = pcall(self.UpdateRangeAndUsable, self, b, b.checksRange or false, b.inRange or false)
         if not ok and not self.DFUsableErrorLogged then
             self.DFUsableErrorLogged = true
-            geterrorhandler()('DFUI ActionbarRange:UpdateUsable: ' .. tostring(err))
+            geterrorhandler()('DFUI ActionbarRange:' .. label .. ': ' .. tostring(err))
         end
+    end
+
+    local hooked = false
+
+    if type(btn.UpdateUsable) == 'function' then
+        hooked = true
+        hooksecurefunc(btn, 'UpdateUsable', function(b) repaint(b, 'UpdateUsable') end)
+    end
+
+    -- The count has its own path. Blizzard reaches UpdateCount from SPELL_UPDATE_CHARGES
+    -- and from UpdateAction after a bag change, and neither goes through UpdateUsable - so
+    -- spending the last item repaints the number while our tint keeps the colour it had
+    -- while the stack still existed.
+    if type(btn.UpdateCount) == 'function' then
+        hooked = true
+        hooksecurefunc(btn, 'UpdateCount', function(b) repaint(b, 'UpdateCount') end)
+    end
+
+    -- Flagged only once something was actually installed. Marking a button that had
+    -- neither method would leave it unhooked for good if its mixin arrived afterwards,
+    -- because every later call bails on the flag.
+    if hooked then usableHooked[btn] = true end
+end
+
+-- Nothing ever wired this: CreateFrameFromMixinAndInit only mixes the table in and calls
+-- Init, so the stub that used to live here never ran. Setup registers the events and
+-- points the frame's script at it.
+function SubModuleMixin:OnEvent(event, ...)
+    self:RequestUpdateAllButtons()
+end
+
+-- Coalesced to one sweep per frame. Looting fires BAG_UPDATE_DELAYED and
+-- ACTIONBAR_SLOT_CHANGED several times in a row, and they all want the same single pass.
+function SubModuleMixin:RequestUpdateAllButtons()
+    if not self.activate then return end
+    if self.DFSweepPending then return end
+    self.DFSweepPending = true
+
+    C_Timer.After(0, function()
+        self.DFSweepPending = false
+        self:UpdateAllButtons()
     end)
 end
 
-function SubModuleMixin:OnEvent(event, ...)
-    -- print('event', event, ...)
+-- Repaint every button we own, whatever Blizzard is or is not doing.
+--
+-- The per-button hooks only fire when Blizzard repaints, and Blizzard only repaints when
+-- something changes. At login nothing has: a stack that was already empty is still empty,
+-- so no usable or count event ever arrives and the first paint keeps whatever colour it
+-- was handed. Empty stacks stayed bright until something forced a restyle - opening edit
+-- mode was one such thing, which is exactly how this surfaced.
+--
+-- The range hook is no substitute either. It only repaints when the range state flips, and
+-- an item that checks no range never flips.
+function SubModuleMixin:UpdateAllButtons()
+    if not self.activate then return end
+
+    local Module = self.ModuleRef
+    if not Module then return end
+
+    local function sweep(bar)
+        if not (bar and bar.buttonTable) then return end
+
+        for _, btn in ipairs(bar.buttonTable) do
+            self:HookButtonUsable(btn)
+
+            -- pcall for the reason the hooks use one: a single bad button must not take
+            -- the rest of the sweep with it. UpdateRangeAndUsable already skips buttons
+            -- that are hidden or carry no action slot.
+            pcall(self.UpdateRangeAndUsable, self, btn, btn.checksRange or false, btn.inRange or false)
+        end
+    end
+
+    for i = 1, 8 do sweep(Module['bar' .. i]) end
+    sweep(Module.petbar)
+    sweep(Module.stancebar)
 end
 
 function SubModuleMixin:UpdateState(state)
@@ -286,6 +369,11 @@ function SubModuleMixin:Update()
     self.notUsableColor = CreateColorFromRGBHexString(state.notUsableColor)
     self.oorColor = CreateColorFromRGBHexString(state.oorColor)
     self.oomColor = CreateColorFromRGBHexString(state.oomColor)
+
+    -- New colours are worth nothing until something applies them, and the hooks only run
+    -- on a Blizzard repaint. This is also the path that paints correctly after a /reload,
+    -- since Update runs once the profile has been read.
+    self:RequestUpdateAllButtons()
 end
 
 -- Hot path: cache the two static lookups - whether a macro is a
@@ -307,6 +395,40 @@ do
             wipe(powerCostCache)
         end
     end)
+end
+
+-- The four action queries this needs all moved to C_ActionBar, and only survive as
+-- globals through Blizzard_DeprecatedActionBar - Deprecated_ActionBar.lua forwards each
+-- one straight to the namespace. Present on Era, TBC Anniversary and MoP alike, but a
+-- deprecated addon is a poor thing to depend on, so ask the namespace first. Same shape
+-- Actionbar.Controller already uses for IsEquippedAction.
+local function ActionQuery(namespaced, legacy, slot)
+    if C_ActionBar and C_ActionBar[namespaced] then return C_ActionBar[namespaced](slot) end
+
+    local fallback = _G[legacy]
+    if fallback then return fallback(slot) end
+
+    return nil
+end
+
+-- Is this an item action with none of it left?
+--
+-- Ordered so a spell costs a single call. This runs inside CustomIsUsableAction, which the
+-- comment further down rightly calls a hot path, and most buttons hold spells - they leave
+-- on the first check. Asking for the count first would have been three more calls for
+-- every spell on the bar, because a spell's use count is zero too.
+--
+-- Equipped items are excluded: they are not in the bags to be counted, so they read as
+-- zero while being perfectly usable. Consumables need no separate test, a consumable on a
+-- bar is an item action.
+--
+-- A nil count means the query is unavailable, not that the stack is empty, so this has to
+-- answer false there rather than dim every item on a client that tells us nothing.
+local function ActionStackIsEmpty(action)
+    if not ActionQuery('IsItemAction', 'IsItemAction', action) then return false end
+    if ActionQuery('IsEquippedAction', 'IsEquippedAction', action) then return false end
+
+    return ActionQuery('GetActionUseCount', 'GetActionCount', action) == 0
 end
 
 local function CustomIsUsableAction(action)
@@ -351,8 +473,17 @@ local function CustomIsUsableAction(action)
         end
     end
 
-    -- isUsable, notEnoughMana = IsUsableAction(slot)
-    return IsUsableAction(action);
+    local isUsable, notEnoughMana = IsUsableAction(action);
+
+    -- An empty stack still answers "usable".
+    --
+    -- IsUsableAction reports mana, reagents and cooldown. Running out of an item is none
+    -- of those, so the answer does not change when the last potion leaves your bags and
+    -- the button stays bright with a 0 next to it. Colouring it as unusable is what the
+    -- icon tint is for.
+    if isUsable and ActionStackIsEmpty(action) then return false, false end
+
+    return isUsable, notEnoughMana
 end
 
 function SubModuleMixin:UpdateRangeAndUsable(btn, checksRange, inRange)
@@ -362,7 +493,10 @@ function SubModuleMixin:UpdateRangeAndUsable(btn, checksRange, inRange)
     if not btn.action then return end
     -- hidden buttons refresh via ActionButton_OnShow when they appear
     if not btn:IsVisible() then return end
-    local icon = btn.Icon
+    -- Blizzard's own ActionBarActionButtonMixin keeps this as lowercase icon; only our
+    -- restyled buttons carry Icon. Checking both means a native button is tinted too
+    -- rather than silently skipped.
+    local icon = btn.Icon or btn.icon
     if not icon then return end
     local state = self.state;
     if not state then return end

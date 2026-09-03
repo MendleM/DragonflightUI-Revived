@@ -2194,6 +2194,19 @@ function DragonflightUIActionbarMixin:StyleButton(btn, keepNormalHighlight)
         local fontFile, fontHeight, flags = count:GetFont()
         count:SetFont(fontFile, 14 + 2, flags)
     end
+
+    -- Wire the per-button usable hooks while we have the button in hand.
+    --
+    -- ActionbarRange:HookButtonUsable existed with no caller at all, so on 1.15.9 - where
+    -- the ActionButton_UpdateUsable global is gone - nothing repainted a button off a
+    -- usable or count change. The range hook is no substitute: it only repaints when the
+    -- range state actually flips, and a consumable never checks range, so its tint was set
+    -- once and then left alone.
+    --
+    -- StyleButton is the one place every button this addon touches passes through.
+    local actionbarModule = DF.GetModule and DF:GetModule('Actionbar', true)
+    local rangeSub = actionbarModule and actionbarModule.SubActionbarRange
+    if rangeSub and rangeSub.HookButtonUsable then rangeSub:HookButtonUsable(btn) end
 end
 
 function DragonflightUIActionbarMixin:MigrateOldKeybinds()

@@ -527,26 +527,28 @@ function Module:SlashCommand(input)
         return
     end
 
-    -- /df layoutnotice - bring back the leftover-layout notice after it has been
-    -- dismissed for good, and say so when there is nothing to show. force=true
-    -- skips both the dismissed flag and the once-per-session guard, because this
-    -- is the player asking for it. See Helper.lua:ShowLegacyEditModeLayoutNotice.
-    if cmd == 'layoutnotice' then
-        if addonTable.ShowLegacyEditModeLayoutNotice then
-            local force = true
-            if addonTable:ShowLegacyEditModeLayoutNotice(force) then
-                DF:Print('No leftover DragonflightUI Edit Mode layout on this character - nothing to clean up.')
+    -- /df layoutretry - hand back the one attempt at adding an Edit Mode layout that can
+    -- store the raid-style party setting. The attempt runs again on the way back up, so a
+    -- reload is needed - but not in combat: reload() is protected there and the client
+    -- refuses it with ADDON_ACTION_BLOCKED. Typed by the player, so it can simply say so.
+    -- See Helper.lua:ResetEditModeLayoutAttempt.
+    if cmd == 'layoutretry' then
+        if addonTable.ResetEditModeLayoutAttempt and addonTable:ResetEditModeLayoutAttempt() then
+            if InCombatLockdown() or UnitAffectingCombat('player') then
+                DF:Print('Edit Mode layout attempt reset. Type |cffffff78/reload|r once you are out of combat.')
             else
-                local db = DF.db and DF.db.global
-                if db then db.editModeLayoutNoticeDismissed = false end
+                DF:Print('Edit Mode layout attempt reset - reloading to try again.')
+
+                local reload = (C_UI and C_UI.Reload) or ReloadUI
+                if reload then reload() end
             end
         end
         return
     end
 
     -- /df raidnotice - bring back the explanation of where raid-style party frame
-    -- appearance is configured. Same force semantics as layoutnotice: the player
-    -- asking overrides both the dismissed flag and the once-per-session guard.
+    -- appearance is configured. force=true skips both the dismissed flag and the
+    -- once-per-session guard, because this is the player asking for it.
     -- See Party.mixin.lua:ShowRaidStylePartyNotice.
     if cmd == 'raidnotice' then
         if addonTable.ShowRaidStylePartyNotice then

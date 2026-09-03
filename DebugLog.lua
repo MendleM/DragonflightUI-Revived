@@ -170,12 +170,18 @@ function DF:Log(tag, msg, ...)
     local key = tostring(tag) .. '\0' .. text
     if key == lastKey and lastIndex and log[lastIndex] then
         lastCount = lastCount + 1
-        log[lastIndex] = string.format('%7.2f [%s] %s  (x%d)', GetTime() % 100000, tostring(tag), text, lastCount)
+        log[lastIndex] = string.format('%s %7.2f [%s] %s  (x%d)', date('%H:%M:%S'), GetTime() % 100000, tostring(tag),
+                                      text, lastCount)
         if echoToChat then print(PREFIX .. log[lastIndex]) end
         return log[lastIndex]
     end
 
-    local entry = string.format('%7.2f [%s] %s', GetTime() % 100000, tostring(tag), text)
+    -- Wall clock alongside the uptime.
+    --
+    -- GetTime() only answers "how long has the client been running", which tells a reader
+    -- nothing hours later - and reports arrive with several dumps in them, from different
+    -- sessions, with no way to tell which came first.
+    local entry = string.format('%s %7.2f [%s] %s', date('%H:%M:%S'), GetTime() % 100000, tostring(tag), text)
 
     if #log < MAX_ENTRIES then
         log[#log + 1] = entry
@@ -1185,8 +1191,10 @@ function DF:LogCopy(filter)
         return
     end
 
-    local header = string.format('DragonflightUI %s | %s | %d entries%s', DF:GetVersion(),
-                                 (GetBuildInfo and select(1, GetBuildInfo())) or '?', #matching,
+    -- Date and time in the header too, so a pasted dump can be placed without asking.
+    local header = string.format('DragonflightUI %s | %s | %s | %d entries%s', DF:GetVersion(),
+                                 (GetBuildInfo and select(1, GetBuildInfo())) or '?',
+                                 date('%Y-%m-%d %H:%M:%S'), #matching,
                                  filter and (' matching "' .. filter .. '"') or '')
 
     local text = header .. '\n\n' .. table.concat(matching, '\n')
@@ -1235,9 +1243,13 @@ end
 -- issecurevariable can see what taintLog cannot. Its second return is the addon
 -- that dirtied the field, so walking the party frames and their interesting
 -- fields turns "something tainted this" into a name and a key.
+-- unitExists is in the list because CompactUnitFrame_UpdateVisible both writes and reads
+-- it, one line above the frame:Hide() that got blocked. If that field is dirty, every trip
+-- through UpdateVisible is dirty with it, and the block needs no addon anywhere in the
+-- stack to explain it.
 local PARTY_TAINT_FIELDS = {
-    'unit', 'isLootObject', 'displayedUnit', 'inVehicle', 'optionTable', 'layoutIndex', 'maxBuffs', 'maxDebuffs',
-    'showBuffs', 'showDebuffs', 'shouldShow'
+    'unit', 'unitExists', 'isLootObject', 'displayedUnit', 'inVehicle', 'optionTable', 'layoutIndex', 'maxBuffs',
+    'maxDebuffs', 'showBuffs', 'showDebuffs', 'shouldShow'
 }
 
 -- Fields on a frame object, whether or not it has a name in _G.
@@ -1254,6 +1266,192 @@ local PARTY_TAINT_FIELDS = {
 -- seed that looks like nothing at all in a data-only dump.
 local PARTY_TAINT_METHODS = {'UpdateOnlineStatus', 'UpdateMember', 'UpdateArt', 'UpdatePet', 'Show', 'Hide',
                              'SetShown', 'SetPoint', 'SetAttribute'}
+
+-- Everything PartyFrameMixin:ShouldShow touches, in the order Blizzard touches it.
+--
+-- ShouldShow runs at PartyFrame.lua:150, four lines before the UpdateMember that writes
+-- member.unit, and the traced seed stack comes in through it:
+--
+--     UnitFrame_SetUnit <- PartyMemberFrame:UpdateMember (168)
+--       <- PartyFrame:UpdatePartyFrames (154)
+--       <- UpdateRaidAndPartyFrames (RaidFrame 261)
+--       <- UIParent_OnEvent, GROUP_ROSTER_UPDATE (UIParent 590)
+--
+-- Blizzard's own chain reads, and any one of these being insecure taints the rest of
+-- that execution - including the .unit written at the end:
+--
+--     ShouldShow -> ShouldShowPartyFrames() and not EditModeManagerFrame:UseRaidStylePartyFrames()
+--     UseRaidStylePartyFrames -> GetSettingValueBool -> GetRegisteredSystemFrame
+--                                (reads EditModeManagerFrame.registeredSystemFrames)
+--     systemFrame:GetSettingValue -> self.systemInfo (IsInitialized)
+--                                 -> self.settingMap[setting].value
+--
+-- The plain field walk above cannot see this: it checks a fixed list of names on the
+-- first level only, and settingMap and systemInfo are neither in that list nor flat.
+-- EditModeSystemMixin:UpdateSettingMap replaces self.settingMap wholesale, and
+-- OnSystemSettingChange is what drives it - so a setting applied from addon code leaves
+-- the whole map insecure, not just the one key that was set.
+local function LogTaintedSlot(tag, label, tbl, key)
+    if type(tbl) ~= 'table' then return false end
+    local ok, who = issecurevariable(tbl, key)
+    if ok then return false end
+    DF:Log(tag, '  SEED %s.%s: INSECURE, tainted by %s', label, key, tostring(who or '?'))
+    return true
+end
+
+local function LogShouldShowReadPath(tag)
+    local found = 0
+
+    -- The two globals the function itself resolves.
+    for _, name in ipairs({'ShouldShowPartyFrames', 'EditModeManagerFrame', 'PartyFrame', 'CompactPartyFrame',
+                           'CompactRaidFrameManager', 'CompactRaidFrameManager_UpdateShown'}) do
+        if _G[name] ~= nil then
+            local ok, who = issecurevariable(name)
+            if not ok then
+                found = found + 1
+                DF:Log(tag, '  SEED global %s: INSECURE, tainted by %s', name, tostring(who or '?'))
+            end
+        end
+    end
+
+    local emm = _G['EditModeManagerFrame']
+    if emm then
+        if LogTaintedSlot(tag, 'EditModeManagerFrame', emm, 'registeredSystemFrames') then found = found + 1 end
+        if LogTaintedSlot(tag, 'EditModeManagerFrame', emm, 'overrideLayoutInfo') then found = found + 1 end
+    end
+
+    local pf = _G['PartyFrame']
+    if pf then
+        for _, key in ipairs({'settingMap', 'systemInfo', 'savedSystemInfo', 'dirtySettings', 'systemNameString'}) do
+            if LogTaintedSlot(tag, 'PartyFrame', pf, key) then found = found + 1 end
+        end
+
+        -- One level in: the map is rebuilt as a whole, but a single entry can be dirty on
+        -- its own, and .value is the field GetSettingValue actually returns.
+        local map = rawget(pf, 'settingMap')
+        if type(map) == 'table' then
+            for setting, entry in pairs(map) do
+                local label = 'PartyFrame.settingMap[' .. tostring(setting) .. ']'
+                if LogTaintedSlot(tag, 'PartyFrame.settingMap', map, setting) then found = found + 1 end
+                if type(entry) == 'table' then
+                    for _, k in ipairs({'value', 'displayValue'}) do
+                        if LogTaintedSlot(tag, label, entry, k) then found = found + 1 end
+                    end
+                end
+            end
+        end
+
+        -- systemInfo.settings is what the map is built from, so a dirty entry here comes
+        -- back on the next rebuild even if the map looks clean right now.
+        local info = rawget(pf, 'systemInfo')
+        if type(info) == 'table' then
+            if LogTaintedSlot(tag, 'PartyFrame.systemInfo', info, 'settings') then found = found + 1 end
+            local settings = info.settings
+            if type(settings) == 'table' then
+                for i, entry in ipairs(settings) do
+                    if LogTaintedSlot(tag, 'PartyFrame.systemInfo.settings', settings, i) then
+                        found = found + 1
+                    end
+                    if type(entry) == 'table' then
+                        for _, k in ipairs({'setting', 'value'}) do
+                            if LogTaintedSlot(tag, 'PartyFrame.systemInfo.settings[' .. i .. ']', entry, k) then
+                                found = found + 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if found == 0 then
+        DF:Log(tag, 'ShouldShow read path: every field and global on it is secure')
+    else
+        DF:Log(tag, 'ShouldShow read path: %d insecure spot(s) - this is what taints UpdateMember', found)
+    end
+end
+
+-- Every station the raid-style setting passes through, in order.
+--
+-- "Gruppe als Schlachtzug anzeigen" is stored rather than applied - the applier taints
+-- both party displays when it is run from addon code - so it is meant to take effect on
+-- the next load. When it does not, the question is which station dropped it:
+--
+--   1. our profile          party.useCompactPartyFrames
+--   2. the CVar             useCompactPartyFrames
+--   3. the saved layout     C_EditMode.GetLayouts() -> systems -> settings
+--   4. the system frame     PartyFrame.settingMap, filled by Blizzard when it applies
+--                           a layout - and only then
+--   5. the frames           which of the two party displays is actually up
+--
+-- Station 4 was the only one ever reported, and a value there proves nothing about
+-- whether it came from station 3.
+local function LogRaidStyleChain(tag)
+    local sys = Enum and Enum.EditModeSystem and Enum.EditModeSystem.UnitFrame
+    local idx = Enum and Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Party
+    local setting = Enum and Enum.EditModeUnitFrameSetting and
+                        Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames
+
+    if not (sys and idx and setting) then
+        DF:Log(tag, 'raid style chain: Enum values missing, cannot walk it')
+        return
+    end
+
+    local mod = DF:GetModule('Unitframe', true)
+    local party = mod and mod.db and mod.db.profile and mod.db.profile.party
+    DF:Log(tag, 'raid style chain 1/5 profile useCompactPartyFrames=%s',
+           tostring(party and party.useCompactPartyFrames))
+
+    local cvar = (C_CVar and C_CVar.GetCVar and C_CVar.GetCVar('useCompactPartyFrames')) or
+                     (GetCVar and GetCVar('useCompactPartyFrames'))
+    DF:Log(tag, 'raid style chain 2/5 CVar useCompactPartyFrames=%s', tostring(cvar))
+
+    -- The saved layouts, which is what WriteLayout writes and what the game reads back at
+    -- login. GetLayouts returns the player's own layouts only, no presets.
+    if C_EditMode and C_EditMode.GetLayouts then
+        local ok, li = pcall(C_EditMode.GetLayouts)
+        if ok and li and li.layouts then
+            if #li.layouts == 0 then
+                DF:Log(tag, 'raid style chain 3/5 no saved layouts - nothing can hold the value')
+            end
+            for i, layout in ipairs(li.layouts) do
+                local stored, sawSystem = nil, false
+                for _, s in ipairs(layout.systems or {}) do
+                    if s.system == sys and s.systemIndex == idx then
+                        sawSystem = true
+                        for _, entry in ipairs(s.settings or {}) do
+                            if entry.setting == setting then stored = entry.value end
+                        end
+                    end
+                end
+                DF:Log(tag, 'raid style chain 3/5 saved layout %d "%s": party system=%s stored value=%s', i,
+                       tostring(layout.layoutName), tostring(sawSystem), tostring(stored))
+            end
+        else
+            DF:Log(tag, 'raid style chain 3/5 GetLayouts failed')
+        end
+    end
+
+    -- Which layout the game is actually on. This index space is presets first, saved
+    -- layouts after - so it does not line up with the numbering above, and that is the
+    -- point: a value written into a saved layout that is not the active one never applies.
+    local emm = _G['EditModeManagerFrame']
+    if emm and emm.layoutInfo then
+        local active = emm.layoutInfo.activeLayout
+        local layout = emm.layoutInfo.layouts and emm.layoutInfo.layouts[active]
+        -- Enum.EditModeLayoutType: Preset 0, Account 1, Character 2. Named rather than
+        -- numbered, because reading 1 as "preset" sent this investigation sideways once.
+        local kinds = {[0] = 'preset', [1] = 'account', [2] = 'character'}
+        local kind = layout and layout.layoutType
+        DF:Log(tag, 'raid style chain 4/5 active layout index=%s name=%s type=%s (%s)', tostring(active),
+               tostring(layout and layout.layoutName), tostring(kind), kinds[kind] or 'unknown')
+    end
+
+    local pf, cpf = _G['PartyFrame'], _G['CompactPartyFrame']
+    DF:Log(tag, 'raid style chain 5/5 PartyFrame shown=%s / CompactPartyFrame shown=%s -> displaying %s',
+           tostring(pf and pf:IsShown()), tostring(cpf and cpf:IsShown()),
+           (cpf and cpf:IsShown()) and 'raid style' or 'portrait frames')
+end
 
 local function LogFrameFieldTaint(tag, label, frame)
     local dirty = 0
@@ -1391,6 +1589,50 @@ local function LogSeedCandidates()
     end
 end
 
+-- The same trick for optionTable on the compact party frames, which needs no group.
+--
+-- CompactUnitFrame_UpdateAll reads frame.optionTable on its first line, at 433, and calls
+-- CompactUnitFrame_UpdateVisible - which does frame:Hide() on a unitless frame - at 438. So
+-- a dirty optionTable taints every update of those frames before the Hide, and the client
+-- refuses it in combat: the ADDON_ACTION_BLOCKED on CompactPartyFramePet1:Hide(), and the
+-- one stale "offline" member left standing.
+--
+-- These frames exist and are updated whether or not raid-style party frames are in use, so
+-- this is not tied to that setting. And /df log party shows the field dirty while solo,
+-- which is why this watcher can fire without a group - unlike the .unit one above.
+--
+-- CompactUnitFrame_SetUpFrame is what writes optionTable, so hook that and ask straight
+-- after it returns. If the field is dirty at that moment, this call is the one that did it,
+-- and debugstack names whoever asked for it.
+local compactSeedArmed, compactSeedFound = false, false
+
+local function ArmCompactSeedWatcher()
+    if compactSeedArmed or not CompactUnitFrame_SetUpFrame then return end
+    compactSeedArmed = true
+
+    hooksecurefunc('CompactUnitFrame_SetUpFrame', function(frame)
+        if compactSeedFound or not frame then return end
+
+        local name = frame.GetName and frame:GetName()
+        if not (name and name:find('CompactParty', 1, true)) then return end
+
+        local ok, who = issecurevariable(frame, 'optionTable')
+        if ok then return end
+
+        compactSeedFound = true
+        DF:Log('seed', 'FIRST INSECURE .optionTable on %s, tainted by %s', name, tostring(who or '?'))
+        DF:Log('seed', 'stack: %s', tostring(debugstack(2, 30, 0)):gsub('\n', ' | '):sub(1, 3000))
+
+        -- Same question as the other watcher: the stack may be pure Blizzard, in which case
+        -- the execution arrived dirty and something we wrote was read on the way in.
+        LogSeedCandidates()
+
+        LogInsecureFields('compact frame', frame)
+        LogInsecureFields('CompactPartyFrame', _G['CompactPartyFrame'])
+        LogInsecureFields('PartyFrame', _G['PartyFrame'])
+    end)
+end
+
 local function ArmSeedWatcher()
     if seedArmed or not UnitFrame_SetUnit then return end
     seedArmed = true
@@ -1420,6 +1662,40 @@ local function ArmSeedWatcher()
         LogInsecureFields('member.PetFrame', frame.PetFrame)
         LogInsecureFields('parent', frame.GetParent and frame:GetParent())
         LogInsecureFields('PartyFrame', _G['PartyFrame'])
+
+        -- The bars, because UnitFrame_SetUnit reads fields off them before it writes
+        -- .unit at UnitFrame.lua:178:
+        --
+        --     if ( not healthbar.frequentUpdates ) then ...            -- 161
+        --     if ( manabar and not manabar.frequentUpdates ) then ...  -- 164
+        --     self.unit = unit;                                       -- 178
+        --
+        -- This is the shape lockColor had, and lockColor was only ever found because
+        -- somebody thought to name it. A pairs() walk needs no such luck.
+        LogInsecureFields('member.HealthBar', frame.HealthBar)
+        LogInsecureFields('member.ManaBar', frame.ManaBar)
+        LogInsecureFields('member.PetFrame.HealthBar', frame.PetFrame and frame.PetFrame.HealthBar)
+
+        -- Everything upstream in the same execution. UpdateRaidAndPartyFrames runs
+        --
+        --     PartyFrame:HidePartyFrames();                                     -- 255
+        --     CompactRaidFrameManager_UpdateShown(CompactRaidFrameManager);     -- 258
+        --     PartyFrame:UpdatePartyFrames();                                   -- 261
+        --
+        -- and the stack enters UpdatePartyFrames already tainted. A field read inside
+        -- the 258 call taints the rest of it, and this addon restyles those raid frames
+        -- and pushes Edit Mode settings onto them - so they are the open question, and
+        -- nothing has ever looked at them.
+        for _, name in ipairs({'CompactRaidFrameManager', 'CompactRaidFrameContainer', 'CompactPartyFrame',
+                               'EditModeManagerFrame'}) do
+            LogInsecureFields(name, _G[name])
+        end
+
+        local crfm = _G['CompactRaidFrameManager']
+        if crfm then
+            LogInsecureFields('CompactRaidFrameManager.container', rawget(crfm, 'container'))
+            LogInsecureFields('CompactRaidFrameManager.displayFrame', rawget(crfm, 'displayFrame'))
+        end
 
         -- Named outright, because it is the suspect and it may not survive a
         -- pairs() walk if Blizzard cached it as false.
@@ -1542,6 +1818,29 @@ function DF:LogPartyTaint(tag)
             if LogFrameFieldTaint(tag, 'pooled member ' .. n, pf) == 0 then
                 DF:Log(tag, 'pooled member %d clean', n)
             end
+
+            -- lockColor on the bars: kept as a regression guard, and expected to read
+            -- secure now.
+            --
+            -- SetupModern used to set healthbar.lockColor and manabar.lockColor to stop
+            -- Blizzard re-tinting our art. Blizzard reads statusbar.lockColor in
+            -- UnitFrame.lua at 750, 757 and 873, manaBar.lockColor at 472 and 501 - so a
+            -- field written from an addon and read there handed our taint to Blizzard's own
+            -- execution, and whatever it wrote next - .unit, by way of UnitFrame_SetUnit -
+            -- carried the blame. That is what refused SetAttribute, Hide and Show on party
+            -- members mid-combat. The colour is re-asserted from a global hooksecurefunc
+            -- instead; if either of these ever reads INSECURE again, that came back.
+            --
+            -- Checked per bar rather than on the member frame, because the write landed on
+            -- the bar. Styling runs whether or not anyone is grouped, so this shows up solo.
+            for _, barKey in ipairs({'HealthBar', 'ManaBar'}) do
+                local bar = pf[barKey]
+                if bar then
+                    local ok, blame = issecurevariable(bar, 'lockColor')
+                    DF:Log(tag, '  pooled member %d %s.lockColor: %s%s', n, barKey,
+                           ok and 'secure' or 'INSECURE', (not ok and blame) and (', tainted by ' .. blame) or '')
+                end
+            end
         end
         DF:Log(tag, 'pooled members active: %d (group has %d)', n, GetNumGroupMembers and GetNumGroupMembers() or -1)
     end
@@ -1583,6 +1882,15 @@ function DF:LogPartyTaint(tag)
     for i = 1, 5 do
         LogFrameTaint(tag, 'CompactPartyFrameMember' .. i)
         LogFrameTaint(tag, 'PartyMemberFrame' .. i)
+
+        -- The pet slots, which the member walk above skipped.
+        --
+        -- These are the frames the report actually named: ADDON_ACTION_BLOCKED on
+        -- CompactPartyFramePet1:Hide() out of CompactUnitFrame_UpdateVisible. A refused
+        -- Hide() leaves a unitless frame on screen, which is what "one offline dummy
+        -- member instead of three" was. Their updateAllEvent is UNIT_PET, so they are
+        -- updated on their own schedule and can be dirty while everything else reads clean.
+        LogFrameTaint(tag, 'CompactPartyFramePet' .. i)
     end
 
     -- The shared seed, and the reason to look here at all.
@@ -1611,11 +1919,44 @@ function DF:LogPartyTaint(tag)
             end
         end
 
+        -- What the party system frame itself answers, and whether the layout can keep it.
+        --
+        -- Two things decide whether this addon has to apply the setting at all. If
+        -- PartyFrame already reports the wanted value, applying it again is pointless and
+        -- taints the compact party frames for nothing - Blizzard writes optionTable on each
+        -- of them from inside our call. And if the active layout is a preset, or there is no
+        -- saved layout at all, the value cannot be persisted on Blizzard's side, so it will
+        -- never be there at login and we are forced to apply it every session.
+        local pf = _G['PartyFrame']
+        if pf and pf.GetSettingValue and Enum and Enum.EditModeUnitFrameSetting then
+            local setting = Enum.EditModeUnitFrameSetting.UseRaidStylePartyFrames
+            local hasIt, has = pcall(pf.HasSetting, pf, setting)
+            local okVal, value = pcall(pf.GetSettingValue, pf, setting)
+
+            DF:Log(tag, 'PartyFrame setting UseRaidStylePartyFrames: HasSetting=%s value=%s (read ok=%s)',
+                   tostring(hasIt and has), tostring(value), tostring(okVal))
+        else
+            DF:Log(tag, 'PartyFrame setting UseRaidStylePartyFrames: no GetSettingValue on the frame')
+        end
+
+        if C_EditMode and C_EditMode.GetLayouts then
+            local gotLayouts, layoutInfo = pcall(C_EditMode.GetLayouts)
+            local saved = (gotLayouts and layoutInfo and layoutInfo.layouts) and #layoutInfo.layouts or -1
+            local isPreset = EditModeManagerFrame.IsActiveLayoutPreset and
+                                 select(2, pcall(EditModeManagerFrame.IsActiveLayoutPreset, EditModeManagerFrame))
+
+            DF:Log(tag, 'edit mode layout: preset=%s saved (non-preset) layouts=%s', tostring(isPreset),
+                   tostring(saved))
+        end
+
         -- The call itself, which is what ShouldShow actually asks.
         if EditModeManagerFrame.UseRaidStylePartyFrames then
             local ok, value = pcall(EditModeManagerFrame.UseRaidStylePartyFrames, EditModeManagerFrame)
             DF:Log(tag, 'UseRaidStylePartyFrames() -> %s (call ok=%s)', tostring(value), tostring(ok))
         end
+
+        LogShouldShowReadPath(tag)
+        LogRaidStyleChain(tag)
     end
 end
 
@@ -2196,12 +2537,17 @@ function DF:HandleLogCommand(rest)
         DF:LogTaintedGlobals('globals')
         DF:LogCopy('globals')
     elseif sub == 'seed' then
-        if seedFound then
+        -- Two watchers, and either one alone is worth reading. The compact one needs no
+        -- group, so say which of them fired instead of sending people off to find friends.
+        if seedFound or compactSeedFound then
             DF:LogCopy('seed')
         else
-            print(PREFIX .. 'no party taint seed captured yet' ..
-                      (seedArmed and ' - the watcher is armed; group up and it will fire.' or
-                          ' - the watcher never armed (UnitFrame_SetUnit missing).'))
+            print(PREFIX .. 'no taint seed captured yet.')
+            print(PREFIX .. '  .unit watcher (needs a group): ' ..
+                      (seedArmed and 'armed' or 'NOT armed - UnitFrame_SetUnit missing'))
+            print(PREFIX .. '  .optionTable watcher (works solo): ' ..
+                      (compactSeedArmed and 'armed, nothing dirty at setup time' or
+                          'NOT armed - CompactUnitFrame_SetUpFrame missing'))
         end
     elseif sub == 'party' then
         DF:LogPartyTaint('party')
@@ -2220,12 +2566,14 @@ InstallCapture()
 -- Blizzard_UnitFrame may not have loaded when this file runs, so arm now if the
 -- function is already there, and again when it arrives.
 ArmSeedWatcher()
+ArmCompactSeedWatcher()
 do
     local armFrame = CreateFrame('Frame')
     armFrame:RegisterEvent('ADDON_LOADED')
     armFrame:RegisterEvent('PLAYER_LOGIN')
     armFrame:SetScript('OnEvent', function(self)
         ArmSeedWatcher()
-        if seedArmed then self:UnregisterAllEvents() end
+        ArmCompactSeedWatcher()
+        if seedArmed and compactSeedArmed then self:UnregisterAllEvents() end
     end)
 end

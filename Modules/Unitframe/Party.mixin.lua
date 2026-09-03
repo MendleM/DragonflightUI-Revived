@@ -18,17 +18,11 @@ local function TextStatusBar_UpdateTextString(f)
 end
 
 -- The health and mana readouts that sit INSIDE the bars (Interface -> Status
--- Text, off by default). The ones the classic reskin creates inherit
--- TextStatusBarText, which is sized for Blizzard's bars - ours are 10 and 7
--- pixels tall, so the numbers spilled out of them.
+-- Text, off by default).
 --
--- "Blizzard's own strings on the pooled frames" used to be the other half of
--- that sentence, and there are none. See EnsureBarStatusText.
-local STATUS_TEXT_KEYS = {'TextString', 'LeftText', 'RightText', 'DFTextString', 'DFLeftText', 'DFRightText'}
-
--- The pooled bars have every part of the status text machinery except somewhere
--- to put it. They inherit TextStatusBar, call InitializeTextStatusBar, set
--- `cvar = "statusText"` and `textLockable = 1`, and the mixin re-runs
+-- The pooled bars have every part of Blizzard's status text machinery except
+-- somewhere to put it. They inherit TextStatusBar, call InitializeTextStatusBar,
+-- set `cvar = "statusText"` and `textLockable = 1`, and the mixin re-runs
 -- UpdateTextString on every value change, on CVAR_UPDATE and on mouseover. But
 -- UpdateTextString opens with
 --
@@ -38,19 +32,11 @@ local STATUS_TEXT_KEYS = {'TextString', 'LeftText', 'RightText', 'DFTextString',
 -- and on 1.15.9 no unit frame has one. The TextStatusBar template carries only
 -- scripts and a mixin - no FontStrings - and in the whole client only
 -- Blizzard_PetBattleUI and the personal resource display declare a TextString.
--- Player, target and party bars all inherit the behaviour and none of them
--- supply the string, so the readouts were never being hidden or mis-sized:
--- there was nothing for the numbers to land in.
 --
--- That is why the earlier pass here did not fix it. FitBarStatusText resizes
--- the strings, and on a pooled frame all six keys are nil, so it had nothing to
--- resize and reported no error.
---
--- Supplying the three strings is the entire fix. Blizzard's own code then fills
--- them on every value change, shows and hides them from the Status Text option,
--- switches between numeric, percentage and both, and reveals them on mouseover
--- through lockShow. LeftText and RightText matter: the "both" display mode
--- writes the percentage and the value into them rather than into TextString.
+-- Handing Blizzard the missing string is what this used to do, and it worked -
+-- at the cost of a field of ours on a protected frame that Blizzard reads on
+-- every update. That was the party taint. The strings are ours now, kept off the
+-- bars entirely; see CreateBarStatusText and UpdateBarStatusText below.
 local function GetDFUIUnitframeFont()
     local newFont = 'Fonts\\FRIZQT__.ttf'
     local locale = GetLocale()
@@ -66,8 +52,30 @@ local function GetDFUIUnitframeFont()
     return newFont
 end
 
-local function EnsureBarStatusText(bar)
-    if not (bar and bar.CreateFontString) or bar.TextString then return end
+-- Why these strings are not handed to Blizzard.
+--
+-- Supplying bar.TextString was the whole fix above, and it was also a taint seed of
+-- the first order. TextStatusBarMixin:UpdateTextString opens with
+--
+--     local textString = self.TextString;
+--
+-- at TextStatusBar.lua:85, and that line runs at the end of every health and power
+-- update. A field written by an addon and read back there hands our taint to
+-- Blizzard's own execution - so everything it wrote next came out insecure too:
+-- statusbar.currValue, statusbar.disconnected, healthbar.unit, and finally
+-- member.unit through UnitFrame_SetUnit. That is what refused SetAttribute, Show
+-- and Hide on pooled party members in combat.
+--
+-- The strings therefore live in memberState, keyed by the frame, and are filled by
+-- UpdateBarStatusText below - a reading of Blizzard's own display logic, from our
+-- own execution. Blizzard's UpdateTextString still runs on these bars and still
+-- finds self.TextString nil, which is exactly the state every other unit frame on
+-- 1.15.9 is in.
+--
+-- CreateFontString does not count: it parents a region to the bar without writing a
+-- named field onto it, and Blizzard never looks the children up.
+local function CreateBarStatusText(bar)
+    if not (bar and bar.CreateFontString) then return nil end
 
     local function make(point, x)
         local fs = bar:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
@@ -76,26 +84,121 @@ local function EnsureBarStatusText(bar)
         return fs
     end
 
-    bar.TextString = make('CENTER', 0)
-    bar.LeftText = make('LEFT', 2)
-    bar.RightText = make('RIGHT', -2)
-
-    -- Nothing has changed value yet, so ask for the first fill rather than
-    -- waiting for the member to take damage.
-    if bar.UpdateTextString then bar:UpdateTextString() end
+    return {center = make('CENTER', 0), left = make('LEFT', 2), right = make('RIGHT', -2)}
 end
 
-local function FitBarStatusText(bar)
-    if not bar or not bar.GetHeight then return end
+local function FitBarStatusText(bar, texts)
+    if not (bar and bar.GetHeight and texts) then return end
 
     local size = ((bar:GetHeight() or 10) >= 12) and 10 or 9
     local fontFile = GetDFUIUnitframeFont()
 
-    for _, key in ipairs(STATUS_TEXT_KEYS) do
-        local text = bar[key]
-        if text and text.SetFont then
-            text:SetFont(fontFile, size, 'OUTLINE')
+    for _, fs in pairs(texts) do
+        if fs and fs.SetFont then fs:SetFont(fontFile, size, 'OUTLINE') end
+    end
+end
+
+-- Blizzard's TextStatusBarMixin:UpdateTextStringWithValues, in the parts that apply
+-- to a party health or power bar.
+--
+-- Left out on purpose: prefix and alwaysPrefix (never set on these bars), pauseUpdates
+-- and controlsShownState (they decide whether to hide the BAR, which is Blizzard's
+-- business and not a text concern), and numericDisplayTransformFunc (unused here).
+-- The rest is the same order of decisions Blizzard makes, so the Status Text option
+-- and its display modes keep behaving as players expect.
+-- C_CVar.GetCVar is the documented form; the bare global is an alias that still works
+-- and is what Blizzard's own TextStatusBar.lua uses on 1.15.9. Prefer the namespaced
+-- one and fall back, the same shape as EditmodePreview.mixin.lua.
+--
+-- The CVars themselves are not deprecated: statusText and statusTextDisplay are still
+-- where the Status Text option lives. What was replaced is the old interface options
+-- panel, by the Settings API - and Settings writes these very CVars.
+local function ReadCVar(name)
+    if C_CVar and C_CVar.GetCVar then return C_CVar.GetCVar(name) end
+    if GetCVar then return GetCVar(name) end
+    return nil
+end
+
+local function UpdateBarStatusText(bar, texts, breakUpLargeNumbers, mouseover)
+    if not (bar and texts and bar.GetValue) then return end
+
+    local center, left, right = texts.center, texts.left, texts.right
+    local function hideAll()
+        for _, fs in pairs(texts) do
+            if fs then
+                fs:SetText('')
+                fs:Hide()
+            end
         end
+    end
+
+    left:SetText('')
+    right:SetText('')
+    left:Hide()
+    right:Hide()
+
+    local value = bar:GetValue()
+    local _, valueMax = bar:GetMinMaxValues()
+    if not (value and valueMax) or valueMax <= 0 then
+        hideAll()
+        return
+    end
+
+    -- Blizzard's gate: the statusText CVar, or a mouseover that lifted lockShow.
+    -- forceHideText is Blizzard's own opt-out and is honoured, not overwritten.
+    local cvarOn = ReadCVar('statusText') == '1'
+    local locked = (bar.lockShow or 0) > 0
+    if bar.forceHideText or not (cvarOn or locked or mouseover or bar.forceShow) then
+        hideAll()
+        return
+    end
+
+    if value == 0 and bar.zeroText then
+        center:SetText(bar.zeroText)
+        center:Show()
+        return
+    end
+
+    local valueDisplay, valueMaxDisplay
+    if bar.capNumericDisplay then
+        valueDisplay, valueMaxDisplay = AbbreviateLargeNumbers(value), AbbreviateLargeNumbers(valueMax)
+    elseif breakUpLargeNumbers then
+        valueDisplay, valueMaxDisplay = BreakUpLargeNumbers(value), BreakUpLargeNumbers(valueMax)
+    else
+        valueDisplay, valueMaxDisplay = tostring(value), tostring(valueMax)
+    end
+
+    local numeric = bar.disableMaxValue and valueDisplay or (valueDisplay .. ' / ' .. valueMaxDisplay)
+    local percent = math.ceil((value / valueMax) * 100) .. '%'
+
+    -- Same precedence Blizzard uses: the bar's own overrides beat the CVar.
+    local mode = ReadCVar('statusTextDisplay') or 'NUMERIC'
+    if bar.showNumeric and bar.showPercentage then
+        mode = 'BOTH'
+    elseif bar.showNumeric then
+        mode = 'NUMERIC'
+    elseif bar.showPercentage then
+        mode = 'PERCENT'
+    end
+    if bar.disablePercentages and mode == 'PERCENT' then mode = 'NUMERIC' end
+
+    if mode == 'BOTH' then
+        -- Blizzard splits this across LeftText and RightText, and only shows the
+        -- percentage on the left for mana or a non-power bar.
+        if not bar.disablePercentages and (not bar.powerToken or bar.powerToken == 'MANA') then
+            left:SetText(percent)
+            left:Show()
+        end
+        right:SetText(valueDisplay)
+        right:Show()
+        center:SetText('')
+        center:Hide()
+    elseif mode == 'PERCENT' then
+        center:SetText(percent)
+        center:Show()
+    else
+        center:SetText(numeric)
+        center:Show()
     end
 end
 
@@ -222,6 +325,37 @@ StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
     end
 }
 
+-- Asked right when the switch is flipped, because the frames do not change until a reload
+-- and nothing else would make that obvious.
+--
+-- A popup rather than a button on the page. A button was tried and thrown away twice over:
+-- the settings list only builds its rows in Init, so a caption cannot change while the page
+-- is open, and a button that does nothing but reload is what /reload, a logout or restarting
+-- the game already do. This asks once, at the moment it matters, and then stays out of the
+-- way.
+StaticPopupDialogs['DragonflightUIRaidStylePartyReload'] = {
+    text = 'The raid-style party frame setting has been saved.\n\n' ..
+        'It takes effect after a reload - Blizzard applies it while the interface loads, which is the only way it ' ..
+        'can be done without leaving the party frames unable to update during combat.\n\n' .. 'Reload now?',
+    button1 = RELOADUI or 'Reload',
+    button2 = LATER or 'Later',
+    showAlert = true,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+    OnAccept = function()
+        if InCombatLockdown() or UnitAffectingCombat('player') then
+            DF:Print('Cannot reload during combat - type |cffffff78/reload|r once the fight is over.')
+
+            return
+        end
+
+        local reload = (C_UI and C_UI.Reload) or ReloadUI
+        if reload then reload() end
+    end
+}
+
 function addonTable:ShowRaidStylePartyNotice(force)
     if not force then
         if raidStyleNoticeShown then return false end
@@ -259,9 +393,16 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     local val = enabled and true or false
 
     local Module = (selfRef and type(selfRef) == 'table' and selfRef.ModuleRef) or DF:GetModule('Unitframe')
-    if Module and Module.db and Module.db.profile and Module.db.profile.party then
-        Module.db.profile.party.useCompactPartyFrames = val
-    end
+    local party = Module and Module.db and Module.db.profile and Module.db.profile.party
+
+    -- Did the checkbox actually change? Then it needs a reload to show.
+    --
+    -- Nothing more than the old value against the new one. Earlier attempts asked Blizzard
+    -- what it currently applies, which is worthless here: the profile write and the CVar
+    -- write below both change that answer, so the comparison agreed with itself.
+    local needsReload = party ~= nil and (party.useCompactPartyFrames and true or false) ~= val
+
+    if party then party.useCompactPartyFrames = val end
 
     -- Keep CVar in sync if client supports it
     if C_CVar and C_CVar.GetCVar and C_CVar.GetCVar('useCompactPartyFrames') ~= nil then
@@ -272,6 +413,14 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
 
     if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
         addonTable:SyncRaidStylePartyFrameToBlizzard(val)
+
+        -- Asked, not just logged: the frames do not change yet and silence would read as a
+        -- broken switch. Only when the two actually disagreed, so setting the value it
+        -- already has stays quiet.
+        if needsReload then
+            DF:Print('Raid-style party frames: setting saved, it applies on the next reload.')
+            StaticPopup_Show('DragonflightUIRaidStylePartyReload')
+        end
     end
 
     -- Only when switching on, and only once per session. Switching back to the
@@ -286,44 +435,35 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
         pcall(fakeParty.Update, fakeParty)
     end
 
-    -- Safely trigger Blizzard updates out of combat on a clean tick
-    Helper:RunOutOfCombat('RaidStylePartyFrames', function()
-        C_Timer.After(0, function()
-            if InCombatLockdown() then return end
-            -- EditModeManagerFrame:UpdateSystem, not PartyFrame:UpdateSystem.
-            --
-            -- Two different functions with different arguments. The manager's
-            -- version takes a system FRAME and looks the systemInfo up out of the
-            -- active layout; the frame's own version takes that systemInfo table
-            -- and iterates systemInfo.settings. This used to call the frame
-            -- version with a setting enum, so it indexed a number and threw
-            -- inside the pcall on every single toggle, without a word.
-            if EditModeManagerFrame and EditModeManagerFrame.UpdateSystem and PartyFrame then
-                local forceFullUpdate = true
-                local ok, err = pcall(EditModeManagerFrame.UpdateSystem, EditModeManagerFrame, PartyFrame,
-                                      forceFullUpdate)
-                if not ok then geterrorhandler()('DFUI PartyFrame UpdateSystem: ' .. tostring(err)) end
-            end
-            if PartyFrame and PartyFrame.UpdatePartyFrames then
-                pcall(PartyFrame.UpdatePartyFrames, PartyFrame)
-            end
-            if CompactPartyFrame and CompactPartyFrame.UpdateVisibility then
-                pcall(CompactPartyFrame.UpdateVisibility, CompactPartyFrame)
-            end
-            if CompactPartyFrame and CompactPartyFrame.UpdateLayout then
-                pcall(CompactPartyFrame.UpdateLayout, CompactPartyFrame)
-            end
-            if UIParent_UpdateRaidAndPartyFrames then
-                pcall(UIParent_UpdateRaidAndPartyFrames)
-            end
-            if CompactRaidFrameManager_UpdateShown then
-                pcall(CompactRaidFrameManager_UpdateShown, CompactRaidFrameManager)
-            end
-            if CompactRaidFrameContainer_UpdateDisplayedUnits then
-                pcall(CompactRaidFrameContainer_UpdateDisplayedUnits, CompactRaidFrameContainer)
-            end
-        end)
-    end)
+    -- No Blizzard update is kicked off from here, and none may be.
+    --
+    -- What used to stand here was a block of them, on a deferred tick out of combat:
+    -- EditModeManagerFrame:UpdateSystem(PartyFrame, forceFullUpdate), then
+    -- PartyFrame:UpdatePartyFrames, CompactPartyFrame:UpdateVisibility and UpdateLayout,
+    -- UIParent_UpdateRaidAndPartyFrames, CompactRaidFrameManager_UpdateShown and
+    -- CompactRaidFrameContainer_UpdateDisplayedUnits - an attempt to make the switch take
+    -- effect at once. It did the opposite of that, twice over.
+    --
+    -- It tainted everything. UpdateSystem with forceFullUpdate runs EVERY applier the
+    -- system has, ours being the execution, and /df log seed caught it exactly:
+    --
+    --   FIRST INSECURE .unit on <pooled> (unit=party1)
+    --     UnitFrame_SetUnit <- UpdateMember <- UpdatePartyFrames
+    --     <- UpdateRaidAndPartyFrames <- UpdateSystemSettingUseRaidStylePartyFrames
+    --     <- UpdateSystemSetting <- UpdateSystem <- EditModeManager:1398
+    --     <- pcall <- Party.mixin.lua:452
+    --
+    -- followed by PartyFrame.settingMap, .systemInfo, .savedSystemInfo, .dirtySettings and
+    -- .hasActiveChanges insecure, .optionTable and .isLootObject on all ten compact frames,
+    -- and member.unit on all four pooled ones. Blizzard then reads settingMap on every
+    -- ShouldShow, which every group event asks - so the taint came straight back.
+    --
+    -- And it applied nothing. UpdateSystem reads the value out of the ACTIVE LAYOUT, not
+    -- out of our profile, so it re-applied the old value with great ceremony. That is why
+    -- the switch appeared to do nothing at all while still breaking the frames.
+    --
+    -- The setting is stored, and the game applies it at the next load out of its own
+    -- execution. The popup above says so.
 end
 
 function SubModuleMixin:SetupOptions()
@@ -441,12 +581,16 @@ function SubModuleMixin:SetupOptions()
             useCompactPartyFrames = {
                 type = 'toggle',
                 name = USE_RAID_STYLE_PARTY_FRAMES,
-                desc = OPTION_TOOLTIP_USE_RAID_STYLE_PARTY_FRAMES,
+                desc = OPTION_TOOLTIP_USE_RAID_STYLE_PARTY_FRAMES .. '\n\n' ..
+                    'Takes effect after a reload. Blizzard\'s own switch for this reaches into both party displays ' ..
+                    'at once, and run from addon code it leaves them unable to update during combat - so the value ' ..
+                    'is stored and the game applies it itself on the way in.',
                 group = 'headerStyling',
                 order = 15,
                 blizzard = true,
                 editmode = true
             },
+
             -- Blizzard's Interface options panel, not the Edit Mode dialog. Named for
             -- what it actually opens: the two are easy to confuse, they hold
             -- different settings, and the Edit Mode ones are offered by this addon
@@ -615,7 +759,7 @@ function SubModuleMixin:SetupModern()
     local subModule = self
     local ATLAS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\uipartyframe'
     local BARS = 'Interface\\Addons\\DragonflightUI\\Textures\\Partyframe\\'
-    local UpdateRoleIcon, UpdateBars
+    local UpdateRoleIcon, UpdateBars, UpdateHealthBar, UpdateManaBar
 
     -- The pooled PartyFrame anchors itself, so DFUI's position, scale and
     -- anchor settings did nothing at all on 1.15.9 - only the classic path
@@ -881,8 +1025,17 @@ function SubModuleMixin:SetupModern()
             healthbar:SetStatusBarColor(1, 1, 1, 1)
             -- UnitFrameHealthBar_Update re-tints this green on every health
             -- event, and that green multiplied into the DF art is what made
-            -- the bars look dark. lockColor is Blizzard's own opt-out.
-            healthbar.lockColor = true
+            -- the bars look dark.
+            --
+            -- Blizzard's own opt-out for that is statusbar.lockColor, and this
+            -- used to set it. It is a field on a protected frame that Blizzard
+            -- reads back at UnitFrame.lua:750, 757 and 873 - so the read handed
+            -- our taint to Blizzard's execution, and the .unit it wrote next by
+            -- way of UnitFrame_SetUnit carried the blame. That is what refused
+            -- SetAttribute, Hide and Show on party members mid-combat.
+            --
+            -- The colour is re-asserted from a global hooksecurefunc below
+            -- instead. Nothing of ours is written onto the frame for it.
 
             local hpMask = healthbar:CreateMaskTexture()
             hpMask:SetPoint('CENTER', healthbar, 'CENTER', 0, 0)
@@ -890,6 +1043,7 @@ function SubModuleMixin:SetupModern()
                               'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
             hpMask:SetSize(71, 10)
             healthbar:GetStatusBarTexture():AddMaskTexture(hpMask)
+            st.hpMask = hpMask
         end
 
         local manabar = pf.ManaBar
@@ -899,9 +1053,11 @@ function SubModuleMixin:SetupModern()
             manabar:SetPoint('TOPLEFT', 41, -30)
             manabar:SetStatusBarTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Mana')
             manabar:SetStatusBarColor(1, 1, 1, 1)
-            -- Without this, UnitFrameManaBar_UpdateType swaps our art out
-            -- for the plain UI-StatusBar and tints it by power color.
-            manabar.lockColor = true
+            -- manabar.lockColor was set here for the same reason, and dropped
+            -- for the same reason - see the health bar above. It bought more
+            -- than colour here: without it UnitFrameManaBar_UpdateType also
+            -- swaps our art out for the plain UI-StatusBar. Both the art and
+            -- the mask are put back from the hook below.
 
             local manaMask = manabar:CreateMaskTexture()
             manaMask:SetPoint('CENTER', manabar, 'CENTER', 0, 0)
@@ -909,14 +1065,39 @@ function SubModuleMixin:SetupModern()
                                 'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
             manaMask:SetSize(74, 7)
             manabar:GetStatusBarTexture():AddMaskTexture(manaMask)
+            st.manaMask = manaMask
         end
 
-        -- Create before fitting: there is nothing to size until these exist.
-        EnsureBarStatusText(pf.HealthBar)
-        EnsureBarStatusText(pf.ManaBar)
+        -- Create before fitting: there is nothing to size until these exist. Kept in
+        -- memberState rather than on the bars - the comment at CreateBarStatusText has
+        -- the reason.
+        st.healthText = st.healthText or CreateBarStatusText(pf.HealthBar)
+        st.manaText = st.manaText or CreateBarStatusText(pf.ManaBar)
 
-        FitBarStatusText(pf.HealthBar)
-        FitBarStatusText(pf.ManaBar)
+        FitBarStatusText(pf.HealthBar, st.healthText)
+        FitBarStatusText(pf.ManaBar, st.manaText)
+
+        -- Mouseover reveals the readout even with Status Text off. Blizzard does this
+        -- with lockShow, but ShowStatusBarText bails on `if ( self and self.TextString )`
+        -- - which is nil now - so the flag never moves and we track it ourselves.
+        --
+        -- HookScript, not a script replacement: it appends to the frame's handler list
+        -- without writing a field onto the frame.
+        if not st.mouseHooked and pf.HookScript then
+            st.mouseHooked = true
+            pf:HookScript('OnEnter', function()
+                local own = memberState[pf]
+                if not own then return end
+                own.mouseover = true
+                pcall(UpdateBars, pf)
+            end)
+            pf:HookScript('OnLeave', function()
+                local own = memberState[pf]
+                if not own then return end
+                own.mouseover = false
+                pcall(UpdateBars, pf)
+            end)
+        end
 
         -- NOTE: lifting the bars above PartyMemberOverlay was tried here to
         -- test whether the overlay art was dimming them. It made the bars
@@ -991,10 +1172,30 @@ function SubModuleMixin:SetupModern()
         end
     end
 
-    -- With lockColor set, Blizzard no longer swaps the power art per power
-    -- type or greys out offline members, so we own both. Uses
-    -- GetStatusBarTexture():SetTexture so the bar's mask survives.
+    -- Blizzard swaps the power art per power type and greys out offline
+    -- members, so we own both. Uses GetStatusBarTexture():SetTexture so the
+    -- bar's mask survives.
+    --
+    -- Split in two because the hooks below know which bar Blizzard just
+    -- touched, and a health event should not drag the power bar through a
+    -- texture swap it does not need.
     function UpdateBars(pf)
+        UpdateHealthBar(pf)
+        UpdateManaBar(pf)
+    end
+
+    -- Blizzard hands our mask-carrying fill texture back to a plain one when it
+    -- swaps the art (UnitFrameManaBar_UpdateType), and a fill texture without
+    -- the mask is a bar with square corners poking out of the DF frame.
+    local function EnsureMask(bar, mask)
+        if not (bar and mask) then return end
+        local tex = bar:GetStatusBarTexture()
+        if not (tex and tex.AddMaskTexture) then return end
+        if tex.GetNumMaskTextures and tex:GetNumMaskTextures() > 0 then return end
+        pcall(tex.AddMaskTexture, tex, mask)
+    end
+
+    function UpdateHealthBar(pf)
         local unit = pf.unit or pf.unitToken
         if not (unit and UnitExists(unit)) then return end
 
@@ -1005,11 +1206,6 @@ function SubModuleMixin:SetupModern()
 
         local healthbar = pf.HealthBar
         if healthbar then
-            -- (re)assert here too, not just at first styling: frames styled
-            -- before this ran would otherwise keep Blizzard's tint until a
-            -- reload recreated them.
-            healthbar.lockColor = true
-
             -- Retail's plain Bar-Health art is a muted green (49,153,8) and
             -- looks dull next to the player frame. The class-color and
             -- gradient options - which the classic reskin honours but this
@@ -1018,9 +1214,21 @@ function SubModuleMixin:SetupModern()
             local tex = healthbar:GetStatusBarTexture()
             local r, g, b = shade, shade, shade
             if tex and state and state.classcolor then
-                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
                 local _, class = UnitClass(unit)
-                r, g, b = DF:GetClassColor(class, 1)
+
+                -- No class yet means the name cache entry has not arrived.
+                --
+                -- GROUP_ROSTER_UPDATE fires before the client has the class for a member,
+                -- so UnitClass answers nil on login and on invite. GetClassColor(nil) hands
+                -- back white, which is the priest colour - so everybody showed up as a
+                -- priest until something repainted them. Use the plain green art until the
+                -- class is known; UNIT_NAME_UPDATE brings us back here once it is.
+                if class then
+                    tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+                    r, g, b = DF:GetClassColor(class, 1)
+                else
+                    tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
+                end
             elseif tex and state and state.gradient then
                 tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
                 r, g, b = Helper:ColorGradiant(Helper:GetUnitHealthPercent(unit))
@@ -1038,11 +1246,23 @@ function SubModuleMixin:SetupModern()
             end
             if tex and tex.SetDesaturated then tex:SetDesaturated(not connected) end
             healthbar:SetStatusBarColor(r * shade, g * shade, b * shade, 1)
+
+            local st = memberState[pf]
+            EnsureMask(healthbar, st and st.hpMask)
+            if st and st.healthText then
+                UpdateBarStatusText(healthbar, st.healthText, state and state.breakUpLargeNumbers, st.mouseover)
+            end
         end
+    end
+
+    function UpdateManaBar(pf)
+        local unit = pf.unit or pf.unitToken
+        if not (unit and UnitExists(unit)) then return end
+
+        local shade = UnitIsConnected(unit) and 1 or 0.5
 
         local manabar = pf.ManaBar
         if manabar then
-            manabar.lockColor = true
             local _, powerToken = UnitPowerType(unit)
             local art = POWER_BAR_ART[powerToken] or 'Mana'
             local tex = manabar:GetStatusBarTexture()
@@ -1050,6 +1270,13 @@ function SubModuleMixin:SetupModern()
             if manabar.SetStatusBarDesaturated then manabar:SetStatusBarDesaturated(false) end
             if tex and tex.SetDesaturated then tex:SetDesaturated(false) end
             manabar:SetStatusBarColor(shade, shade, shade, 1)
+
+            local st = memberState[pf]
+            EnsureMask(manabar, st and st.manaMask)
+            if st and st.manaText then
+                local profile = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
+                UpdateBarStatusText(manabar, st.manaText, profile and profile.breakUpLargeNumbers, st.mouseover)
+            end
         end
     end
 
@@ -1090,6 +1317,52 @@ function SubModuleMixin:SetupModern()
     end
     styleAll()
 
+    -- What replaces lockColor.
+    --
+    -- Blizzard re-tints these bars - and swaps the power art - on every health
+    -- and power event. Opting out of that with statusbar.lockColor meant
+    -- writing a field onto a protected frame that Blizzard reads back, which
+    -- tainted its execution and cost us .unit, then SetAttribute, Hide and Show
+    -- on party members in combat. So we let Blizzard paint and paint over it.
+    --
+    -- hooksecurefunc is the safe way round: it restores the taint state after
+    -- the hook returns, so Blizzard carries on as securely as it came in. That
+    -- is the difference to lockColor, which left an insecure value sitting on
+    -- the frame for Blizzard to read on every later pass.
+    --
+    -- Cost is one setter per event on at most four frames, next to the setter
+    -- Blizzard already ran on the same line. Nothing is re-created and nothing
+    -- is re-rendered.
+    local function BarOwner(bar, key)
+        if not bar then return nil end
+        local pf = bar:GetParent()
+        if not pf then return nil end
+        local st = memberState[pf]
+        if not (st and st.styled) then return nil end
+        if pf[key] ~= bar then return nil end
+        return pf
+    end
+
+    if type(UnitFrameHealthBar_Update) == 'function' then
+        hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar)
+            local pf = BarOwner(statusbar, 'HealthBar')
+            if pf then pcall(UpdateHealthBar, pf) end
+        end)
+    end
+
+    -- Both are needed: UpdateType is where the art swap and the power tint
+    -- happen, and it is also called on its own from UNIT_DISPLAYPOWER, while
+    -- Update paints disconnected members grey at UnitFrame.lua:873, after
+    -- UpdateType has already returned.
+    for _, fname in ipairs({'UnitFrameManaBar_UpdateType', 'UnitFrameManaBar_Update'}) do
+        if type(_G[fname]) == 'function' then
+            hooksecurefunc(fname, function(manaBar)
+                local pf = BarOwner(manaBar, 'ManaBar')
+                if pf then pcall(UpdateManaBar, pf) end
+            end)
+        end
+    end
+
     -- Reachable from Update(), so changing a setting re-applies immediately.
     -- Without this the only things that ever restyled a pooled member frame
     -- were InitializePartyMemberFrames above and the roster watcher below -
@@ -1116,22 +1389,48 @@ function SubModuleMixin:SetupModern()
     -- Gradient coloring follows current health, so it needs health events.
     -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would
     -- fire for every unit in a raid.
+    --
+    -- UNIT_NAME_UPDATE shares the watcher but not the gradient gate. It is the client
+    -- saying the name cache entry arrived, which is the moment UnitClass starts answering -
+    -- Blizzard calls CompactUnitFrame_UpdateHealthColor on that same event and says so in a
+    -- comment. Without it a member painted plain for a missing class stayed that way, since
+    -- nothing repaints a bar whose health has not moved.
+    --
+    -- The gate stays on UNIT_HEALTH alone. That one fires constantly in combat for four
+    -- units, and outside gradient mode there is nothing for it to change.
     for _, units in ipairs({{'party1', 'party2'}, {'party3', 'party4'}}) do
-        local healthWatcher = CreateFrame('Frame')
-        healthWatcher:RegisterUnitEvent('UNIT_HEALTH', units[1], units[2])
-        healthWatcher:SetScript('OnEvent', function(_, _, unit)
-            local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
-            if not (state and state.gradient) then return end
+        local unitWatcher = CreateFrame('Frame')
+        unitWatcher:RegisterUnitEvent('UNIT_HEALTH', units[1], units[2])
+        unitWatcher:RegisterUnitEvent('UNIT_NAME_UPDATE', units[1], units[2])
+
+        unitWatcher:SetScript('OnEvent', function(_, event, unit)
+            if event == 'UNIT_HEALTH' then
+                local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
+                if not (state and state.gradient) then return end
+            end
+
             if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
+
             for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
                 local st = memberState[pf]
-                if st and st.styled and (pf.unit == unit or pf.unitToken == unit) then pcall(UpdateBars, pf) end
+
+                -- layoutIndex is the only handle a frame has before Blizzard has put a unit
+                -- on it. PartyFrameMixin:InitializePartyMemberFrames assigns 1 through
+                -- MAX_PARTY_MEMBERS, which maps straight onto party1 through party4.
+                local slot = pf.layoutIndex and ('party' .. pf.layoutIndex)
+
+                if st and st.styled and (pf.unit == unit or pf.unitToken == unit or slot == unit) then
+                    pcall(UpdateBars, pf)
+                end
             end
         end)
     end
 
     local roleWatcher = CreateFrame('Frame')
     roleWatcher:RegisterEvent('GROUP_ROSTER_UPDATE')
+    -- Logging in or reloading while already in a group: GROUP_ROSTER_UPDATE can land before
+    -- the frames have been styled, and a member skipped for that reason is never revisited.
+    roleWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
     if C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid('PLAYER_ROLES_ASSIGNED') then
         roleWatcher:RegisterEvent('PLAYER_ROLES_ASSIGNED')
     end
@@ -1140,10 +1439,20 @@ function SubModuleMixin:SetupModern()
     -- UNIT_* events, which must always be unit-filtered on this client.
     roleWatcher:RegisterEvent('UNIT_DISPLAYPOWER')
     roleWatcher:RegisterEvent('UNIT_CONNECTION')
+
+    -- Interface -> Status Text, and its display mode. Blizzard's own bars redraw from
+    -- TextStatusBar's CVAR_UPDATE handler, which now finds no TextString on these, so
+    -- the readouts are ours to refresh.
+    roleWatcher:RegisterEvent('CVAR_UPDATE')
+
     roleWatcher:SetScript('OnEvent', function(_, event, unit)
         if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
-        local barsOnly = (event == 'UNIT_DISPLAYPOWER' or event == 'UNIT_CONNECTION')
-        if barsOnly and not (unit and unit:find('party', 1, true)) then return end
+
+        local barsOnly = (event == 'UNIT_DISPLAYPOWER' or event == 'UNIT_CONNECTION' or event == 'CVAR_UPDATE')
+
+        -- CVAR_UPDATE carries a CVar name in the same argument slot, not a unit, so the
+        -- unit filter below would throw it away. It concerns every member equally.
+        if barsOnly and event ~= 'CVAR_UPDATE' and not (unit and unit:find('party', 1, true)) then return end
         for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
             if memberState[pf] and memberState[pf].styled then
                 if not barsOnly then pcall(UpdateRoleIcon, pf) end
@@ -1164,6 +1473,13 @@ function SubModuleMixin:Setup()
             setDefaultSubValues('party')
         end
     })
+
+    -- The raid-style checkbox has to describe what the frames are doing, and the two could
+    -- drift: for a long while the setting was never stored, so a tick from an older build
+    -- sits over party frames that never changed. This reads the layout and moves the tick,
+    -- not the frames.
+    if addonTable and addonTable.WatchRaidStylePartySetting then addonTable:WatchRaidStylePartySetting() end
+
     --
     self:RegisterEvent('CVAR_UPDATE')
 
