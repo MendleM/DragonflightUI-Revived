@@ -135,10 +135,11 @@ function Module:EnableOutOfCombat()
     if not self.DFPEWReapply then
         local pew = CreateFrame('Frame')
         pew:RegisterEvent('PLAYER_ENTERING_WORLD')
-        -- Also after combat: a mid-combat login reports no lockdown during
-        -- load, so the enable-time SetPoints get silently blocked - the
-        -- first regen re-places everything.
-        pew:RegisterEvent('PLAYER_REGEN_ENABLED')
+        -- Do not reapply the complete unit-frame configuration on every combat
+        -- exit. On TBC Anniversary that pass reaches Blizzard's protected compact
+        -- raid frames just as Blizzard is rebuilding them, seeding an
+        -- ADDON_ACTION_BLOCKED geometry/visibility cascade. A combat-time enable
+        -- is already queued by Helper:RunOutOfCombat in OnEnable.
         pew:SetScript('OnEvent', function()
             C_Timer.After(0.7, function()
                 if not Helper:IsCombatLocked() then Module:ApplySettings() end
@@ -350,7 +351,10 @@ function Module:ApplySettingsInternal(sub, key)
     updateSub('pet', self.SubPet, db.pet)
     updateSub('target', self.SubTarget, db.target)
     updateSub('tot', self.SubTargetOfTarget, db.tot)
-    updateSub('raid', self.SubRaid, db.raid)
+    -- TBC Anniversary's compact raid and raid-style-party members are
+    -- Blizzard-owned protected frames. Out-of-combat geometry writes can still
+    -- taint the secure layout path used when combat ends.
+    if not DF.TBC then updateSub('raid', self.SubRaid, db.raid) end
 
     if DF.Caps.HasFocus then
         updateSub('focus', self.SubFocus, db.focus)
@@ -774,7 +778,7 @@ function Module:SetupSubmodules()
     self.SubPet:Setup()
     self.SubTarget:Setup()
     self.SubTargetOfTarget:Setup()
-    self.SubRaid:Setup()
+    if not DF.TBC then self.SubRaid:Setup() end
 
     self:HookEnergyBar()
     self:ChangeFonts()
