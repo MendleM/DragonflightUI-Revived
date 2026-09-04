@@ -22,7 +22,24 @@ function SubModuleMixin:SetDefaults()
         anchor = 'TOPLEFT',
         anchorParent = 'BOTTOMLEFT',
         x = 99 + 3,
-        y = 38 - 3
+        y = 38 - 3,
+        -- Visibility. AddStateTable exposes these controls, so the submodule must
+        -- provide the same complete defaults as the other managed unit frames.
+        alphaNormal = 1.0,
+        alphaCombat = 1.0,
+        showMouseover = false,
+        hideAlways = false,
+        hideCombat = false,
+        hideOutOfCombat = false,
+        hideVehicle = false,
+        hidePet = false,
+        hideNoPet = false,
+        hideStance = false,
+        hideStealth = false,
+        hideNoStealth = false,
+        hideBattlePet = false,
+        hideCustom = false,
+        hideCustomCond = ''
     };
     self.Defaults = defaults;
 end
@@ -77,6 +94,8 @@ function SubModuleMixin:SetupOptions()
         args = {}
     }
     DF.Settings:AddPositionTable(Module, options, 'playerTotemFrame', 'playerTotemFrame', getDefaultStr, frameTable)
+    DragonflightUIStateHandlerMixin:AddStateTable(Module, options, 'playerTotemFrame', 'Player Totem Frame',
+                                                   getDefaultStr)
 
     local optionsEditmode = {
         name = 'Pet',
@@ -133,9 +152,11 @@ function SubModuleMixin:Setup()
     -- 
     local f = self.BaseFrame
 
-    -- state
-    -- Mixin(f, DragonflightUIStateHandlerMixin)
-    -- f:InitStateHandler()
+    -- The visibility controls were registered below but the handler that applies
+    -- them was commented out. Manage the addon-owned parent; Blizzard's TotemFrame
+    -- is its child and follows visibility without direct protected-frame calls.
+    Mixin(f, DragonflightUIStateHandlerMixin)
+    f:InitStateHandler()
     -- editmode
 
     local EditModeModule = DF:GetModule('Editmode');
@@ -157,8 +178,12 @@ function SubModuleMixin:Setup()
             -- fakeWidget.FakePreview:Show()
         end,
         hideFunction = function()
-            --
-            f:Show()
+            -- Restore the saved visibility condition after leaving edit mode.
+            if f.UpdateStateHandler and self.state then
+                f:UpdateStateHandler(self.state)
+            else
+                f:Show()
+            end
         end
     });
 end
@@ -198,6 +223,8 @@ function SubModuleMixin:Update()
         -- f:SetScale(PlayerFrame:GetScale() * state.scale)
         f:SetScale(state.scale)
     end
+
+    if f.UpdateStateHandler then f:UpdateStateHandler(state) end
 end
 
 function SubModuleMixin:CreateBase()
