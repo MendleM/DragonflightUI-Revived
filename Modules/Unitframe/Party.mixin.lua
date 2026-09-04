@@ -1396,8 +1396,11 @@ function SubModuleMixin:SetupModern()
     -- comment. Without it a member painted plain for a missing class stayed that way, since
     -- nothing repaints a bar whose health has not moved.
     --
-    -- The gate stays on UNIT_HEALTH alone. That one fires constantly in combat for four
-    -- units, and outside gradient mode there is nothing for it to change.
+    -- Gradient coloring and class coloring both need health events: gradient follows
+    -- current health percentage, and class color must be re-asserted because Blizzard's
+    -- internal health bar update resets the status bar color back to default green.
+    -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would fire for
+    -- every unit in a raid.
     for _, units in ipairs({{'party1', 'party2'}, {'party3', 'party4'}}) do
         local unitWatcher = CreateFrame('Frame')
         unitWatcher:RegisterUnitEvent('UNIT_HEALTH', units[1], units[2])
@@ -1406,7 +1409,7 @@ function SubModuleMixin:SetupModern()
         unitWatcher:SetScript('OnEvent', function(_, event, unit)
             if event == 'UNIT_HEALTH' then
                 local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
-                if not (state and state.gradient) then return end
+                if not (state and (state.gradient or state.classcolor)) then return end
             end
 
             if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
