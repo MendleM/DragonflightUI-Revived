@@ -83,6 +83,9 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          whether its setting display info exists, which frame
 --                          the raid system resolves to, and per setting whether
 --                          that frame has it and what value it holds
+--     /df log totem        complete status of Blizzard TotemFrame, buttons,
+--                          GetTotemInfo(1..4), DFUI holder, and event/show/hide trace
+--     /df log totem state  print the totem state report to chat
 --     /df log <tag>        only entries carrying that tag, e.g.
 --                          /df log error, /df log taint
 --
@@ -2569,6 +2572,302 @@ function DF:LogRaidOptions(tag)
     end
 end
 
+-- /df log totem - complete visibility, slot, and caller state of the Totem Frame.
+--
+-- Shaman/DK totems can disappear or fail to populate after events like "Totemic Call"
+-- ("Ruf der Totems") or when external totem addons or taint interfere. This command
+-- logs every term: GetTotemInfo(1..4), TotemFrame visibility and points, each button's
+-- slot and textures, Blizzard function hooks, and recent event transitions.
+local totemWatcherArmed = false
+local function ArmTotemWatcher()
+    if totemWatcherArmed then return true end
+    local totemFrame = _G['TotemFrame']
+    if not totemFrame then return false end
+    totemWatcherArmed = true
+
+    DF:Log('totem', 'Totem watcher armed. Initial TotemFrame: shown=%s vis=%s activeTotems=%s',
+           tostring(totemFrame:IsShown()), tostring(totemFrame:IsVisible()), tostring(totemFrame.activeTotems))
+
+    hooksecurefunc(totemFrame, 'Show', function(self)
+        DF:Log('totem', 'TotemFrame:Show() [activeTotems=%s shown=%s vis=%s] | stack: %s',
+               tostring(self.activeTotems), tostring(self:IsShown()), tostring(self:IsVisible()),
+               tostring(debugstack(2, 6, 0)):gsub('\n', ' | '):sub(1, 400))
+    end)
+
+    hooksecurefunc(totemFrame, 'Hide', function(self)
+        DF:Log('totem', 'TotemFrame:Hide() [activeTotems=%s shown=%s vis=%s] | stack: %s',
+               tostring(self.activeTotems), tostring(self:IsShown()), tostring(self:IsVisible()),
+               tostring(debugstack(2, 6, 0)):gsub('\n', ' | '):sub(1, 400))
+    end)
+
+    for i = 1, 4 do
+        local btn = _G['TotemFrameTotem' .. i]
+        if btn then
+            hooksecurefunc(btn, 'Show', function(self)
+                DF:Log('totem', 'TotemFrameTotem%d:Show() [slot=%s shown=%s vis=%s]',
+                       i, tostring(self.slot), tostring(self:IsShown()), tostring(self:IsVisible()))
+            end)
+            hooksecurefunc(btn, 'Hide', function(self)
+                DF:Log('totem', 'TotemFrameTotem%d:Hide() [slot=%s shown=%s vis=%s]',
+                       i, tostring(self.slot), tostring(self:IsShown()), tostring(self:IsVisible()))
+            end)
+        end
+    end
+
+    if _G['TotemFrame_Update'] then
+        hooksecurefunc('TotemFrame_Update', function()
+            local tf = _G['TotemFrame']
+            DF:Log('totem', 'TotemFrame_Update() finished | activeTotems=%s TotemFrame:shown=%s vis=%s | stack: %s',
+                   tostring(tf and tf.activeTotems), tostring(tf and tf:IsShown()), tostring(tf and tf:IsVisible()),
+                   tostring(debugstack(2, 5, 0)):gsub('\n', ' | '):sub(1, 350))
+        end)
+    end
+
+    if _G['TotemButton_Update'] then
+        hooksecurefunc('TotemButton_Update', function(button, startTime, duration, icon)
+            local btnName = (button and button.GetName and button:GetName()) or tostring(button)
+            DF:Log('totem', 'TotemButton_Update(%s, start=%.1f, dur=%.1f, icon=%s) -> slot=%s shown=%s',
+                   btnName, startTime or 0, duration or 0, tostring(icon),
+                   tostring(button and button.slot), tostring(button and button:IsShown()))
+        end)
+    end
+
+    local function hookBase(base)
+        if not base or base.DFTotemHooked then return end
+        base.DFTotemHooked = true
+        hooksecurefunc(base, 'Show', function(self)
+            DF:Log('totem', 'DragonflightUIPlayerTotemFrame:Show() [shown=%s vis=%s] | stack: %s',
+                   tostring(self:IsShown()), tostring(self:IsVisible()),
+                   tostring(debugstack(2, 5, 0)):gsub('\n', ' | '):sub(1, 350))
+        end)
+        hooksecurefunc(base, 'Hide', function(self)
+            DF:Log('totem', 'DragonflightUIPlayerTotemFrame:Hide() [shown=%s vis=%s] | stack: %s',
+                   tostring(self:IsShown()), tostring(self:IsVisible()),
+                   tostring(debugstack(2, 5, 0)):gsub('\n', ' | '):sub(1, 350))
+        end)
+    end
+
+    local base = _G['DragonflightUIPlayerTotemFrame']
+    if base then hookBase(base) end
+
+    local evFrame = CreateFrame('Frame')
+    evFrame:RegisterEvent('PLAYER_TOTEM_UPDATE')
+    evFrame:RegisterEvent('UNIT_SPELLCAST_SUCCEEDED')
+    evFrame:RegisterEvent('PLAYER_ENTERING_WORLD')
+    evFrame:SetScript('OnEvent', function(_, event, arg1, arg2, arg3, ...)
+        if not base and _G['DragonflightUIPlayerTotemFrame'] then
+            base = _G['DragonflightUIPlayerTotemFrame']
+            hookBase(base)
+        end
+
+        if event == 'PLAYER_TOTEM_UPDATE' then
+            local slot = arg1
+            local haveTotem, name, startTime, duration, icon = GetTotemInfo(slot)
+            local timeLeft = (GetTotemTimeLeft and GetTotemTimeLeft(slot)) or -1
+            local tf = _G['TotemFrame']
+            DF:Log('totem', 'EVENT PLAYER_TOTEM_UPDATE slot=%s -> have=%s name="%s" start=%.1f dur=%.1f left=%.1f icon=%s',
+                   tostring(slot), tostring(haveTotem), tostring(name or ''), startTime or 0, duration or 0, timeLeft, tostring(icon))
+            DF:Log('totem', '  state: TotemFrame(shown=%s vis=%s active=%s) BaseFrame(shown=%s vis=%s) | buttons: T1[s=%s,sh=%s] T2[s=%s,sh=%s] T3[s=%s,sh=%s] T4[s=%s,sh=%s]',
+                   tostring(tf and tf:IsShown()), tostring(tf and tf:IsVisible()), tostring(tf and tf.activeTotems),
+                   tostring(base and base:IsShown()), tostring(base and base:IsVisible()),
+                   tostring(_G['TotemFrameTotem1'] and _G['TotemFrameTotem1'].slot), tostring(_G['TotemFrameTotem1'] and _G['TotemFrameTotem1']:IsShown()),
+                   tostring(_G['TotemFrameTotem2'] and _G['TotemFrameTotem2'].slot), tostring(_G['TotemFrameTotem2'] and _G['TotemFrameTotem2']:IsShown()),
+                   tostring(_G['TotemFrameTotem3'] and _G['TotemFrameTotem3'].slot), tostring(_G['TotemFrameTotem3'] and _G['TotemFrameTotem3']:IsShown()),
+                   tostring(_G['TotemFrameTotem4'] and _G['TotemFrameTotem4'].slot), tostring(_G['TotemFrameTotem4'] and _G['TotemFrameTotem4']:IsShown()))
+        elseif event == 'UNIT_SPELLCAST_SUCCEEDED' and arg1 == 'player' then
+            local spellName, spellID
+            if select('#', arg1, arg2, arg3) >= 3 and type(arg3) == 'number' then
+                spellID = arg3
+                spellName = arg2
+                if C_Spell and C_Spell.GetSpellInfo then
+                    local info = C_Spell.GetSpellInfo(spellID)
+                    if info and info.name then spellName = info.name end
+                elseif GetSpellInfo then
+                    spellName = GetSpellInfo(spellID) or spellName
+                end
+            else
+                spellName = arg2
+                spellID = select(5, arg1, arg2, arg3, ...)
+            end
+            local lower = (spellName or ''):lower()
+            if lower:find('totem') or lower:find('ruf') or lower:find('call') or lower:find('recall') then
+                DF:Log('totem', 'SPELL CAST SUCCEEDED: "%s" (id=%s)', tostring(spellName), tostring(spellID))
+            end
+        elseif event == 'PLAYER_ENTERING_WORLD' then
+            DF:Log('totem', 'EVENT PLAYER_ENTERING_WORLD')
+        end
+    end)
+    return true
+end
+
+function DF:LogTotemState(tag)
+    tag = tag or 'totem'
+
+    local _, class = UnitClass('player')
+    local spec = (GetSpecialization and GetSpecialization()) or 'n/a'
+    local level = UnitLevel('player')
+    DF:Log(tag, '=== TOTEM STATE REPORT ===')
+    DF:Log(tag, 'player: class=%s spec=%s level=%s', tostring(class), tostring(spec), tostring(level))
+
+    -- Addon conflict check
+    local ttLoaded = IsAddOnLoaded and IsAddOnLoaded('TotemTimers')
+    DF:Log(tag, 'addons: TotemTimers loaded=%s', tostring(ttLoaded))
+    if GetNumAddOns and GetAddOnInfo then
+        local otherTotemAddons = {}
+        for i = 1, GetNumAddOns() do
+            local name, _, _, enabled = GetAddOnInfo(i)
+            if name and name:lower():find('totem') and name ~= 'TotemTimers' then
+                table.insert(otherTotemAddons, string.format('%s(loaded=%s,enabled=%s)', name, tostring(IsAddOnLoaded(i)), tostring(enabled)))
+            end
+        end
+        if #otherTotemAddons > 0 then
+            DF:Log(tag, 'other totem addons: %s', table.concat(otherTotemAddons, ', '))
+        end
+    end
+
+    -- DFUI Profile settings
+    local okMod, unitMod = pcall(function() return DF:GetModule('Unitframe') end)
+    local profile = okMod and unitMod and unitMod.db and unitMod.db.profile and unitMod.db.profile.playerTotemFrame
+    if profile then
+        DF:Log(tag, 'profile settings: activate=%s scale=%s anchor=%s anchorParent=%s anchorFrame=%s customAnchorFrame="%s" x=%s y=%s',
+               tostring(profile.activate), tostring(profile.scale), tostring(profile.anchor),
+               tostring(profile.anchorParent), tostring(profile.anchorFrame), tostring(profile.customAnchorFrame),
+               tostring(profile.x), tostring(profile.y))
+    else
+        DF:Log(tag, 'profile settings: UNREACHABLE')
+    end
+
+    -- Blizzard API GetTotemInfo(1..4)
+    DF:Log(tag, '--- API GetTotemInfo (1..4) ---')
+    local totalActiveFromAPI = 0
+    for slot = 1, 4 do
+        local haveTotem, name, startTime, duration, icon = GetTotemInfo(slot)
+        local timeLeft = (GetTotemTimeLeft and GetTotemTimeLeft(slot)) or -1
+        if haveTotem then totalActiveFromAPI = totalActiveFromAPI + 1 end
+        DF:Log(tag, 'slot %d: have=%s name="%s" start=%.1f dur=%.1f left=%.1f icon=%s',
+               slot, tostring(haveTotem), tostring(name or ''), startTime or 0, duration or 0, timeLeft, tostring(icon))
+    end
+    DF:Log(tag, 'total API active totems: %d', totalActiveFromAPI)
+
+    -- Container: DragonflightUIPlayerTotemFrame
+    local base = _G['DragonflightUIPlayerTotemFrame']
+    if base then
+        local pName = (base:GetParent() and base:GetParent().GetName and base:GetParent():GetName()) or '<anon>'
+        DF:Log(tag, '--- DragonflightUIPlayerTotemFrame ---')
+        DF:Log(tag, 'shown=%s vis=%s alpha=%.2f effAlpha=%.2f scale=%.2f effScale=%.2f parent=%s points=%d size=%.0fx%.0f',
+               tostring(base:IsShown()), tostring(base:IsVisible()), base:GetAlpha() or -1,
+               (base.GetEffectiveAlpha and base:GetEffectiveAlpha()) or -1,
+               (base.GetScale and base:GetScale()) or 1, (base.GetEffectiveScale and base:GetEffectiveScale()) or 1,
+               pName, base:GetNumPoints() or 0, base:GetWidth() or 0, base:GetHeight() or 0)
+        for i = 1, (base:GetNumPoints() or 0) do
+            local point, relTo, relPoint, x, y = base:GetPoint(i)
+            local relName = (relTo and relTo.GetName and relTo:GetName()) or tostring(relTo)
+            DF:Log(tag, '  point %d: %s -> %s %s (%.0f, %.0f)', i, tostring(point), relName, tostring(relPoint), x or 0, y or 0)
+        end
+    else
+        DF:Log(tag, 'DragonflightUIPlayerTotemFrame: ABSENT')
+    end
+
+    -- Blizzard TotemFrame
+    local tf = _G['TotemFrame']
+    if tf then
+        local pName = (tf:GetParent() and tf:GetParent().GetName and tf:GetParent():GetName()) or '<anon>'
+        DF:Log(tag, '--- TotemFrame ---')
+        DF:Log(tag, 'shown=%s vis=%s alpha=%.2f effAlpha=%.2f scale=%.2f effScale=%.2f parent=%s activeTotems=%s ignorePosMgr=%s points=%d size=%.0fx%.0f',
+               tostring(tf:IsShown()), tostring(tf:IsVisible()), tf:GetAlpha() or -1,
+               (tf.GetEffectiveAlpha and tf:GetEffectiveAlpha()) or -1,
+               (tf.GetScale and tf:GetScale()) or 1, (tf.GetEffectiveScale and tf:GetEffectiveScale()) or 1,
+               pName, tostring(tf.activeTotems), tostring(tf.ignoreFramePositionManager),
+               tf:GetNumPoints() or 0, tf:GetWidth() or 0, tf:GetHeight() or 0)
+        for i = 1, (tf:GetNumPoints() or 0) do
+            local point, relTo, relPoint, x, y = tf:GetPoint(i)
+            local relName = (relTo and relTo.GetName and relTo:GetName()) or tostring(relTo)
+            DF:Log(tag, '  point %d: %s -> %s %s (%.0f, %.0f)', i, tostring(point), relName, tostring(relPoint), x or 0, y or 0)
+        end
+
+        local evs = {}
+        for _, ev in ipairs({'PLAYER_TOTEM_UPDATE', 'PLAYER_ENTERING_WORLD', 'UPDATE_SHAPESHIFT_FORM', 'PLAYER_TALENT_UPDATE'}) do
+            if tf.IsEventRegistered and tf:IsEventRegistered(ev) then table.insert(evs, ev) end
+        end
+        DF:Log(tag, 'registered events: %s', #evs > 0 and table.concat(evs, ', ') or 'NONE')
+    else
+        DF:Log(tag, 'TotemFrame: ABSENT')
+    end
+
+    -- Blizzard Buttons TotemFrameTotem1..4
+    DF:Log(tag, '--- TotemFrameTotem1..4 Buttons ---')
+    local buttonsShown = 0
+    for i = 1, 4 do
+        local btn = _G['TotemFrameTotem' .. i]
+        if btn then
+            local iconTex = _G['TotemFrameTotem' .. i .. 'IconTexture'] or (btn.icon and btn.icon.texture)
+            local texVal = iconTex and iconTex.GetTexture and iconTex:GetTexture()
+            local durText = btn.duration and btn.duration.GetText and btn.duration:GetText()
+            local cd = _G['TotemFrameTotem' .. i .. 'IconCooldown'] or (btn.icon and btn.icon.cooldown)
+            if btn:IsShown() then buttonsShown = buttonsShown + 1 end
+            local pName = (btn:GetParent() and btn:GetParent().GetName and btn:GetParent():GetName()) or '<anon>'
+
+            DF:Log(tag, 'btn%d: slot=%s shown=%s vis=%s alpha=%.2f parent=%s size=%.0fx%.0f tex=%s dur="%s" cdShown=%s DFMask=%s',
+                   i, tostring(btn.slot), tostring(btn:IsShown()), tostring(btn:IsVisible()), btn:GetAlpha() or -1,
+                   pName, btn:GetWidth() or 0, btn:GetHeight() or 0,
+                   tostring(texVal), tostring(durText or ''), tostring(cd and cd:IsShown()), tostring(btn.DFMask ~= nil))
+            for p = 1, (btn:GetNumPoints() or 0) do
+                local point, relTo, relPoint, x, y = btn:GetPoint(p)
+                local relName = (relTo and relTo.GetName and relTo:GetName()) or tostring(relTo)
+                DF:Log(tag, '    pt%d: %s -> %s %s (%.0f, %.0f)', p, tostring(point), relName, tostring(relPoint), x or 0, y or 0)
+            end
+        else
+            DF:Log(tag, 'btn%d: ABSENT', i)
+        end
+    end
+
+    -- Globals & Priorities
+    local prioritiesStr = 'nil'
+    local pTable = _G['TOTEM_PRIORITIES'] or _G['SHAMAN_TOTEM_PRIORITIES'] or _G['STANDARD_TOTEM_PRIORITIES']
+    if type(pTable) == 'table' then
+        local parts = {}
+        for idx, val in ipairs(pTable) do table.insert(parts, string.format('[%d]=%s', idx, tostring(val))) end
+        prioritiesStr = table.concat(parts, ', ')
+    end
+    DF:Log(tag, 'priorities: %s', prioritiesStr)
+    DF:Log(tag, 'functions: TotemFrame_Update=%s TotemButton_Update=%s TotemFrame_OnEvent=%s',
+           tostring(type(_G['TotemFrame_Update'])), tostring(type(_G['TotemButton_Update'])),
+           tostring(type(_G['TotemFrame_OnEvent'])))
+
+    -- PetFrame check
+    local pf = _G['PetFrame']
+    DF:Log(tag, 'PetFrame: exists=%s shown=%s vis=%s', tostring(pf ~= nil), tostring(pf and pf:IsShown()), tostring(pf and pf:IsVisible()))
+
+    -- VERDICT
+    if profile and profile.activate == false then
+        DF:Log(tag, 'VERDICT: Player Totem Frame is DISABLED in settings (activate = false).')
+    elseif not base then
+        DF:Log(tag, 'VERDICT: DragonflightUIPlayerTotemFrame is absent - setup never completed.')
+    elseif not base:IsShown() then
+        DF:Log(tag, 'VERDICT: DragonflightUIPlayerTotemFrame is HIDDEN.')
+    elseif not base:IsVisible() then
+        DF:Log(tag, 'VERDICT: DragonflightUIPlayerTotemFrame is shown, but an ancestor is hidden.')
+    elseif not tf then
+        DF:Log(tag, 'VERDICT: Blizzard TotemFrame global does not exist on this client.')
+    elseif totalActiveFromAPI == 0 then
+        DF:Log(tag, 'VERDICT: GetTotemInfo reports 0 active totems - WoW client states player has no active totems.')
+    elseif not tf:IsShown() then
+        DF:Log(tag, 'VERDICT: TotemFrame:IsShown() is false despite %d active totems from API! (activeTotems field is %s)',
+               totalActiveFromAPI, tostring(tf.activeTotems))
+    elseif not tf:IsVisible() then
+        DF:Log(tag, 'VERDICT: TotemFrame:IsShown() is true, but IsVisible() is false (parent %s might be hidden or alpha=0).',
+               (tf:GetParent() and tf:GetParent().GetName and tf:GetParent():GetName()) or '<anon>')
+    elseif buttonsShown == 0 then
+        DF:Log(tag, 'VERDICT: TotemFrame is visible, but 0 buttons are shown! (API reports %d active totems)',
+               totalActiveFromAPI)
+    else
+        DF:Log(tag, 'VERDICT: OK - %d API totems active, TotemFrame visible, %d button(s) shown.',
+               totalActiveFromAPI, buttonsShown)
+    end
+
+    if tf then DF:LogFrame(tf, tag) end
+end
+
 -- Returns true when the input was a log command and has been handled.
 function DF:HandleLogCommand(rest)
     rest = rest or ''
@@ -2676,6 +2975,15 @@ function DF:HandleLogCommand(rest)
         -- other than the player running it, and 80 lines of chat cannot be
         -- pasted anywhere useful.
         DF:LogCopy('party')
+    elseif sub == 'totem' or sub == 'totems' then
+        local a = arg:lower()
+        if a == 'state' then
+            DF:LogTotemState('totem')
+            DF:LogDump('totem', 40)
+        else
+            DF:LogTotemState('totem')
+            DF:LogCopy('totem')
+        end
     else
         DF:LogDump(rest, 60)
     end
@@ -2688,6 +2996,7 @@ InstallCapture()
 -- function is already there, and again when it arrives.
 ArmSeedWatcher()
 ArmCompactSeedWatcher()
+ArmTotemWatcher()
 do
     local armFrame = CreateFrame('Frame')
     armFrame:RegisterEvent('ADDON_LOADED')
@@ -2695,6 +3004,7 @@ do
     armFrame:SetScript('OnEvent', function(self)
         ArmSeedWatcher()
         ArmCompactSeedWatcher()
-        if seedArmed and compactSeedArmed then self:UnregisterAllEvents() end
+        ArmTotemWatcher()
+        if seedArmed and compactSeedArmed and totemWatcherArmed then self:UnregisterAllEvents() end
     end)
 end

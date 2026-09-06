@@ -208,10 +208,14 @@ function SubModuleMixin:Update()
     local f = self.BaseFrame
     if not f then return end
 
+    DF:Log('totem', 'PlayerTotemFrame:Update() activate=%s parent=%s scale=%.2f',
+           tostring(state.activate), tostring(parent and parent.GetName and parent:GetName()), state.scale or -1)
+
     local totemFrame = _G['TotemFrame']
     if state.activate == false then
         f:Hide()
         if totemFrame then totemFrame:Hide() end
+        DF:Log('totem', 'PlayerTotemFrame:Update() -> deactivated: hiding baseFrame and TotemFrame')
     else
         f:Show()
         if totemFrame then
@@ -222,6 +226,7 @@ function SubModuleMixin:Update()
                 totemFrame:Update()
             end
         end
+        DF:Log('totem', 'PlayerTotemFrame:Update() -> activated: showing baseFrame and TotemFrame')
     end
 
     -- f:SetScale(state.scale)
@@ -256,11 +261,14 @@ function SubModuleMixin:CreateBase()
         hooksecurefunc(totemFrame, 'SetPoint', function(self)
             if self.DFSettingPoint then return end
             self.DFSettingPoint = true
+            DF:Log('totem', 'PlayerTotemFrame: TotemFrame:SetPoint intercepted, re-anchoring to baseFrame')
             self:ClearAllPoints()
             self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
             self.DFSettingPoint = nil
         end)
     end
+
+    DF:Log('totem', 'PlayerTotemFrame:CreateBase() completed')
 end
 
 local base = 'Interface\\Addons\\DragonflightUI\\Textures\\'
