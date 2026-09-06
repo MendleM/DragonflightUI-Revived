@@ -1072,6 +1072,20 @@ function addonTable:SyncRaidStylePartyFrameToBlizzard(enabled)
                                             layoutOnly)
 end
 
+-- Are the raid-style party frames the ones currently on screen?
+--
+-- The APPLIED state, deliberately, not the stored one: callers use this to decide whether
+-- a compact party frame exists to be configured at all, and that is a question about right
+-- now. ReadRaidStyleFromActiveLayout below answers the other question, the stored one, and
+-- the two differ on purpose between flipping the switch and the reload.
+function addonTable:RaidStylePartyFramesShown()
+    local emm = _G['EditModeManagerFrame']
+    if not (emm and emm.UseRaidStylePartyFrames) then return false end
+
+    local ok, value = pcall(emm.UseRaidStylePartyFrames, emm)
+    return (ok and value) and true or false
+end
+
 -- What the ACTIVE layout stores for the raid-style setting, as a boolean, or nil when it
 -- cannot be determined.
 --
