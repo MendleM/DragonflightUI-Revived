@@ -24,6 +24,27 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.45.2',
+        title = 'Player Totem Frame Toggle',
+        date = '6 September 2026',
+        intro = 'Added a clean activation toggle for the Player Totem Frame in settings and Edit Mode, allowing the frame to be hidden without reloading.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'Player Totem Frame can now be toggled on/off under /df -> Unitframes -> Player Totem Frame and in HUD Edit Mode.',
+                    'Re-enabling the frame immediately restores and updates active totems without requiring a /reload.'
+                }
+            }, {
+                title = 'Unit Frames',
+                items = {
+                    'Added an Active toggle (activate) to the Player Totem Frame submodule, providing a clean way to hide or disable the totem frame without relying on heavy secure state handlers.',
+                    'When toggling the frame back on, Blizzard\'s TotemFrame is immediately shown and refreshed via TotemFrame_Update() so existing active totems appear right away.',
+                    'Fixed a minor naming error in Edit Mode options where the Totem Frame reset preset was labelled as \'Pet\'.'
+                }
+            }
+        }
+    }, {
         version = '0.45.1',
         title = 'Party Health Bars',
         date = '6 September 2026',
