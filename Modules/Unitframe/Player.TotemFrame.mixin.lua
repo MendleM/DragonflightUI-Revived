@@ -16,6 +16,7 @@ end
 -- ]:SetPoint('TOPLEFT', PlayerFrame, 'BOTTOMLEFT', 99 + 3, 38 - 3)
 function SubModuleMixin:SetDefaults()
     local defaults = {
+        activate = true,
         scale = 1.0,
         anchorFrame = 'PlayerFrame',
         customAnchorFrame = '',
@@ -74,13 +75,22 @@ function SubModuleMixin:SetupOptions()
         get = getOption,
         set = setOption,
         type = 'group',
-        args = {}
+        args = {
+            activate = {
+                type = 'toggle',
+                name = L["ButtonTableActive"],
+                desc = L["ButtonTableActiveDesc"] .. getDefaultStr('activate', 'playerTotemFrame'),
+                order = -1,
+                new = false,
+                editmode = true
+            }
+        }
     }
     DF.Settings:AddPositionTable(Module, options, 'playerTotemFrame', 'playerTotemFrame', getDefaultStr, frameTable)
 
     local optionsEditmode = {
-        name = 'Pet',
-        desc = 'Pet',
+        name = L["PlayerTotemFrameName"],
+        desc = L["PlayerTotemFrameNameDesc"],
         get = getOption,
         set = setOption,
         type = 'group',
@@ -153,12 +163,14 @@ function SubModuleMixin:Setup()
         end,
         moduleRef = self.ModuleRef,
         showFunction = function()
-            --         
-            -- fakeWidget.FakePreview:Show()
+            f:Show()
         end,
         hideFunction = function()
-            --
-            f:Show()
+            if self.state and self.state.activate == false then
+                f:Hide()
+            else
+                f:Show()
+            end
         end
     });
 end
@@ -185,6 +197,12 @@ function SubModuleMixin:Update()
 
     local f = self.BaseFrame
     if not f then return end
+
+    if state.activate == false then
+        f:Hide()
+    else
+        f:Show()
+    end
 
     -- f:SetScale(state.scale)
     f:ClearAllPoints()
