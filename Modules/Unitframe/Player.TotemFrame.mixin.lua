@@ -166,10 +166,20 @@ function SubModuleMixin:Setup()
             f:Show()
         end,
         hideFunction = function()
+            local totemFrame = _G['TotemFrame']
             if self.state and self.state.activate == false then
                 f:Hide()
+                if totemFrame then totemFrame:Hide() end
             else
                 f:Show()
+                if totemFrame then
+                    totemFrame:Show()
+                    if _G['TotemFrame_Update'] then
+                        _G['TotemFrame_Update']()
+                    elseif totemFrame.Update then
+                        totemFrame:Update()
+                    end
+                end
             end
         end
     });
@@ -198,10 +208,20 @@ function SubModuleMixin:Update()
     local f = self.BaseFrame
     if not f then return end
 
+    local totemFrame = _G['TotemFrame']
     if state.activate == false then
         f:Hide()
+        if totemFrame then totemFrame:Hide() end
     else
         f:Show()
+        if totemFrame then
+            totemFrame:Show()
+            if _G['TotemFrame_Update'] then
+                _G['TotemFrame_Update']()
+            elseif totemFrame.Update then
+                totemFrame:Update()
+            end
+        end
     end
 
     -- f:SetScale(state.scale)
