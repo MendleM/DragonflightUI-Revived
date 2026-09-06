@@ -215,11 +215,15 @@ function SubModuleMixin:Update()
     else
         f:Show()
         if totemFrame then
+            totemFrame.leftPadding = 0
             totemFrame:Show()
             if _G['TotemFrame_Update'] then
                 _G['TotemFrame_Update']()
             elseif totemFrame.Update then
                 totemFrame:Update()
+            end
+            if totemFrame.Layout then
+                totemFrame:Layout()
             end
         end
     end
@@ -248,7 +252,18 @@ function SubModuleMixin:CreateBase()
 
     local totemFrame = _G['TotemFrame']
     if totemFrame then
+        -- Detach from Blizzard's UIParentManagedFrameContainer:
+        -- Blizzard's RemoveManagedFrame (UIParent.lua:214) checks `if not frame.IsInDefaultPosition then frame:ClearAllPoints() end`.
+        -- Setting IsInDefaultPosition prevents Blizzard from wiping anchor points when totems expire.
+        totemFrame.IsInDefaultPosition = function() return false end
         totemFrame.ignoreFramePositionManager = true
+        totemFrame.ignoreInLayout = true
+
+        if totemFrame.layoutParent and totemFrame.layoutParent.showingFrames then
+            totemFrame.layoutParent.showingFrames[totemFrame] = nil
+        end
+
+        totemFrame.leftPadding = 0
         totemFrame:ClearAllPoints()
         totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
         totemFrame:SetParent(baseFrame)
@@ -260,6 +275,21 @@ function SubModuleMixin:CreateBase()
             self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
             self.DFSettingPoint = nil
         end)
+
+        totemFrame:HookScript('OnShow', function(self)
+            if self:GetNumPoints() == 0 and baseFrame then
+                self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+            end
+        end)
+
+        if totemFrame.Update then
+            hooksecurefunc(totemFrame, 'Update', function(self)
+                if self.leftPadding and self.leftPadding ~= 0 then
+                    self.leftPadding = 0
+                    if self.Layout then self:Layout() end
+                end
+            end)
+        end
     end
 end
 

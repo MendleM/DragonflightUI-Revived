@@ -9,11 +9,13 @@ Everything before v0.40.3 is in
 
 ## 0.45.2 — Player Totem Frame Toggle (6 September 2026)
 Added a clean activation toggle for the Player Totem Frame in settings and Edit Mode, allowing the frame to be hidden without reloading.
-**Highlights** — Player Totem Frame can now be toggled on/off under `/df` -> Unitframes -> Player Totem Frame and in HUD Edit Mode · re-enabling the frame immediately restores and updates active totems without requiring a `/reload`
+**Highlights** — Player Totem Frame can now be toggled on/off under `/df` -> Unitframes -> Player Totem Frame and in HUD Edit Mode · re-enabling the frame immediately restores and updates active totems without requiring a `/reload` · TotemFrame reliably retains its position after totems expire or Totemic Call is used
 ### Unit Frames
 - Added an **Active** toggle (`activate`) to the Player Totem Frame submodule, providing a clean way to hide or disable the totem frame (e.g. for players using dedicated totem addons like TotemTimers) without relying on heavy secure state handlers.
 - When toggling the frame back on, Blizzard's `TotemFrame` is immediately shown and refreshed via `TotemFrame_Update()` so existing active totems appear right away.
 - Fixed a minor naming error in Edit Mode options where the Totem Frame reset preset was labelled as 'Pet'.
+- Fixed Blizzard's `TotemFrame` losing its anchor points (`points = 0`) and disappearing from the screen when totems expire or "Ruf der Totems" (Totemic Call) is cast. Disconnected `TotemFrame` cleanly from Blizzard's `UIParentManagedFrameContainer` via `IsInDefaultPosition` and `ignoreInLayout`.
+- Removed the blank 38px `leftPadding` offset on `TotemFrame` so totem icons align neatly without a leading gap.
 
 ## 0.45.1 — Party Health Bars (6 September 2026)
 Follow-up to 0.45.0: the party health bars keep their colour and their number without being hovered, and a preset Edit Mode layout no longer taints the party frames on every login.
