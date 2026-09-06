@@ -51,6 +51,14 @@ local frame = CreateFrame("Frame");
 lib.frame = frame;
 lib.Defaults = defaults
 lib.IsStandalone = standalone
+lib.FrameState = lib.FrameState or {}
+
+local function GetFrameState(f)
+    if not lib.FrameState[f] then
+        lib.FrameState[f] = { auraRows = 0, spellbarAnchor = nil }
+    end
+    return lib.FrameState[f]
+end
 
 function frame:SetDefaults()
     for k, v in pairs(defaults) do AuraDurationsDB[k] = v; end
@@ -181,9 +189,10 @@ frame.UpdateAuraPositions = function(self, auraName, numAuras, numOppositeAuras,
         end
 
         -- anchor the current aura
+        local fState = GetFrameState(self);
         if (i == 1) then
             rowWidth = size;
-            self.auraRows = self.auraRows + 1;
+            fState.auraRows = fState.auraRows + 1;
         else
             rowWidth = rowWidth + size + offsetX;
         end
@@ -194,11 +203,11 @@ frame.UpdateAuraPositions = function(self, auraName, numAuras, numOppositeAuras,
                        mirrorAurasVertically);
 
             rowWidth = size;
-            self.auraRows = self.auraRows + 1;
+            fState.auraRows = fState.auraRows + 1;
             firstBuffOnRow = i;
             offsetY = AURA_OFFSET_Y;
 
-            if (self.auraRows > NUM_TOT_AURA_ROWS) then
+            if (fState.auraRows > NUM_TOT_AURA_ROWS) then
                 -- if we exceed the number of tot rows, then reset the max row width
                 -- note: don't have to check if we have tot because AURA_ROW_WIDTH is the default anyway
                 maxRowWidth = AURA_ROW_WIDTH;
@@ -243,12 +252,12 @@ local function TargetFrame_UpdateBuffAnchor(self, buffName, index, numDebuffs, a
         end
         self.buffs:SetPoint(point .. "LEFT", buff, point .. "LEFT", 0, 0);
         self.buffs:SetPoint(relativePoint .. "LEFT", buff, relativePoint .. "LEFT", 0, -auraOffsetY);
-        self.spellbarAnchor = buff;
+        GetFrameState(self).spellbarAnchor = buff;
     elseif (anchorIndex ~= (index - 1)) then
         -- anchor index is not the previous index...must be a new row
         buff:SetPoint(point .. "LEFT", _G[buffName .. anchorIndex], relativePoint .. "LEFT", 0, -offsetY);
         self.buffs:SetPoint(relativePoint .. "LEFT", buff, relativePoint .. "LEFT", 0, -auraOffsetY);
-        self.spellbarAnchor = buff;
+        GetFrameState(self).spellbarAnchor = buff;
     else
         -- anchor index is the previous index
         buff:SetPoint(point .. "LEFT", _G[buffName .. anchorIndex], point .. "RIGHT", offsetX, 0);
@@ -295,12 +304,12 @@ local function TargetFrame_UpdateDebuffAnchor(self, debuffName, index, numBuffs,
         end
         self.debuffs:SetPoint(point .. "LEFT", buff, point .. "LEFT", 0, 0);
         self.debuffs:SetPoint(relativePoint .. "LEFT", buff, relativePoint .. "LEFT", 0, -auraOffsetY);
-        if ((isFriend) or (not isFriend and numBuffs == 0)) then self.spellbarAnchor = buff; end
+        if ((isFriend) or (not isFriend and numBuffs == 0)) then GetFrameState(self).spellbarAnchor = buff; end
     elseif (anchorIndex ~= (index - 1)) then
         -- anchor index is not the previous index...must be a new row
         buff:SetPoint(point .. "LEFT", _G[debuffName .. anchorIndex], relativePoint .. "LEFT", 0, -offsetY);
         self.debuffs:SetPoint(relativePoint .. "LEFT", buff, relativePoint .. "LEFT", 0, -auraOffsetY);
-        if ((isFriend) or (not isFriend and numBuffs == 0)) then self.spellbarAnchor = buff; end
+        if ((isFriend) or (not isFriend and numBuffs == 0)) then GetFrameState(self).spellbarAnchor = buff; end
     else
         -- anchor index is the previous index
         buff:SetPoint(point .. "LEFT", _G[debuffName .. (index - 1)], point .. "RIGHT", offsetX, 0);
@@ -425,20 +434,21 @@ frame.TargetBuffHook = function(self)
     local TOT_AURA_ROW_WIDTH = AuraDurationsDB.totAuraRowWidth
     --
 
-    self.auraRows = 0;
+    local fState = GetFrameState(self);
+    fState.auraRows = 0;
 
     local mirrorAurasVertically = false;
     if (self.buffsOnTop) then mirrorAurasVertically = true; end
     local haveTargetofTarget;
     if (self.totFrame) then haveTargetofTarget = self.totFrame:IsShown(); end
-    self.spellbarAnchor = nil;
+    fState.spellbarAnchor = nil;
     local maxRowWidth;
     -- update buff positions
     maxRowWidth = (haveTargetofTarget and TOT_AURA_ROW_WIDTH) or AURA_ROW_WIDTH;
     frame.UpdateAuraPositions(self, selfName .. "Buff", numBuffs, numDebuffs, largeBuffList,
                               TargetFrame_UpdateBuffAnchor, maxRowWidth, 3, mirrorAurasVertically);
     -- update debuff positions
-    maxRowWidth = (haveTargetofTarget and self.auraRows < NUM_TOT_AURA_ROWS and TOT_AURA_ROW_WIDTH) or AURA_ROW_WIDTH;
+    maxRowWidth = (haveTargetofTarget and fState.auraRows < NUM_TOT_AURA_ROWS and TOT_AURA_ROW_WIDTH) or AURA_ROW_WIDTH;
     frame.UpdateAuraPositions(self, selfName .. "Debuff", numDebuffs, numBuffs, largeDebuffList,
                               TargetFrame_UpdateDebuffAnchor, maxRowWidth, 3, mirrorAurasVertically);
     -- update the spell bar position

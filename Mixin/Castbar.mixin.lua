@@ -1084,13 +1084,15 @@ function DragonFlightUICastbarMixin:AutoPosition()
     -- auraRows is nil until the target frame has laid its auras out once, and
     -- tonumber(nil) < 1 throws the same way the line below did. Nil rows means
     -- no rows, which is the branch this is testing for anyway.
-    if parent.buffsOntop or not parent.spellbarAnchor or (tonumber(parent.auraRows) or 0) < 1 then
+    local auraState = AuraDurations and AuraDurations.FrameState and AuraDurations.FrameState[parent]
+    local spellbarAnchor = (auraState and auraState.spellbarAnchor) or parent.spellbarAnchor
+    local auraRows = (auraState and auraState.auraRows) or parent.auraRows
+
+    if parent.buffsOntop or not spellbarAnchor or (tonumber(auraRows) or 0) < 1 then
         -- print('default')
         self:SetPoint('TOPLEFT', parent, 'BOTTOMLEFT', dx, dy) -- default
         return;
     end
-
-    local spellbarAnchor = parent.spellbarAnchor;
 
     -- GetBottom returns nil for a frame the layout has not resolved a position
     -- for yet. On TBC Anniversary that is the state at startup, and the

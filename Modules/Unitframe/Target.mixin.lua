@@ -609,9 +609,9 @@ function SubModuleMixin:Setup()
         if event == 'UNIT_MAXHEALTH' and arg1 == 'target' then UpdateTargetStatusBars() end
     end)
 
-    _G['TargetFrameManaBar'].DFUpdateFunc = function()
+    self.ModuleRef:RegisterManaBarCallback(TargetFrameManaBar, function()
         self:ReApplyTargetFrame()
-    end
+    end)
 
     if TargetFrame_CheckFaction then
         hooksecurefunc('TargetFrame_CheckFaction', function(f)
@@ -651,10 +651,10 @@ function SubModuleMixin:Setup()
     end
 
     -- state
-    Mixin(TargetFrame, DragonflightUIStateHandlerMixin)
-    TargetFrame:InitStateHandler()
-    TargetFrame:SetUnit('target')
-    -- f:SetHideFrame(TargetFrame, 1)
+    Mixin(f, DragonflightUIStateHandlerMixin)
+    f:InitStateHandler()
+    f:SetUnit('target')
+    f:SetHideFrame(TargetFrame, 1)
 
     -- editmode
     local EditModeModule = DF:GetModule('Editmode');
@@ -761,7 +761,7 @@ function SubModuleMixin:Update()
     else
         TargetFrame:CheckFaction()
     end
-    TargetFrame:UpdateStateHandler(state)
+    f:UpdateStateHandler(state)
 
     self.PreviewTarget:UpdateState(state);
 end
@@ -779,21 +779,23 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
     local ART_W, ART_H = 192, 67
     local ART_X, ART_Y = -20, 6
 
-    local port = frame.Portrait or _G[frame:GetName() .. 'Portrait']
-    local healthBar = frame.HealthBar or _G[frame:GetName() .. 'HealthBar']
-    local manaBar = frame.ManaBar or _G[frame:GetName() .. 'ManaBar']
-    local name = frame.Name;
+    local fName = frame:GetName()
+    local port = frame.portrait or frame.Portrait or _G[fName .. 'Portrait']
+    local healthBar = frame.healthbar or frame.HealthBar or _G[fName .. 'HealthBar']
+    local manaBar = frame.manabar or frame.ManaBar or _G[fName .. 'ManaBar']
+    local name = frame.name or frame.Name or _G[fName .. 'TextureFrameName'] or _G[fName .. 'Name']
     -- 1.15.9 exposes this as parentKey 'nameBackground' (lower case); with a
     -- nil lookup the reskin block below silently skips and the Blizzard
     -- reaction-colored gradient stays at its DEFAULT anchor - rendering as a
     -- colored bar hanging under the rearranged frame (blue on friendly
     -- players). CheckClassification re-shows it on every target change.
     local nameBackground = frame.NameBackground or frame.nameBackground or
-                               _G[frame:GetName() .. 'NameBackground'];
-    local flash = frame.Flash;
-    local levelText = frame.LevelText or _G[self:GetName() '..TextureFrameLevelText']
-    local deadText = frame.DeadText;
-    local unconsciousText = frame.UnconsciousText;
+                               _G[fName .. 'NameBackground'] or _G[fName .. 'TextureFrameNameBackground'];
+    local flash = frame.flash or frame.Flash or _G[fName .. 'Flash'];
+    local levelText = frame.LevelText or _G[fName .. 'TextureFrameLevelText'];
+    local deadText = frame.deadText or frame.DeadText or _G[fName .. 'TextureFrameDeadText'];
+    local unconsciousText = frame.unconsciousText or frame.UnconsciousText or
+                                _G[fName .. 'TextureFrameUnconsciousText'];
 
     local portDelta = 0; -- not 100% centered without it
     port:SetSize(56, 56)
@@ -869,22 +871,22 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
         levelText:SetJustifyV('MIDDLE')
         levelText:SetFontObject(GameFontNormalSmall)
 
-        function frame:DFFixLevelText()
-            levelText:ClearAllPoints()
-            levelText:SetPoint('BOTTOMLEFT', healthBar, 'TOPLEFT', 5, 1)
-            levelText:SetHeight(12)
-            -- levelText:SetWidth(20)
+        local function FixLevelText(f)
+            local hBar = f and (f.healthbar or f.HealthBar or _G[f:GetName() .. 'HealthBar'])
+            local lText = f and (f.LevelText or _G[f:GetName() .. 'TextureFrameLevelText'])
+            if lText and hBar then
+                lText:ClearAllPoints()
+                lText:SetPoint('BOTTOMLEFT', hBar, 'TOPLEFT', 5, 1)
+                lText:SetHeight(12)
+            end
         end
-        frame:DFFixLevelText()
+        FixLevelText(frame)
 
         local module = DF:GetModule('Unitframe');
         if module and not module.TargetFrameNameHooked and TargetFrame_UpdateLevelTextAnchor then
             module.TargetFrameNameHooked = true;
             hooksecurefunc('TargetFrame_UpdateLevelTextAnchor', function(f, targetLevel)
-                if f.DFFixLevelText and type(f.DFFixLevelText) == 'function' then
-                    -- print('DFFixLevelText hook', f:GetName())
-                    f:DFFixLevelText();
-                end
+                FixLevelText(f)
             end)
         end
     end
@@ -1125,14 +1127,6 @@ function SubModuleMixin:ChangeTargetFrame()
     TargetFrameTextureFrameTexture:Hide()
     TargetFrameBackground:Hide()
 
-    TargetFrame.Portrait = TargetFramePortrait;
-    TargetFrame.Name = TargetFrameTextureFrameName;
-    TargetFrame.NameBackground = TargetFrameNameBackground;
-    TargetFrame.Flash = TargetFrameFlash;
-    TargetFrame.LevelText = TargetFrameTextureFrameLevelText;
-    TargetFrame.DeadText = TargetFrameTextureFrameDeadText;
-    TargetFrame.UnconsciousText = TargetFrameTextureFrameUnconsciousText;
-
     self:ChangeTargetFrameGeneral(self, TargetFrame)
 
     -- TargetFrameTextureFrameRaidTargetIcon:SetPoint('CENTER',TargetFrameTextureFrame,'TOPRIGHT',-73,-14)
@@ -1141,8 +1135,8 @@ function SubModuleMixin:ChangeTargetFrame()
 
     -- TargetFrameBuff1:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 5, 0)  
 
-    if not TargetFrameNameBackground.DFHooked then
-        TargetFrameNameBackground.DFHooked = true
+    if not self.TargetNameBackgroundHooked then
+        self.TargetNameBackgroundHooked = true
 
         TargetFrameNameBackground:HookScript('OnShow', function()
             --          
@@ -1201,33 +1195,6 @@ function SubModuleMixin:ChangeTargetFrame()
         end
     end
 
-    if not TargetFrame.DFRangeHooked then
-        TargetFrame.DFRangeHooked = true;
-
-        local state = self.ModuleRef.db.profile.target
-
-        if not RangeCheck then return end
-        local function updateRange()
-            local minRange, maxRange = RangeCheck:GetRange('target')
-            -- print(minRange, maxRange)
-
-            if not state.fadeOut then
-                TargetFrame:SetAlpha(1);
-                return;
-            end
-
-            if minRange and minRange >= state.fadeOutDistance then
-                TargetFrame:SetAlpha(0.55);
-                -- elseif maxRange and maxRange >= 40 then
-                --     TargetFrame:SetAlpha(0.55);
-            else
-                TargetFrame:SetAlpha(1);
-            end
-        end
-
-        TargetFrame:HookScript('OnUpdate', updateRange)
-        TargetFrame:HookScript('OnEvent', updateRange)
-    end
 end
 
 local texBase = 'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe\\'
@@ -1404,7 +1371,7 @@ end
 
 function SubModuleMixin:AddMobhealth()
     hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar, unit)
-        -- print(statusbar:GetName(), 'should know?', Module.ShouldKnowHealth(unit))
+        if statusbar == TargetFrameToTHealthBar or statusbar == FocusFrameToTHealthBar then return end
         local shouldKnow = self:ShouldKnowHealth(unit)
 
         if shouldKnow then

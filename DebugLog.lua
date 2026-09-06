@@ -36,6 +36,9 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          plus each frame's own state and a verdict
 --     /df log tot focus    only the focus frame's target-of-target
 --     /df log tot watch    toggle a watcher that logs each time that changes
+--     /df log tot taint    deep taint audit of TargetFrameToT, TargetFrame,
+--                          and their fields/methods, opens the copy window
+--     /df log tottaint     same as /df log tot taint
 --     /df log party        every party/raid frame field that is tainted, and
 --                          the addon that dirtied it. issecurevariable sees
 --                          what taintLog cannot: taintLog records tainted
@@ -145,9 +148,15 @@ local function InstallCapture()
     -- cut exactly that off. It did: a blocked C_Club.SetAvatarTexture arrived
     -- with everything above it and nothing below. Repeats are collapsed now, so
     -- the extra length costs nothing.
+    local totAuditCaptured = false
     watcher:SetScript('OnEvent', function(_, event, addon, func)
         DF:Log('taint', '%s: %s -> %s | %s', event, tostring(addon), tostring(func),
                tostring(debugstack(2, 20, 0)):gsub('\n', ' | '):sub(1, 1600))
+        if not totAuditCaptured and tostring(func):find('ToT') and DF.LogToTTaint then
+            totAuditCaptured = true
+            local which = tostring(func):find('Focus') and 'focus' or 'target'
+            pcall(DF.LogToTTaint, DF, 'taint', which)
+        end
     end)
 end
 
@@ -563,6 +572,131 @@ function DF:LogToT(tag, which)
         DF:Log(tag, 'VERDICT: shown and visible but transparent')
     else
         DF:Log(tag, 'VERDICT: the frame is up and drawable - if it is not on screen, check the screen rect above')
+    end
+end
+
+-- Walks every field, method, script and child of TargetFrameToT and its owner
+-- TargetFrame to name exactly which fields are insecure and who tainted them.
+function DF:LogToTTaint(tag, which)
+    local isFocus = (which == 'focus')
+    tag = tag or 'tottaint'
+
+    local ownerName = isFocus and 'FocusFrame' or 'TargetFrame'
+    local owner = _G[ownerName]
+    local tot = (owner and owner.totFrame) or _G[ownerName .. 'ToT']
+    local holderName = isFocus and 'DragonflightUIFocusToTFrame' or 'DragonflightUITargetToTFrame'
+    local holder = _G[holderName]
+
+    DF:Log(tag, '=== %s Target-of-Target Taint Audit ===', isFocus and 'focus' or 'target')
+
+    -- 1. Owner Frame (_G['TargetFrame'] or _G['FocusFrame'])
+    if owner then
+        local okG, whoG = issecurevariable(ownerName)
+        DF:Log(tag, 'owner %s global: secure=%s%s', ownerName, tostring(okG),
+               (not okG and whoG) and (' (tainted by ' .. whoG .. ')') or '')
+
+        for _, k in ipairs({'totFrame', 'unit', 'OnEvent', 'OnUpdate', 'Update', 'buffsOnTop'}) do
+            if rawget(owner, k) ~= nil or owner[k] ~= nil then
+                local ok, who = issecurevariable(owner, k)
+                DF:Log(tag, '  owner.%s: val=%s secure=%s%s', k, tostring(owner[k]), tostring(ok),
+                       (not ok and who) and (' tainted by ' .. who) or '')
+            end
+        end
+
+        local dirtyOwner = 0
+        for k in pairs(owner) do
+            if type(k) == 'string' then
+                local ok, who = issecurevariable(owner, k)
+                if not ok then
+                    dirtyOwner = dirtyOwner + 1
+                    DF:Log(tag, '  INSECURE owner.%s tainted by %s', k, tostring(who or '?'))
+                end
+            end
+        end
+        if dirtyOwner == 0 then DF:Log(tag, '  owner %s: all fields secure', ownerName) end
+    else
+        DF:Log(tag, 'owner %s is nil', ownerName)
+    end
+
+    -- 2. Target of Target Frame (_G['TargetFrameToT'] or _G['FocusFrameToT'])
+    if tot then
+        local totName = (tot.GetName and tot:GetName()) or (ownerName .. 'ToT')
+        local okG, whoG = issecurevariable(totName)
+        local isProt = tot.IsProtected and tot:IsProtected()
+        DF:Log(tag, '%s global: secure=%s%s  protected=%s', totName, tostring(okG),
+               (not okG and whoG) and (' (tainted by ' .. whoG .. ')') or '', tostring(isProt))
+
+        for _, m in ipairs({'Show', 'Hide', 'SetShown', 'SetPoint', 'ClearAllPoints', 'SetParent', 'Update'}) do
+            local rawVal = rawget(tot, m)
+            if rawVal ~= nil then
+                local ok, who = issecurevariable(tot, m)
+                DF:Log(tag, '  OVERRIDDEN %s:%s() secure=%s%s', totName, m, tostring(ok),
+                       (not ok and who) and (' tainted by ' .. who) or '')
+            else
+                local ok, who = issecurevariable(tot, m)
+                if not ok then
+                    DF:Log(tag, '  INSECURE %s:%s() tainted by %s', totName, m, tostring(who or '?'))
+                end
+            end
+        end
+
+        for _, s in ipairs({'OnUpdate', 'OnEvent', 'OnShow', 'OnHide'}) do
+            local scr = tot.GetScript and tot:GetScript(s)
+            DF:Log(tag, '  script %s: installed=%s (type=%s)', s, tostring(scr ~= nil), type(scr))
+        end
+
+        local dirtyTot = 0
+        for k in pairs(tot) do
+            if type(k) == 'string' then
+                local ok, who = issecurevariable(tot, k)
+                if not ok then
+                    dirtyTot = dirtyTot + 1
+                    DF:Log(tag, '  INSECURE %s.%s tainted by %s', totName, k, tostring(who or '?'))
+                end
+            end
+        end
+        if dirtyTot == 0 then DF:Log(tag, '  %s: all fields secure', totName) end
+
+        for _, childKey in ipairs({'HealthBar', 'ManaBar', 'Portrait', 'TextureFrame', 'Background'}) do
+            local child = tot[childKey] or _G[totName .. childKey]
+            if child then
+                local dirtyChild = 0
+                for k in pairs(child) do
+                    if type(k) == 'string' then
+                        local ok, who = issecurevariable(child, k)
+                        if not ok then
+                            dirtyChild = dirtyChild + 1
+                            DF:Log(tag, '  INSECURE %s.%s.%s tainted by %s', totName, childKey, k,
+                                   tostring(who or '?'))
+                        end
+                    end
+                end
+                if dirtyChild == 0 then DF:Log(tag, '  %s.%s: clean', totName, childKey) end
+            end
+        end
+    else
+        DF:Log(tag, '%sToT is nil', ownerName)
+    end
+
+    -- 3. DFUI Holder frame
+    if holder then
+        local okG, whoG = issecurevariable(holderName)
+        local isProt = holder.IsProtected and holder:IsProtected()
+        DF:Log(tag, 'holder %s: global secure=%s%s  protected=%s', holderName, tostring(okG),
+               (not okG and whoG) and (' (tainted by ' .. whoG .. ')') or '', tostring(isProt))
+        local dirtyHolder = 0
+        for k in pairs(holder) do
+            if type(k) == 'string' then
+                local ok, who = issecurevariable(holder, k)
+                if not ok then
+                    dirtyHolder = dirtyHolder + 1
+                    DF:Log(tag, '  INSECURE holder.%s tainted by %s', k, tostring(who or '?'))
+                end
+            end
+        end
+        if dirtyHolder == 0 then DF:Log(tag, '  holder %s: all fields secure', holderName) end
+    else
+        DF:Log(tag, 'holder %s absent', holderName)
     end
 end
 
@@ -2629,14 +2763,29 @@ function DF:HandleLogCommand(rest)
             DF:LogToTWatch(not totWatcher)
         elseif a == 'focus' then
             DF:LogToT('totdump', 'focus')
-            DF:LogDump('totdump', 40)
+            if DF.LogToTTaint then DF:LogToTTaint('totdump', 'focus') end
+            DF:LogDump('totdump', 60)
+        elseif a == 'taint' then
+            if DF.LogToTTaint then
+                DF:LogToTTaint('totdump', 'target')
+                DF:LogToTTaint('totdump', 'focus')
+            end
+            DF:LogCopy('totdump')
         else
             -- both by default: the two run the same mixin, and having the pair
             -- side by side is what shows which of them lost its parent
             DF:LogToT('totdump')
+            if DF.LogToTTaint then DF:LogToTTaint('totdump', 'target') end
             DF:LogToT('totdump', 'focus')
-            DF:LogDump('totdump', 60)
+            if DF.LogToTTaint then DF:LogToTTaint('totdump', 'focus') end
+            DF:LogDump('totdump', 80)
         end
+    elseif sub == 'tottaint' then
+        if DF.LogToTTaint then
+            DF:LogToTTaint('totdump', 'target')
+            DF:LogToTTaint('totdump', 'focus')
+        end
+        DF:LogCopy('totdump')
     elseif sub == 'bagtrace' then
         local a = arg:lower()
         if a == 'off' then

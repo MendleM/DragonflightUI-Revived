@@ -479,9 +479,9 @@ function SubModuleMixin:Setup()
         self:UpdatePlayerFrameHealthBar()
     end)
 
-    _G['PlayerFrameManaBar'].DFUpdateFunc = function()
+    self.ModuleRef:RegisterManaBarCallback(PlayerFrameManaBar, function()
         self:UpdatePlayerFrameManaBar()
-    end
+    end)
 
     hooksecurefunc('PlayerFrame_UpdateStatus', function()
         --

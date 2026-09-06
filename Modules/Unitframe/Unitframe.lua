@@ -508,10 +508,84 @@ function Module:AddPortraitMasks()
     addMask(DressUpFrame, DressUpFramePortrait)
 end
 
+Module.ManaBarUpdateFuncs = {}
+
+function Module:RegisterManaBarCallback(manaBar, func)
+    if not manaBar then return end
+    self.ManaBarUpdateFuncs[manaBar] = func
+end
+
 function Module:HookEnergyBar()
     hooksecurefunc("UnitFrameManaBar_UpdateType", function(manaBar, dontcall)
-        if manaBar.DFUpdateFunc and type(manaBar.DFUpdateFunc) == 'function' and not dontcall then
+        if dontcall or not manaBar then return end
+        local func = Module.ManaBarUpdateFuncs and Module.ManaBarUpdateFuncs[manaBar]
+        if func and type(func) == 'function' then
+            func()
+        elseif manaBar.DFUpdateFunc and type(manaBar.DFUpdateFunc) == 'function' then
             manaBar.DFUpdateFunc()
+        end
+    end)
+end
+
+function Module:InitRangeChecker()
+    if self.RangeCheckerFrame then return end
+
+    local RangeCheck = LibStub and LibStub("LibRangeCheck-3.0", true)
+    local f = CreateFrame('Frame', 'DragonflightUIRangeCheckerFrame', UIParent)
+    self.RangeCheckerFrame = f
+
+    local elapsedTotal = 0
+    local checkInterval = 0.15
+
+    local tracked = {
+        {
+            unit = 'target',
+            getFrame = function() return TargetFrame end,
+            getProfile = function() return self.db and self.db.profile and self.db.profile.target end
+        },
+        {
+            unit = 'targettarget',
+            getFrame = function() return TargetFrameToT end,
+            getProfile = function() return self.db and self.db.profile and self.db.profile.tot end
+        },
+        {
+            unit = 'focus',
+            getFrame = function() return FocusFrame end,
+            getProfile = function() return self.db and self.db.profile and self.db.profile.focus end
+        },
+        {
+            unit = 'focustarget',
+            getFrame = function() return FocusFrameToT end,
+            getProfile = function() return self.db and self.db.profile and self.db.profile.focusTarget end
+        }
+    }
+
+    f:SetScript('OnUpdate', function(_, elapsed)
+        elapsedTotal = elapsedTotal + elapsed
+        if elapsedTotal < checkInterval then return end
+        elapsedTotal = 0
+
+        if not RangeCheck then
+            RangeCheck = LibStub and LibStub("LibRangeCheck-3.0", true)
+            if not RangeCheck then return end
+        end
+
+        for _, item in ipairs(tracked) do
+            local frame = item.getFrame()
+            local profile = item.getProfile()
+            if frame and frame:IsShown() and profile then
+                if profile.fadeOut and UnitExists(item.unit) then
+                    local minRange, maxRange = RangeCheck:GetRange(item.unit)
+                    local dist = profile.fadeOutDistance or 40
+                    if minRange and minRange >= dist then
+                        if frame:GetAlpha() ~= 0.55 then frame:SetAlpha(0.55) end
+                    else
+                        if frame:GetAlpha() ~= 1.0 then frame:SetAlpha(1.0) end
+                    end
+                else
+                    if frame:GetAlpha() ~= 1.0 then frame:SetAlpha(1.0) end
+                end
+            end
         end
     end)
 end
@@ -777,6 +851,7 @@ function Module:SetupSubmodules()
     self.SubRaid:Setup()
 
     self:HookEnergyBar()
+    self:InitRangeChecker()
     self:ChangeFonts()
     self:HookDrag()
     self:AddPortraitMasks()

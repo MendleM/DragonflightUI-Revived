@@ -336,9 +336,9 @@ function SubModuleMixin:Setup()
         if event == 'UNIT_MAXHEALTH' and arg1 == 'focus' then up() end
     end)
 
-    _G['FocusFrameManaBar'].DFUpdateFunc = function()
+    self.ModuleRef:RegisterManaBarCallback(FocusFrameManaBar, function()
         self:ReApplyFocusFrame()
-    end
+    end)
 
     if TargetFrame_CheckFaction then
         hooksecurefunc('TargetFrame_CheckFaction', function(f)
@@ -389,9 +389,10 @@ function SubModuleMixin:Setup()
     end
 
     -- state handler
-    Mixin(FocusFrame, DragonflightUIStateHandlerMixin)
-    FocusFrame:InitStateHandler()
-    FocusFrame:SetUnit('focus')
+    Mixin(f, DragonflightUIStateHandlerMixin)
+    f:InitStateHandler()
+    f:SetUnit('focus')
+    f:SetHideFrame(FocusFrame, 1)
 
     -- Edit mode
     local EditModeModule = DF:GetModule('Editmode');
@@ -495,8 +496,8 @@ function SubModuleMixin:Update()
     elseif FocusFrame.CheckFaction then
         FocusFrame:CheckFaction()
     end
-    if FocusFrame.UpdateStateHandler then
-        FocusFrame:UpdateStateHandler(state)
+    if f.UpdateStateHandler then
+        f:UpdateStateHandler(state)
     end
     if self.PreviewFocus and self.PreviewFocus.UpdateState then
         self.PreviewFocus:UpdateState(state)
@@ -511,20 +512,12 @@ function SubModuleMixin:ChangeFocusFrame()
     FocusFrameTextureFrameTexture:Hide()
     FocusFrameBackground:Hide()
 
-    FocusFrame.Portrait = FocusFramePortrait;
-    FocusFrame.Name = FocusFrameTextureFrameName;
-    FocusFrame.NameBackground = FocusFrameNameBackground;
-    FocusFrame.Flash = FocusFrameFlash;
-    FocusFrame.LevelText = FocusFrameTextureFrameLevelText;
-    FocusFrame.DeadText = FocusFrameTextureFrameDeadText;
-    FocusFrame.UnconsciousText = FocusFrameTextureFrameUnconsciousText;
-
     self.ModuleRef.SubTarget:ChangeTargetFrameGeneral(self, FocusFrame)
 
     FocusFrameTextureFrameRaidTargetIcon:SetPoint('CENTER', FocusFramePortrait, 'TOP', 0, 2)
 
-    if not FocusFrameNameBackground.DFHooked then
-        FocusFrameNameBackground.DFHooked = true
+    if not self.FocusNameBackgroundHooked then
+        self.FocusNameBackgroundHooked = true
 
         FocusFrameNameBackground:HookScript('OnShow', function()
             --          
@@ -618,33 +611,6 @@ function SubModuleMixin:ChangeFocusFrame()
 
     -- FocusFrameToTDebuff1:SetPoint('TOPLEFT', FocusFrameToT, 'TOPRIGHT', 25, -20) -- ?? TODO
 
-    if not FocusFrame.DFRangeHooked then
-        FocusFrame.DFRangeHooked = true;
-
-        local state = self.ModuleRef.db.profile.focus
-
-        if not RangeCheck then return end
-        local function updateRange()
-            local minRange, maxRange = RangeCheck:GetRange('focus')
-            -- print(minRange, maxRange)
-
-            if not state.fadeOut then
-                FocusFrame:SetAlpha(1);
-                return;
-            end
-
-            if minRange and minRange >= state.fadeOutDistance then
-                FocusFrame:SetAlpha(0.55);
-                -- elseif maxRange and maxRange >= 40 then
-                --     TargetFrame:SetAlpha(0.55);
-            else
-                FocusFrame:SetAlpha(1);
-            end
-        end
-
-        FocusFrame:HookScript('OnUpdate', updateRange)
-        FocusFrame:HookScript('OnEvent', updateRange)
-    end
 end
 
 function SubModuleMixin:ReApplyFocusFrame()

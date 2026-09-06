@@ -299,9 +299,9 @@ function SubModuleMixin:Setup()
     --
     self:ChangePetFrame()
 
-    _G['PetFrameManaBar'].DFUpdateFunc = function()
+    self.ModuleRef:RegisterManaBarCallback(PetFrameManaBar, function()
         self:UpdatePetManaBarTexture();
-    end
+    end)
 
     local f = _G['DragonflightUIPetFrame']
     f:SetSize(120, 49)

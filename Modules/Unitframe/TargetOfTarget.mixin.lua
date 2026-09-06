@@ -269,9 +269,9 @@ function SubModuleMixin:Setup()
     self:ChangeToT()
     self:ReApplyToT()
 
-    _G['TargetFrameToTManaBar'].DFUpdateFunc = function()
+    self.ModuleRef:RegisterManaBarCallback(TargetFrameToTManaBar, function()
         self:ReApplyToT()
-    end
+    end)
 
     local f = _G['DragonflightUITargetToTFrame']
     f:SetSize(120, 49)
@@ -351,9 +351,11 @@ function SubModuleMixin:Update()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     f:SetScale(state.scale)
 
-    f_orig:ClearAllPoints()
-    f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
-    f_orig:SetScale(state.scale)
+    if not InCombatLockdown() then
+        f_orig:ClearAllPoints()
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        f_orig:SetScale(state.scale)
+    end
 
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 
@@ -366,10 +368,11 @@ end
 function SubModuleMixin:ChangeToTFrame(self, frame)
     local tex2xBase = 'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe2x\\'
 
-    local port = frame.Portrait or _G[frame:GetName() .. 'Portrait']
-    local healthBar = self.HealthBar or _G[frame:GetName() .. 'HealthBar']
-    local manaBar = self.ManaBar or _G[frame:GetName() .. 'ManaBar']
-    local name = frame.Name;
+    local fName = frame:GetName()
+    local port = frame.portrait or frame.Portrait or _G[fName .. 'Portrait']
+    local healthBar = frame.healthbar or frame.HealthBar or _G[fName .. 'HealthBar']
+    local manaBar = frame.manabar or frame.ManaBar or _G[fName .. 'ManaBar']
+    local name = frame.name or frame.Name or _G[fName .. 'TextureFrameName']
 
     frame:SetSize(120, 49)
 
@@ -398,10 +401,12 @@ function SubModuleMixin:ChangeToTFrame(self, frame)
     healthBar:GetStatusBarTexture():SetTexture(
         'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Health')
 
-    if not healthBar.DFMask then
+    if not self.ToTMasks then self.ToTMasks = {} end
+
+    if not self.ToTMasks[healthBar] then
         local hpMask = healthBar:CreateMaskTexture()
         healthBar:GetStatusBarTexture():AddMaskTexture(hpMask)
-        healthBar.DFMask = hpMask
+        self.ToTMasks[healthBar] = hpMask
         hpMask:ClearAllPoints()
         hpMask:SetPoint('TOPLEFT', healthBar, 'TOPLEFT', -29, 3)
         hpMask:SetTexture(tex2xBase .. 'uipartyframeportraitonhealthmask', 'CLAMPTOBLACKADDITIVE',
@@ -417,7 +422,7 @@ function SubModuleMixin:ChangeToTFrame(self, frame)
         'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Mana')
     manaBar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
 
-    if not manaBar.DFMask then
+    if not self.ToTMasks[manaBar] then
         local manaMask = manaBar:CreateMaskTexture()
         manaMask:ClearAllPoints()
         manaMask:SetPoint('TOPLEFT', manaBar, 'TOPLEFT', -27, 4)
@@ -426,7 +431,7 @@ function SubModuleMixin:ChangeToTFrame(self, frame)
         -- hpMask:SetTexCoord(0, 1, 0, 1)
         manaMask:SetSize(128, 16 + 0.5)
         manaBar:GetStatusBarTexture():AddMaskTexture(manaMask)
-        manaBar.DFMask = manaMask
+        self.ToTMasks[manaBar] = manaMask
     end
 
     name:ClearAllPoints()
@@ -448,7 +453,6 @@ function SubModuleMixin:ChangeToT()
     TargetFrameToT:ClearAllPoints()
     TargetFrameToT:SetPoint('BOTTOMRIGHT', TargetFrame, 'BOTTOMRIGHT', -35 + 27, -10 - 5)
 
-    TargetFrameToT.Name = TargetFrameToTTextureFrameName
     self:ChangeToTFrame(self, TargetFrameToT)
 
     TargetFrameToTTextureFrameTexture:SetTexture('')
@@ -463,34 +467,6 @@ function SubModuleMixin:ChangeToT()
 
     TargetFrameToTTextureFrameUnconsciousText:ClearAllPoints()
     TargetFrameToTTextureFrameUnconsciousText:SetPoint('CENTER', TargetFrameToTHealthBar, 'CENTER', 0, 0)
-
-    if not TargetFrameToT.DFRangeHooked then
-        TargetFrameToT.DFRangeHooked = true;
-
-        local state = self.ModuleRef.db.profile.tot
-
-        if not RangeCheck then return end
-        local function updateRange()
-            local minRange, maxRange = RangeCheck:GetRange('targettarget')
-            -- print(minRange, maxRange)
-
-            if not state.fadeOut then
-                TargetFrameToT:SetAlpha(1);
-                return;
-            end
-
-            if minRange and minRange >= state.fadeOutDistance then
-                TargetFrameToT:SetAlpha(0.55);
-                -- elseif maxRange and maxRange >= 40 then
-                --     TargetFrame:SetAlpha(0.55);
-            else
-                TargetFrameToT:SetAlpha(1);
-            end
-        end
-
-        TargetFrameToT:HookScript('OnUpdate', updateRange)
-        TargetFrameToT:HookScript('OnEvent', updateRange)
-    end
 end
 
 function SubModuleMixin:ReApplyToT()
