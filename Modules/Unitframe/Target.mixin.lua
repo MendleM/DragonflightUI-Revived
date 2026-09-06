@@ -1347,22 +1347,6 @@ function SubModuleMixin:AddMobhealth()
     -- Directly mutating statusbar.showPercentage on TargetFrameHealthBar taints the secure status bar.
 end
 
-    --[[    hooksecurefunc("TextStatusBar_UpdateTextStringWithValues",
-                   function(statusFrame, textString, value, valueMin, valueMax)
-        -- print(statusFrame, textString, value, valueMin, valueMax)
-    end); ]]
-
-    -- hooksecurefunc("TextStatusBar_UpdateTextString", function(textStatusBar)
-    --     local textString = textStatusBar.TextString;
-    --     if textString then
-    --         local value = textStatusBar:GetValue();
-    --         local valueMin, valueMax = textStatusBar:GetMinMaxValues();
-
-    --         -- print('TextStatusBar_UpdateTextString', textStatusBar:GetName(), value, valueMin, valueMax)
-    --     end
-    -- end)
-end
-
 function SubModuleMixin:CreatThreatIndicator()
     local sizeX, sizeY = 42, 16
 
