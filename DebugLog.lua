@@ -2623,6 +2623,15 @@ local function ArmTotemWatcher()
         end)
     end
 
+    if totemFrame.Update then
+        hooksecurefunc(totemFrame, 'Update', function(self)
+            DF:Log('totem', 'TotemFrame:Update() finished | activeTotems=%s shown=%s vis=%s size=%.0fx%.0f | stack: %s',
+                   tostring(self.activeTotems), tostring(self:IsShown()), tostring(self:IsVisible()),
+                   self:GetWidth() or 0, self:GetHeight() or 0,
+                   tostring(debugstack(2, 5, 0)):gsub('\n', ' | '):sub(1, 350))
+        end)
+    end
+
     if _G['TotemButton_Update'] then
         hooksecurefunc('TotemButton_Update', function(button, startTime, duration, icon)
             local btnName = (button and button.GetName and button:GetName()) or tostring(button)
@@ -2630,6 +2639,38 @@ local function ArmTotemWatcher()
                    btnName, startTime or 0, duration or 0, tostring(icon),
                    tostring(button and button.slot), tostring(button and button:IsShown()))
         end)
+    end
+
+    if TotemButtonMixin and TotemButtonMixin.Update then
+        hooksecurefunc(TotemButtonMixin, 'Update', function(self, startTime, duration, icon)
+            DF:Log('totem', 'TotemButtonMixin:Update(slot=%s, start=%.1f, dur=%.1f, icon=%s) -> shown=%s vis=%s',
+                   tostring(self.slot), startTime or 0, duration or 0, tostring(icon),
+                   tostring(self:IsShown()), tostring(self:IsVisible()))
+        end)
+    end
+
+    local function hookBtn(btn)
+        if not btn or btn.DFHooked then return end
+        btn.DFHooked = true
+        hooksecurefunc(btn, 'Show', function(self)
+            DF:Log('totem', 'TotemButton:Show() [%s slot=%s idx=%s shown=%s vis=%s]',
+                   self:GetName() or 'poolBtn', tostring(self.slot), tostring(self.layoutIndex), tostring(self:IsShown()), tostring(self:IsVisible()))
+        end)
+        hooksecurefunc(btn, 'Hide', function(self)
+            DF:Log('totem', 'TotemButton:Hide() [%s slot=%s idx=%s shown=%s vis=%s]',
+                   self:GetName() or 'poolBtn', tostring(self.slot), tostring(self.layoutIndex), tostring(self:IsShown()), tostring(self:IsVisible()))
+        end)
+        if btn.Update and not TotemButtonMixin then
+            hooksecurefunc(btn, 'Update', function(self, startTime, duration, icon)
+                DF:Log('totem', 'TotemButton:Update(slot=%s, start=%.1f, dur=%.1f, icon=%s) -> shown=%s vis=%s',
+                       tostring(self.slot), startTime or 0, duration or 0, tostring(icon),
+                       tostring(self:IsShown()), tostring(self:IsVisible()))
+            end)
+        end
+    end
+
+    for _, child in ipairs({totemFrame:GetChildren()}) do
+        if child:IsObjectType('Button') then hookBtn(child) end
     end
 
     local function hookBase(base)
@@ -2667,13 +2708,23 @@ local function ArmTotemWatcher()
             local tf = _G['TotemFrame']
             DF:Log('totem', 'EVENT PLAYER_TOTEM_UPDATE slot=%s -> have=%s name="%s" start=%.1f dur=%.1f left=%.1f icon=%s',
                    tostring(slot), tostring(haveTotem), tostring(name or ''), startTime or 0, duration or 0, timeLeft, tostring(icon))
-            DF:Log('totem', '  state: TotemFrame(shown=%s vis=%s active=%s) BaseFrame(shown=%s vis=%s) | buttons: T1[s=%s,sh=%s] T2[s=%s,sh=%s] T3[s=%s,sh=%s] T4[s=%s,sh=%s]',
+
+            local btnSummary = {}
+            if tf then
+                for _, child in ipairs({tf:GetChildren()}) do
+                    if child:IsObjectType('Button') then
+                        hookBtn(child)
+                        table.insert(btnSummary, string.format('btn[slot=%s,idx=%s,sh=%s,vis=%s]',
+                                     tostring(child.slot), tostring(child.layoutIndex),
+                                     tostring(child:IsShown()), tostring(child:IsVisible())))
+                    end
+                end
+            end
+            DF:Log('totem', '  state: TotemFrame(shown=%s vis=%s active=%s sz=%.0fx%.0f) BaseFrame(shown=%s vis=%s) | buttons(%d): %s',
                    tostring(tf and tf:IsShown()), tostring(tf and tf:IsVisible()), tostring(tf and tf.activeTotems),
+                   tf and tf:GetWidth() or 0, tf and tf:GetHeight() or 0,
                    tostring(base and base:IsShown()), tostring(base and base:IsVisible()),
-                   tostring(_G['TotemFrameTotem1'] and _G['TotemFrameTotem1'].slot), tostring(_G['TotemFrameTotem1'] and _G['TotemFrameTotem1']:IsShown()),
-                   tostring(_G['TotemFrameTotem2'] and _G['TotemFrameTotem2'].slot), tostring(_G['TotemFrameTotem2'] and _G['TotemFrameTotem2']:IsShown()),
-                   tostring(_G['TotemFrameTotem3'] and _G['TotemFrameTotem3'].slot), tostring(_G['TotemFrameTotem3'] and _G['TotemFrameTotem3']:IsShown()),
-                   tostring(_G['TotemFrameTotem4'] and _G['TotemFrameTotem4'].slot), tostring(_G['TotemFrameTotem4'] and _G['TotemFrameTotem4']:IsShown()))
+                   #btnSummary, #btnSummary > 0 and table.concat(btnSummary, ' ') or 'none')
         elseif event == 'UNIT_SPELLCAST_SUCCEEDED' and arg1 == 'player' then
             local spellName, spellID
             if select('#', arg1, arg2, arg3) >= 3 and type(arg3) == 'number' then
@@ -2794,32 +2845,76 @@ function DF:LogTotemState(tag)
         DF:Log(tag, 'TotemFrame: ABSENT')
     end
 
-    -- Blizzard Buttons TotemFrameTotem1..4
-    DF:Log(tag, '--- TotemFrameTotem1..4 Buttons ---')
+    if tf then
+        DF:Log(tag, 'TotemFrame layout: leftPadding=%s rightPadding=%s topPadding=%s bottomPadding=%s spacing=%s',
+               tostring(tf.leftPadding), tostring(tf.rightPadding), tostring(tf.topPadding), tostring(tf.bottomPadding), tostring(tf.spacing))
+        if tf.totemPool then
+            DF:Log(tag, 'TotemFrame.totemPool: active=%s numActiveFunc=%s',
+                   tostring(tf.totemPool.activeObjects and #tf.totemPool.activeObjects),
+                   tostring(tf.totemPool.GetNumActive and tf.totemPool:GetNumActive()))
+        end
+    end
+
+    -- Totem Buttons (handles both pool-based buttons and legacy TotemFrameTotem1..4)
+    DF:Log(tag, '--- Totem Buttons ---')
     local buttonsShown = 0
+    local buttonList = {}
+
     for i = 1, 4 do
         local btn = _G['TotemFrameTotem' .. i]
-        if btn then
-            local iconTex = _G['TotemFrameTotem' .. i .. 'IconTexture'] or (btn.icon and btn.icon.texture)
-            local texVal = iconTex and iconTex.GetTexture and iconTex:GetTexture()
-            local durText = btn.duration and btn.duration.GetText and btn.duration:GetText()
-            local cd = _G['TotemFrameTotem' .. i .. 'IconCooldown'] or (btn.icon and btn.icon.cooldown)
+        if btn then table.insert(buttonList, btn) end
+    end
+
+    if tf then
+        for _, child in ipairs({tf:GetChildren()}) do
+            if child:IsObjectType('Button') then
+                local already = false
+                for _, b in ipairs(buttonList) do
+                    if b == child then already = true; break end
+                end
+                if not already then table.insert(buttonList, child) end
+            end
+        end
+    end
+
+    if #buttonList == 0 then
+        DF:Log(tag, 'no buttons found under TotemFrame!')
+    else
+        for idx, btn in ipairs(buttonList) do
             if btn:IsShown() then buttonsShown = buttonsShown + 1 end
+            local iconTex = (btn.Icon and btn.Icon.GetTexture and btn.Icon:GetTexture()) or
+                            (btn.Icon and btn.Icon.Texture and btn.Icon.Texture.GetTexture and btn.Icon.Texture:GetTexture()) or
+                            (btn.icon and btn.icon.GetTexture and btn.icon:GetTexture()) or
+                            (btn.icon and btn.icon.texture and btn.icon.texture.GetTexture and btn.icon.texture:GetTexture()) or
+                            (_G[btn:GetName() and (btn:GetName() .. 'IconTexture')] and _G[btn:GetName() .. 'IconTexture']:GetTexture())
+            if not iconTex then
+                for _, reg in ipairs({btn:GetRegions()}) do
+                    if reg:IsObjectType('Texture') and reg:GetTexture() then
+                        iconTex = string.format('%s[%s]', tostring(reg:GetTexture()), reg:GetDrawLayer() or '?')
+                        break
+                    end
+                end
+            end
+            local durText = (btn.Duration and btn.Duration.GetText and btn.Duration:GetText()) or
+                            (btn.duration and btn.duration.GetText and btn.duration:GetText()) or ''
             local pName = (btn:GetParent() and btn:GetParent().GetName and btn:GetParent():GetName()) or '<anon>'
 
-            DF:Log(tag, 'btn%d: slot=%s shown=%s vis=%s alpha=%.2f parent=%s size=%.0fx%.0f tex=%s dur="%s" cdShown=%s DFMask=%s',
-                   i, tostring(btn.slot), tostring(btn:IsShown()), tostring(btn:IsVisible()), btn:GetAlpha() or -1,
-                   pName, btn:GetWidth() or 0, btn:GetHeight() or 0,
-                   tostring(texVal), tostring(durText or ''), tostring(cd and cd:IsShown()), tostring(btn.DFMask ~= nil))
+            local bLeft, bBottom, bW, bH = btn:GetLeft(), btn:GetBottom(), btn:GetWidth() or 0, btn:GetHeight() or 0
+            local screenPos = bLeft and string.format('pos=%.0f,%.0f to %.0f,%.0f', bLeft, bBottom, bLeft + bW, bBottom + bH) or 'pos=nil'
+
+            DF:Log(tag, 'btn %d [%s]: slot=%s layoutIdx=%s shown=%s vis=%s alpha=%.2f strata=%s level=%s size=%.0fx%.0f %s parent=%s tex=%s dur="%s"',
+                   idx, btn:GetName() or 'poolBtn', tostring(btn.slot), tostring(btn.layoutIndex),
+                   tostring(btn:IsShown()), tostring(btn:IsVisible()), btn:GetAlpha() or -1,
+                   tostring(btn:GetFrameStrata()), tostring(btn:GetFrameLevel()),
+                   bW, bH, screenPos, pName, tostring(iconTex), tostring(durText))
             for p = 1, (btn:GetNumPoints() or 0) do
                 local point, relTo, relPoint, x, y = btn:GetPoint(p)
                 local relName = (relTo and relTo.GetName and relTo:GetName()) or tostring(relTo)
                 DF:Log(tag, '    pt%d: %s -> %s %s (%.0f, %.0f)', p, tostring(point), relName, tostring(relPoint), x or 0, y or 0)
             end
-        else
-            DF:Log(tag, 'btn%d: ABSENT', i)
         end
     end
+    DF:Log(tag, 'total buttons shown: %d', buttonsShown)
 
     -- Globals & Priorities
     local prioritiesStr = 'nil'
@@ -2830,9 +2925,9 @@ function DF:LogTotemState(tag)
         prioritiesStr = table.concat(parts, ', ')
     end
     DF:Log(tag, 'priorities: %s', prioritiesStr)
-    DF:Log(tag, 'functions: TotemFrame_Update=%s TotemButton_Update=%s TotemFrame_OnEvent=%s',
-           tostring(type(_G['TotemFrame_Update'])), tostring(type(_G['TotemButton_Update'])),
-           tostring(type(_G['TotemFrame_OnEvent'])))
+    DF:Log(tag, 'functions: TotemFrame.Update=%s TotemFrame_Update=%s TotemButtonMixin.Update=%s',
+           tostring(type(tf and tf.Update)), tostring(type(_G['TotemFrame_Update'])),
+           tostring(type(TotemButtonMixin and TotemButtonMixin.Update)))
 
     -- PetFrame check
     local pf = _G['PetFrame']
@@ -2861,8 +2956,8 @@ function DF:LogTotemState(tag)
         DF:Log(tag, 'VERDICT: TotemFrame is visible, but 0 buttons are shown! (API reports %d active totems)',
                totalActiveFromAPI)
     else
-        DF:Log(tag, 'VERDICT: OK - %d API totems active, TotemFrame visible, %d button(s) shown.',
-               totalActiveFromAPI, buttonsShown)
+        DF:Log(tag, 'VERDICT: OK - %d API totems active, TotemFrame visible (%.0fx%.0f), %d button(s) shown.',
+               totalActiveFromAPI, tf:GetWidth() or 0, tf:GetHeight() or 0, buttonsShown)
     end
 
     if tf then DF:LogFrame(tf, tag) end
