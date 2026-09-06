@@ -2,10 +2,18 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.45.1`.
+May 2026). Current builds report version `0.45.2`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.45.2 — Player Totem Frame Toggle (6 September 2026)
+Added a clean activation toggle for the Player Totem Frame in settings and Edit Mode, allowing the frame to be hidden without reloading.
+**Highlights** — Player Totem Frame can now be toggled on/off under `/df` -> Unitframes -> Player Totem Frame and in HUD Edit Mode · re-enabling the frame immediately restores and updates active totems without requiring a `/reload`
+### Unit Frames
+- Added an **Active** toggle (`activate`) to the Player Totem Frame submodule, providing a clean way to hide or disable the totem frame (e.g. for players using dedicated totem addons like TotemTimers) without relying on heavy secure state handlers.
+- When toggling the frame back on, Blizzard's `TotemFrame` is immediately shown and refreshed via `TotemFrame_Update()` so existing active totems appear right away.
+- Fixed a minor naming error in Edit Mode options where the Totem Frame reset preset was labelled as 'Pet'.
 
 ## 0.45.1 — Party Health Bars (6 September 2026)
 Follow-up to 0.45.0: the party health bars keep their colour and their number without being hovered, and a preset Edit Mode layout no longer taints the party frames on every login.
