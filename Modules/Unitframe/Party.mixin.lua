@@ -1211,6 +1211,22 @@ function SubModuleMixin:SetupModern()
             -- gradient options - which the classic reskin honours but this
             -- path never did - swap in the greyscale -Status art and tint
             -- it, exactly like PlayerFrame does.
+            -- SetTexture only when the art actually changes.
+            --
+            -- This runs on every value change now, from the repaint hook that replaced
+            -- lockColor - it used to run only on roster changes. Re-assigning the fill
+            -- texture that often is pointless work on the hot path, and it is the texture
+            -- the status bar crops to the current value, so there is no reason to touch it
+            -- when the path has not changed.
+            --
+            -- The colour still goes on unconditionally; SetStatusBarColor is a vertex
+            -- colour and does not disturb the crop.
+            local function SetBarArt(texture, path)
+                if not (texture and texture.SetTexture) then return end
+                if texture.GetTexture and texture:GetTexture() == path then return end
+                texture:SetTexture(path)
+            end
+
             local tex = healthbar:GetStatusBarTexture()
             local r, g, b = shade, shade, shade
             if tex and state and state.classcolor then
@@ -1224,16 +1240,16 @@ function SubModuleMixin:SetupModern()
                 -- priest until something repainted them. Use the plain green art until the
                 -- class is known; UNIT_NAME_UPDATE brings us back here once it is.
                 if class then
-                    tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+                    SetBarArt(tex, BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
                     r, g, b = DF:GetClassColor(class, 1)
                 else
-                    tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
+                    SetBarArt(tex, BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
                 end
             elseif tex and state and state.gradient then
-                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
+                SetBarArt(tex, BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Status')
                 r, g, b = Helper:ColorGradiant(Helper:GetUnitHealthPercent(unit))
             elseif tex then
-                tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
+                SetBarArt(tex, BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health')
             end
             -- Blizzard desaturates this bar for disconnected members
             -- (PartyMemberFrameMixin:UpdateOnlineStatus) and the flag could
@@ -1266,7 +1282,13 @@ function SubModuleMixin:SetupModern()
             local _, powerToken = UnitPowerType(unit)
             local art = POWER_BAR_ART[powerToken] or 'Mana'
             local tex = manabar:GetStatusBarTexture()
-            if tex then tex:SetTexture(BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-' .. art) end
+
+            -- Only on a real change, same reason as the health bar above: this is the fill
+            -- texture and the status bar crops it to the current value.
+            local path = BARS .. 'UI-HUD-UnitFrame-Party-PortraitOn-Bar-' .. art
+            if tex and tex.SetTexture and not (tex.GetTexture and tex:GetTexture() == path) then
+                tex:SetTexture(path)
+            end
             if manabar.SetStatusBarDesaturated then manabar:SetStatusBarDesaturated(false) end
             if tex and tex.SetDesaturated then tex:SetDesaturated(false) end
             manabar:SetStatusBarColor(shade, shade, shade, 1)
@@ -1333,21 +1355,108 @@ function SubModuleMixin:SetupModern()
     -- Cost is one setter per event on at most four frames, next to the setter
     -- Blizzard already ran on the same line. Nothing is re-created and nothing
     -- is re-rendered.
+    -- Why a bar was not recognised, counted per reason.
+    --
+    -- Needed because the health hook demonstrably runs and demonstrably does not match:
+    -- fired went 9 -> 14 while matched stayed at 4, in a group, with the bar sitting at
+    -- Blizzard's green. The mana hooks match on the same frames, so the three exits below
+    -- are not equally likely and guessing which one fires is how the last two hours went.
+    local barOwnerMiss = {}
+    addonTable.PartyBarOwnerMiss = barOwnerMiss
+
     local function BarOwner(bar, key)
-        if not bar then return nil end
+        if not bar then
+            barOwnerMiss[key .. ':noBar'] = (barOwnerMiss[key .. ':noBar'] or 0) + 1
+            return nil
+        end
+
         local pf = bar:GetParent()
-        if not pf then return nil end
+        if not pf then
+            barOwnerMiss[key .. ':noParent'] = (barOwnerMiss[key .. ':noParent'] or 0) + 1
+            return nil
+        end
+
         local st = memberState[pf]
-        if not (st and st.styled) then return nil end
-        if pf[key] ~= bar then return nil end
+        if not (st and st.styled) then
+            barOwnerMiss[key .. ':notStyled'] = (barOwnerMiss[key .. ':notStyled'] or 0) + 1
+            return nil
+        end
+
+        if pf[key] ~= bar then
+            barOwnerMiss[key .. ':wrongKey'] = (barOwnerMiss[key .. ':wrongKey'] or 0) + 1
+            return nil
+        end
+
         return pf
     end
 
+    -- Reported, not assumed. These are FrameXML globals and a client that does not have
+    -- one leaves the hook silently unregistered - which is a repaint that never happens and
+    -- nothing anywhere saying so. A 2.5.6 report of green, stale bars is what made this
+    -- worth recording; /df log party prints it.
+    addonTable.PartyBarHookState = {registered = {}, fired = {}, matched = {}}
+    local hookState = addonTable.PartyBarHookState
+
     if type(UnitFrameHealthBar_Update) == 'function' then
+        hookState.registered.UnitFrameHealthBar_Update = true
         hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar)
+            -- Counted before the ownership check, so this rises for the player, target and
+            -- pet frames too. That is the point: it makes the question answerable without a
+            -- group. A count of zero means the client does not take this route at all.
+            hookState.fired.UnitFrameHealthBar_Update = (hookState.fired.UnitFrameHealthBar_Update or 0) + 1
+
             local pf = BarOwner(statusbar, 'HealthBar')
-            if pf then pcall(UpdateHealthBar, pf) end
+            if not pf then return end
+
+            -- Counted separately, because this is the part a group is needed for: whether
+            -- Blizzard reaches the POOLED party bars this way, or by some other route on
+            -- this client.
+            hookState.matched.UnitFrameHealthBar_Update = (hookState.matched.UnitFrameHealthBar_Update or 0) + 1
+            pcall(UpdateHealthBar, pf)
         end)
+    else
+        hookState.registered.UnitFrameHealthBar_Update = false
+    end
+
+    -- The one that actually matters for the party health bar.
+    --
+    -- UnitFrameHealthBar_Update above is not the path Blizzard takes for these. The bars
+    -- carry frequentUpdates, so UNIT_HEALTH is deliberately NOT registered on them and
+    -- UnitFrameHealthBar_OnUpdate polls instead - which calls SetValue, which fires
+    -- OnValueChanged, which is where the green is set:
+    --
+    --   SetStatusBarColor
+    --     <- HealthBar_OnValueChanged            (Blizzard_GameTooltip/HealthBar.lua:30)
+    --     <- UnitFrameHealthBar_OnValueChanged   (UnitFrame.lua:769)
+    --     <- PartyFrameTemplates.xml:194_OnValueChanged
+    --     <- SetValue <- UnitFrameHealthBar_OnUpdate (UnitFrame.lua:707)
+    --
+    -- Measured, not guessed: /df log party counted 21 green writes from exactly that stack,
+    -- while the hook on UnitFrameHealthBar_Update stayed at 4 matches across three logs.
+    -- HealthBar_OnValueChanged also guards on `if ( not self.lockColor )` - it is the second
+    -- reader of the field this addon used to set, and the one nobody had found.
+    --
+    -- Hooking here fixes the readout too. Blizzard's own text would follow every SetValue
+    -- through UpdateTextString, but that finds self.TextString nil now, so our strings are
+    -- ours to refresh - and this is the moment the value changes.
+    if type(UnitFrameHealthBar_OnValueChanged) == 'function' then
+        hookState.registered.UnitFrameHealthBar_OnValueChanged = true
+        hooksecurefunc('UnitFrameHealthBar_OnValueChanged', function(statusbar)
+            hookState.fired.UnitFrameHealthBar_OnValueChanged =
+                (hookState.fired.UnitFrameHealthBar_OnValueChanged or 0) + 1
+
+            local pf = BarOwner(statusbar, 'HealthBar')
+            if not pf then return end
+
+            hookState.matched.UnitFrameHealthBar_OnValueChanged =
+                (hookState.matched.UnitFrameHealthBar_OnValueChanged or 0) + 1
+
+            -- No recursion: UpdateHealthBar sets a colour, a texture and a font string, and
+            -- only SetValue re-enters this handler.
+            pcall(UpdateHealthBar, pf)
+        end)
+    else
+        hookState.registered.UnitFrameHealthBar_OnValueChanged = false
     end
 
     -- Both are needed: UpdateType is where the art swap and the power tint
@@ -1356,10 +1465,18 @@ function SubModuleMixin:SetupModern()
     -- UpdateType has already returned.
     for _, fname in ipairs({'UnitFrameManaBar_UpdateType', 'UnitFrameManaBar_Update'}) do
         if type(_G[fname]) == 'function' then
+            hookState.registered[fname] = true
             hooksecurefunc(fname, function(manaBar)
+                hookState.fired[fname] = (hookState.fired[fname] or 0) + 1
+
                 local pf = BarOwner(manaBar, 'ManaBar')
-                if pf then pcall(UpdateManaBar, pf) end
+                if not pf then return end
+
+                hookState.matched[fname] = (hookState.matched[fname] or 0) + 1
+                pcall(UpdateManaBar, pf)
             end)
+        else
+            hookState.registered[fname] = false
         end
     end
 
@@ -1386,29 +1503,27 @@ function SubModuleMixin:SetupModern()
         end
     end
 
-    -- Gradient coloring follows current health, so it needs health events.
-    -- Unit-filtered to the four party slots: an unfiltered UNIT_HEALTH would
-    -- fire for every unit in a raid.
+    -- UNIT_NAME_UPDATE, and deliberately not UNIT_HEALTH.
     --
-    -- UNIT_NAME_UPDATE shares the watcher but not the gradient gate. It is the client
-    -- saying the name cache entry arrived, which is the moment UnitClass starts answering -
-    -- Blizzard calls CompactUnitFrame_UpdateHealthColor on that same event and says so in a
-    -- comment. Without it a member painted plain for a missing class stayed that way, since
-    -- nothing repaints a bar whose health has not moved.
+    -- This is the client saying the name cache entry arrived, which is the moment UnitClass
+    -- starts answering - Blizzard calls CompactUnitFrame_UpdateHealthColor on the same event
+    -- and says so in a comment. Without it a member painted plain for a missing class stayed
+    -- that way, since nothing repaints a bar whose health has not moved.
     --
-    -- The gate stays on UNIT_HEALTH alone. That one fires constantly in combat for four
-    -- units, and outside gradient mode there is nothing for it to change.
+    -- Health is not handled here, and an earlier attempt to do so was wrong. These bars
+    -- carry frequentUpdates, so their value arrives through UnitFrameHealthBar_OnUpdate ->
+    -- SetValue -> OnValueChanged, and the hook on that path above repaints on every change.
+    -- Listening to UNIT_HEALTH as well would do the same work a second time per tick, and
+    -- the event is throttled anyway - which is exactly why driving the readout from it left
+    -- the number trailing the target frame by one regeneration tick.
+    --
+    -- Unit-filtered to the four party slots: an unfiltered event would fire for every unit
+    -- in a raid.
     for _, units in ipairs({{'party1', 'party2'}, {'party3', 'party4'}}) do
         local unitWatcher = CreateFrame('Frame')
-        unitWatcher:RegisterUnitEvent('UNIT_HEALTH', units[1], units[2])
         unitWatcher:RegisterUnitEvent('UNIT_NAME_UPDATE', units[1], units[2])
 
         unitWatcher:SetScript('OnEvent', function(_, event, unit)
-            if event == 'UNIT_HEALTH' then
-                local state = subModule.ModuleRef and subModule.ModuleRef.db.profile.party
-                if not (state and state.gradient) then return end
-            end
-
             if not (PartyFrame and PartyFrame.PartyMemberFramePool) then return end
 
             for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
@@ -1420,7 +1535,9 @@ function SubModuleMixin:SetupModern()
                 local slot = pf.layoutIndex and ('party' .. pf.layoutIndex)
 
                 if st and st.styled and (pf.unit == unit or pf.unitToken == unit or slot == unit) then
-                    pcall(UpdateBars, pf)
+                    -- A health event cannot have changed the power bar, and UNIT_NAME_UPDATE
+                    -- is what finally answers UnitClass - which only the health bar reads.
+                    pcall(UpdateHealthBar, pf)
                 end
             end
         end)
