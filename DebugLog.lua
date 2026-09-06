@@ -674,6 +674,50 @@ function DF:LogToTTaint(tag, which)
                 if dirtyChild == 0 then DF:Log(tag, '  %s.%s: clean', totName, childKey) end
             end
         end
+
+        -- Anchors check
+        local nPoints = tot.GetNumPoints and tot:GetNumPoints() or 0
+        DF:Log(tag, '  points: count=%d', nPoints)
+        for p = 1, nPoints do
+            local point, relTo, relPoint, x, y = tot:GetPoint(p)
+            local relName = (relTo and relTo.GetName and relTo:GetName()) or tostring(relTo)
+            local okRel, whoRel = issecurevariable(relName)
+            DF:Log(tag, '    pt %d: %s -> %s:%s (%.1f, %.1f) [relSecure=%s%s]', p, tostring(point), tostring(relName),
+                   tostring(relPoint), x or 0, y or 0, tostring(okRel),
+                   (not okRel and whoRel) and (' tainted by ' .. whoRel) or '')
+        end
+        local parentObj = tot.GetParent and tot:GetParent()
+        local parentName = (parentObj and parentObj.GetName and parentObj:GetName()) or tostring(parentObj)
+        DF:Log(tag, '  parent: %s', tostring(parentName))
+
+        -- TargetOfTargetMixin:Update context variables
+        local okP, whoP = issecurevariable('PlayerFrame')
+        local okPU, whoPU = issecurevariable(PlayerFrame, 'unit')
+        DF:Log(tag, '  PlayerFrame: global secure=%s%s, unit (%s) secure=%s%s', tostring(okP),
+               (not okP and whoP) and (' tainted by ' .. whoP) or '', tostring(PlayerFrame and PlayerFrame.unit),
+               tostring(okPU), (not okPU and whoPU) and (' tainted by ' .. whoPU) or '')
+
+        local okCV, whoCV = issecurevariable('CVarCallbackRegistry')
+        DF:Log(tag, '  CVarCallbackRegistry: global secure=%s%s', tostring(okCV),
+               (not okCV and whoCV) and (' tainted by ' .. whoCV) or '')
+
+        local sb = owner and owner.spellbar
+        if sb then
+            local sbName = (sb.GetName and sb:GetName()) or 'spellbar'
+            local okSB, whoSB = issecurevariable(sbName)
+            local dirtySB = 0
+            for k in pairs(sb) do
+                if type(k) == 'string' then
+                    local ok, who = issecurevariable(sb, k)
+                    if not ok then
+                        dirtySB = dirtySB + 1
+                        DF:Log(tag, '    INSECURE %s.%s tainted by %s', sbName, k, tostring(who or '?'))
+                    end
+                end
+            end
+            DF:Log(tag, '  spellbar %s: global secure=%s%s, dirtyFields=%d', sbName, tostring(okSB),
+                   (not okSB and whoSB) and (' tainted by ' .. whoSB) or '', dirtySB)
+        end
     else
         DF:Log(tag, '%sToT is nil', ownerName)
     end

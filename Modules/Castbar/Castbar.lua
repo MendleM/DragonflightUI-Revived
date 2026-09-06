@@ -904,24 +904,26 @@ function Module.AddNewCastbar()
     local target = CreateFrame('StatusBar', 'DragonflightUITargetCastbar', UIParent,
                                'DragonflightUITargetCastbarTemplate')
     target.DefaultParent = TargetFrame;
-    if TargetFrameSpellBar then TargetFrameSpellBar.DFCastbar = target end
     Module.TargetCastbar = target
 
     if DF.Caps.HasFocus then
         local focus = CreateFrame('StatusBar', 'DragonflightUIFocusCastbar', UIParent,
                                   'DragonflightUIFocusCastbarTemplate')
         focus.DefaultParent = FocusFrame;
-        if FocusFrameSpellBar then FocusFrameSpellBar.DFCastbar = focus end
         Module.FocusCastbar = focus
     end
 
     if Target_Spellbar_AdjustPosition then
         hooksecurefunc('Target_Spellbar_AdjustPosition', function(self)
-            if self.DFCastbar then self.DFCastbar:AdjustPosition() end
+            if self == TargetFrameSpellBar and Module.TargetCastbar then
+                Module.TargetCastbar:AdjustPosition()
+            elseif self == FocusFrameSpellBar and Module.FocusCastbar then
+                Module.FocusCastbar:AdjustPosition()
+            end
         end)
     elseif TargetFrameSpellBar and TargetFrameSpellBar.AdjustPosition then
         hooksecurefunc(TargetFrameSpellBar, 'AdjustPosition', function(self)
-            if self.DFCastbar then self.DFCastbar:AdjustPosition() end
+            if Module.TargetCastbar then Module.TargetCastbar:AdjustPosition() end
         end)
     end
 end

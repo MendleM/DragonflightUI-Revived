@@ -378,6 +378,7 @@ function SubModuleMixin:Update()
     else
         parent = _G[state.anchorFrame]
     end
+    parent = parent or FocusFrame or UIParent
 
     f:SetScale(state.scale)
     f:ClearAllPoints()
@@ -409,7 +410,7 @@ function SubModuleMixin:Update()
     -- clients, and has none of this. This frame now does the same.
     if not InCombatLockdown() then
         f_orig:ClearAllPoints()
-        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        f_orig:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
         -- Scale the frame itself, the way target-of-target does. The holder is not
         -- its parent, so scaling the holder alone would never reach it.

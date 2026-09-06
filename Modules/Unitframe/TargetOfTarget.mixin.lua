@@ -346,6 +346,7 @@ function SubModuleMixin:Update()
     else
         parent = _G[state.anchorFrame]
     end
+    parent = parent or TargetFrame or UIParent
 
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
@@ -353,7 +354,7 @@ function SubModuleMixin:Update()
 
     if not InCombatLockdown() then
         f_orig:ClearAllPoints()
-        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        f_orig:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
         f_orig:SetScale(state.scale)
     end
 
