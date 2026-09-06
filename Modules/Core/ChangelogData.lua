@@ -33,14 +33,17 @@ DF.ChangelogData = {
                 title = 'Highlights',
                 items = {
                     'Player Totem Frame can now be toggled on/off under /df -> Unitframes -> Player Totem Frame and in HUD Edit Mode.',
-                    'Re-enabling the frame immediately restores and updates active totems without requiring a /reload.'
+                    'Re-enabling the frame immediately restores and updates active totems without requiring a /reload.',
+                    'Fixed TotemFrame disappearing and losing anchor points after totems expire or Totemic Call is used.'
                 }
             }, {
                 title = 'Unit Frames',
                 items = {
                     'Added an Active toggle (activate) to the Player Totem Frame submodule, providing a clean way to hide or disable the totem frame without relying on heavy secure state handlers.',
                     'When toggling the frame back on, Blizzard\'s TotemFrame is immediately shown and refreshed via TotemFrame_Update() so existing active totems appear right away.',
-                    'Fixed a minor naming error in Edit Mode options where the Totem Frame reset preset was labelled as \'Pet\'.'
+                    'Fixed a minor naming error in Edit Mode options where the Totem Frame reset preset was labelled as \'Pet\'.',
+                    'Fixed Blizzard\'s TotemFrame losing its anchor points and disappearing after totems expire or Totemic Call ("Ruf der Totems") is used, by cleanly disconnecting it from Blizzard\'s UIParent managed container.',
+                    'Removed the blank 38px leftPadding offset on TotemFrame so totem icons align properly.'
                 }
             }
         }

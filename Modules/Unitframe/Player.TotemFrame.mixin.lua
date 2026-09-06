@@ -208,14 +208,10 @@ function SubModuleMixin:Update()
     local f = self.BaseFrame
     if not f then return end
 
-    DF:Log('totem', 'PlayerTotemFrame:Update() activate=%s parent=%s scale=%.2f',
-           tostring(state.activate), tostring(parent and parent.GetName and parent:GetName()), state.scale or -1)
-
     local totemFrame = _G['TotemFrame']
     if state.activate == false then
         f:Hide()
         if totemFrame then totemFrame:Hide() end
-        DF:Log('totem', 'PlayerTotemFrame:Update() -> deactivated: hiding baseFrame and TotemFrame')
     else
         f:Show()
         if totemFrame then
@@ -230,7 +226,6 @@ function SubModuleMixin:Update()
                 totemFrame:Layout()
             end
         end
-        DF:Log('totem', 'PlayerTotemFrame:Update() -> activated: showing baseFrame and TotemFrame')
     end
 
     -- f:SetScale(state.scale)
@@ -257,7 +252,17 @@ function SubModuleMixin:CreateBase()
 
     local totemFrame = _G['TotemFrame']
     if totemFrame then
+        -- Detach from Blizzard's UIParentManagedFrameContainer:
+        -- Blizzard's RemoveManagedFrame (UIParent.lua:214) checks `if not frame.IsInDefaultPosition then frame:ClearAllPoints() end`.
+        -- Setting IsInDefaultPosition prevents Blizzard from wiping anchor points when totems expire.
+        totemFrame.IsInDefaultPosition = function() return false end
         totemFrame.ignoreFramePositionManager = true
+        totemFrame.ignoreInLayout = true
+
+        if totemFrame.layoutParent and totemFrame.layoutParent.showingFrames then
+            totemFrame.layoutParent.showingFrames[totemFrame] = nil
+        end
+
         totemFrame.leftPadding = 0
         totemFrame:ClearAllPoints()
         totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
@@ -266,10 +271,15 @@ function SubModuleMixin:CreateBase()
         hooksecurefunc(totemFrame, 'SetPoint', function(self)
             if self.DFSettingPoint then return end
             self.DFSettingPoint = true
-            DF:Log('totem', 'PlayerTotemFrame: TotemFrame:SetPoint intercepted, re-anchoring to baseFrame')
             self:ClearAllPoints()
             self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
             self.DFSettingPoint = nil
+        end)
+
+        totemFrame:HookScript('OnShow', function(self)
+            if self:GetNumPoints() == 0 and baseFrame then
+                self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+            end
         end)
 
         if totemFrame.Update then
@@ -281,8 +291,6 @@ function SubModuleMixin:CreateBase()
             end)
         end
     end
-
-    DF:Log('totem', 'PlayerTotemFrame:CreateBase() completed')
 end
 
 local base = 'Interface\\Addons\\DragonflightUI\\Textures\\'
