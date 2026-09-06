@@ -219,11 +219,15 @@ function SubModuleMixin:Update()
     else
         f:Show()
         if totemFrame then
+            totemFrame.leftPadding = 0
             totemFrame:Show()
             if _G['TotemFrame_Update'] then
                 _G['TotemFrame_Update']()
             elseif totemFrame.Update then
                 totemFrame:Update()
+            end
+            if totemFrame.Layout then
+                totemFrame:Layout()
             end
         end
         DF:Log('totem', 'PlayerTotemFrame:Update() -> activated: showing baseFrame and TotemFrame')
@@ -254,6 +258,7 @@ function SubModuleMixin:CreateBase()
     local totemFrame = _G['TotemFrame']
     if totemFrame then
         totemFrame.ignoreFramePositionManager = true
+        totemFrame.leftPadding = 0
         totemFrame:ClearAllPoints()
         totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
         totemFrame:SetParent(baseFrame)
@@ -266,6 +271,15 @@ function SubModuleMixin:CreateBase()
             self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
             self.DFSettingPoint = nil
         end)
+
+        if totemFrame.Update then
+            hooksecurefunc(totemFrame, 'Update', function(self)
+                if self.leftPadding and self.leftPadding ~= 0 then
+                    self.leftPadding = 0
+                    if self.Layout then self:Layout() end
+                end
+            end)
+        end
     end
 
     DF:Log('totem', 'PlayerTotemFrame:CreateBase() completed')
