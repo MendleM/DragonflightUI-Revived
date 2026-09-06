@@ -215,7 +215,17 @@ function SubModuleMixin:SetupOptions()
         -- Raid-style party frames are their own Edit Mode system reading their own values,
         -- so the same number has to land there too or this page has no effect on them.
         -- Helper skips the settings the party system does not have.
-        if addonTable.MirrorRaidSettingToParty then addonTable:MirrorRaidSettingToParty(setting, value) end
+        --
+        -- Only while those frames are actually up, for the reason spelled out at the other
+        -- mirror call in PushStoredSettings: the party applier rebuilds
+        -- PartyFrame.settingMap from our execution, and Blizzard reads that map on every
+        -- ShouldShow. With raid-style off there is nothing to configure and the taint is
+        -- all that would be left. The number is kept in the profile either way, and
+        -- PushStoredSettings mirrors it at the next login if raid-style is on by then.
+        if addonTable.MirrorRaidSettingToParty and addonTable.RaidStylePartyFramesShown and
+            addonTable:RaidStylePartyFramesShown() then
+            addonTable:MirrorRaidSettingToParty(setting, value)
+        end
     end
 
     self.GetBlizzRaidStored = GetBlizzRaidStored
@@ -848,6 +858,10 @@ function SubModuleMixin:Setup()
             local saved = profile and profile.raid and profile.raid.blizzSettings
             if not saved then return end
 
+            -- Are the raid-style party frames the ones on screen? Asked once, before the
+            -- loop, because it decides whether the mirror below has anything to serve.
+            local raidStyle = addonTable.RaidStylePartyFramesShown and addonTable:RaidStylePartyFramesShown()
+
             for key, value in pairs(saved) do
                 local setting = tonumber(key)
                 if setting and value ~= nil then
@@ -868,13 +882,34 @@ function SubModuleMixin:Setup()
                         addonTable:SetRaidEditModeSettingBySetting(setting, value)
                     end
 
-                    -- The mirror runs regardless, and it is the half that matters in a
-                    -- party: raid-style party frames read their size from the PARTY system
-                    -- - CompactUnitFrame asks GetRaidFrameWidth(frame.groupType), and
-                    -- groupType is the system index. The party appliers end in
-                    -- PartyFrame:UpdatePaddingAndLayout, not TryUpdate, so this is safe.
+                    -- The mirror, and only where there is something to mirror TO.
+                    --
+                    -- It exists for one reason: raid-style party frames read their size
+                    -- from the PARTY system, because CompactUnitFrame asks
+                    -- GetRaidFrameWidth(frame.groupType) and groupType is the system index.
+                    -- With raid-style off those frames do not exist, so the mirror serves
+                    -- nobody - and it is not free.
+                    --
+                    -- This used to run regardless, on the reasoning that the party appliers
+                    -- end in PartyFrame:UpdatePaddingAndLayout rather than TryUpdate and
+                    -- are therefore harmless. They take no protected action, true. But
+                    -- OnSystemSettingChange rebuilds PartyFrame.settingMap through
+                    -- UpdateSettingMap, from our execution, and Blizzard reads that map on
+                    -- every ShouldShow - which is every group event. /df log party on 2.5.6
+                    -- reported it plainly, solo, straight after login, with the switch
+                    -- never touched:
+                    --
+                    --   ShouldShow read path: 25 insecure spot(s)
+                    --     SEED PartyFrame.settingMap, .settingMap[n].value, .systemInfo
+                    --     CompactPartyFrameMember1..5.optionTable / isLootObject
+                    --
+                    -- It never showed on a client with layouts of its own, because there
+                    -- the stored values already match and BlizzardHoldsSettingValue skips
+                    -- the applier. On a preset with no saved layout nothing can persist, so
+                    -- every value mismatches and the applier ran at every single login.
+                    --
                     -- Helper skips SortPlayersBy, the one exception.
-                    if addonTable.MirrorRaidSettingToParty then
+                    if raidStyle and addonTable.MirrorRaidSettingToParty then
                         addonTable:MirrorRaidSettingToParty(setting, value)
                     end
                 end

@@ -1453,6 +1453,54 @@ local function LogRaidStyleChain(tag)
            (cpf and cpf:IsShown()) and 'raid style' or 'portrait frames')
 end
 
+-- Whether the bar repaint hooks exist on this client, and whether they ever ran.
+--
+-- These replaced lockColor: Blizzard repaints the party health and power bars on every
+-- health and power event, and our colour goes back on from a global hooksecurefunc rather
+-- than from a field on the frame. They are FrameXML globals, so a client that does not
+-- carry one leaves the hook unregistered - silently, and the bars then stay at Blizzard's
+-- plain green while everything else looks fine. Reported on 2.5.6.
+--
+-- How to read it, and most of this needs no group:
+--
+--   exists=false                    the client has no such global, the hook can never be
+--                                   registered, and nothing repaints. Answer found solo.
+--   fired=0                         the client never calls it, for any unit frame. Also
+--                                   answered solo - take damage or pick up a target.
+--   fired>0 but matched=0           Blizzard uses this route, but not for the pooled party
+--                                   bars. This is the one that needs a group.
+--   matched>0                       the repaint path works and the bug is elsewhere.
+--
+-- fired counts every unit frame, matched only the pooled party members.
+local function LogBarRepaintHooks(tag)
+    local state = addonTable.PartyBarHookState
+
+    if not state then
+        DF:Log(tag, 'bar repaint hooks: no state recorded - the party module may not have run its setup')
+        return
+    end
+
+    for _, name in ipairs({'UnitFrameHealthBar_Update', 'UnitFrameHealthBar_OnValueChanged',
+                           'UnitFrameManaBar_UpdateType', 'UnitFrameManaBar_Update'}) do
+        DF:Log(tag, 'bar repaint hook %s: exists=%s registered=%s fired=%s matched=%s', name,
+               tostring(_G[name] ~= nil), tostring(state.registered and state.registered[name]),
+               tostring((state.fired and state.fired[name]) or 0),
+               tostring((state.matched and state.matched[name]) or 0))
+    end
+
+    -- Which exit in BarOwner turned the bar away. A hook that fires without matching leaves
+    -- its reason here.
+    local miss = addonTable.PartyBarOwnerMiss
+    if miss then
+        local any = false
+        for reason, count in pairs(miss) do
+            any = true
+            DF:Log(tag, 'bar owner rejected %s: %d time(s)', reason, count)
+        end
+        if not any then DF:Log(tag, 'bar owner rejected nothing') end
+    end
+end
+
 local function LogFrameFieldTaint(tag, label, frame)
     local dirty = 0
 
@@ -1841,6 +1889,78 @@ function DF:LogPartyTaint(tag)
                            ok and 'secure' or 'INSECURE', (not ok and blame) and (', tainted by ' .. blame) or '')
                 end
             end
+
+            -- What the bar actually looks like right now, against what UpdateHealthBar
+            -- meant to set.
+            --
+            -- Needed because the repaint hook demonstrably runs - fired=359 matched=214 in
+            -- a group - while the bar still goes green. So the question is no longer whether
+            -- our code is called, but whether what it sets survives. Either the colour is
+            -- not ours, and something overwrites it after us, or the colour is ours and the
+            -- plain green ART is what is on screen.
+            local unit = pf.unit or pf.unitToken
+            if unit and UnitExists and UnitExists(unit) then
+                local hb = pf.HealthBar
+                local tex = hb and hb.GetStatusBarTexture and hb:GetStatusBarTexture()
+                local r, g, b, a = 0, 0, 0, 0
+                if hb and hb.GetStatusBarColor then r, g, b, a = hb:GetStatusBarColor() end
+
+                local _, class = UnitClass(unit)
+                local Module = DF:GetModule('Unitframe', true)
+                local party = Module and Module.db and Module.db.profile and Module.db.profile.party
+                local wantR, wantG, wantB = 1, 1, 1
+                if party and party.classcolor and class and DF.GetClassColor then
+                    wantR, wantG, wantB = DF:GetClassColor(class, 1)
+                end
+
+                DF:Log(tag, '  pooled member %d %s: barColor=%.2f/%.2f/%.2f/%.2f class=%s wanted=%.2f/%.2f/%.2f', n,
+                       unit, r or -1, g or -1, b or -1, a or -1, tostring(class), wantR or -1, wantG or -1,
+                       wantB or -1)
+                DF:Log(tag, '  pooled member %d %s: texture=%s masks=%s', n, unit,
+                       tostring(tex and tex.GetTexture and tex:GetTexture()),
+                       tostring(tex and tex.GetNumMaskTextures and tex:GetNumMaskTextures()))
+
+                -- The fill level, against the truth. A bar showing full for a member at
+                -- half health is either holding a stale value, or holding the right value
+                -- with a fill texture whose crop was reset under it.
+                local barMin, barMax = -1, -1
+                if hb and hb.GetMinMaxValues then barMin, barMax = hb:GetMinMaxValues() end
+                DF:Log(tag, '  pooled member %d %s: value=%s range=%s..%s actual=%s/%s', n, unit,
+                       tostring(hb and hb.GetValue and hb:GetValue()), tostring(barMin), tostring(barMax),
+                       tostring(UnitHealth and UnitHealth(unit)), tostring(UnitHealthMax and UnitHealthMax(unit)))
+                DF:Log(tag, '  pooled member %d %s: options classcolor=%s gradient=%s desaturated=%s', n, unit,
+                       tostring(party and party.classcolor), tostring(party and party.gradient),
+                       tostring(hb and hb.IsStatusBarDesaturated and hb:IsStatusBarDesaturated()))
+
+                -- Does the bar still listen?
+                --
+                -- UnitFrame_SetUnit registers UNIT_HEALTH on the health bar itself, and only
+                -- inside `if ( self.unit ~= unit )` - so it happens once per unit change and
+                -- never again. If that registration is gone, Blizzard stops calling
+                -- UnitFrameHealthBar_Update for this member and the bar freezes at its last
+                -- value, which is exactly the party frame reading 65 while the target frame
+                -- reads 69 for the same player. .unit on the bar is what the handler
+                -- compares the event's unit against.
+                local reg = hb and hb.IsEventRegistered and {hb:IsEventRegistered('UNIT_HEALTH')}
+                DF:Log(tag, '  pooled member %d %s: bar.unit=%s UNIT_HEALTH registered=%s MAXHEALTH=%s', n, unit,
+                       tostring(hb and hb.unit), tostring(reg and reg[1]),
+                       tostring(hb and hb.IsEventRegistered and hb:IsEventRegistered('UNIT_MAXHEALTH')))
+                DF:Log(tag, '  pooled member %d %s: frame.unit=%s unitToken=%s frequentUpdates=%s', n, unit,
+                       tostring(pf.unit), tostring(pf.unitToken), tostring(hb and hb.frequentUpdates))
+
+                -- The three switches that turn the poll off.
+                --
+                -- With frequentUpdates set, UNIT_HEALTH is deliberately NOT registered and
+                -- UnitFrameHealthBar_OnUpdate does the work instead - but only inside
+                -- `if ( not self.disconnected and not self.lockValues )`, and only when
+                -- currValue differs from what UnitHealth reports. disconnected is written by
+                -- UnitFrameHealthBar_Update, which ran four times for this member and then
+                -- never again, so a false reading taken during the invite would stick
+                -- forever and freeze the bar exactly as observed.
+                DF:Log(tag, '  pooled member %d %s: disconnected=%s lockValues=%s currValue=%s connected=%s', n, unit,
+                       tostring(hb and hb.disconnected), tostring(hb and hb.lockValues),
+                       tostring(hb and hb.currValue), tostring(UnitIsConnected and UnitIsConnected(unit)))
+            end
         end
         DF:Log(tag, 'pooled members active: %d (group has %d)', n, GetNumGroupMembers and GetNumGroupMembers() or -1)
     end
@@ -1957,6 +2077,7 @@ function DF:LogPartyTaint(tag)
 
         LogShouldShowReadPath(tag)
         LogRaidStyleChain(tag)
+        LogBarRepaintHooks(tag)
     end
 end
 
