@@ -328,12 +328,10 @@ function SubModuleMixin:Setup()
     --
     self:ChangeFocusFrame()
 
-    local up = function()
-        self:ReApplyFocusFrame()
-    end
-    FocusFrameHealthBar:HookScript('OnValueChanged', up)
-    FocusFrameHealthBar:HookScript('OnEvent', function(_, event, arg1)
-        if event == 'UNIT_MAXHEALTH' and arg1 == 'focus' then up() end
+    hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar, unit)
+        if statusbar == FocusFrameHealthBar and (unit == 'focus' or unit == nil) then
+            self:ReApplyFocusFrame()
+        end
     end)
 
     self.ModuleRef:RegisterManaBarCallback(FocusFrameManaBar, function()
@@ -370,22 +368,6 @@ function SubModuleMixin:Setup()
 
     if addonTable.OverrideBlizzEditmode and FocusFrame then
         addonTable:OverrideBlizzEditmode(FocusFrame, 'CENTER', f, 'CENTER', 0, 0)
-
-        -- The focus frame has to be the large variant, not the small one.
-        --
-        -- This used to be written into Blizzard's layout as UseLargerFrame = 1.
-        -- Blizzard's applier for that setting is a single call:
-        --
-        --   EditModeUnitFrameSystemMixin:UpdateSystemSettingUseLargerFrame()
-        --     FocusFrame:SetSmallSize(not value)
-        --
-        -- so we make that call ourselves and leave the layout alone. Same result,
-        -- no write to a server-side layout, and it still holds with this addon
-        -- disabled because nothing was persisted on Blizzard's side to undo.
-        if FocusFrame.SetSmallSize and not Helper:IsCombatLocked() then
-            local ok, err = pcall(FocusFrame.SetSmallSize, FocusFrame, false)
-            if not ok then geterrorhandler()('DFUI FocusFrame:SetSmallSize: ' .. tostring(err)) end
-        end
     end
 
     -- state handler
@@ -481,20 +463,11 @@ function SubModuleMixin:Update()
 
     self:ReApplyFocusFrame()
     -- self:ReApplyFocusToT()
-    if FocusFrameHealthBar then
-        FocusFrameHealthBar.breakUpLargeNumbers = state.breakUpLargeNumbers
-        TextStatusBar_UpdateTextString(FocusFrameHealthBar)
-    end
     if FocusFrameNameBackground then
-        FocusFrameNameBackground:SetShown(not state.hideNameBackground)
+        FocusFrameNameBackground:SetAlpha(state.hideNameBackground and 0 or 1)
     end
     if UnitFramePortrait_Update then
         UnitFramePortrait_Update(FocusFrame)
-    end
-    if TargetFrame_CheckFaction then
-        TargetFrame_CheckFaction(FocusFrame)
-    elseif FocusFrame.CheckFaction then
-        FocusFrame:CheckFaction()
     end
     if f.UpdateStateHandler then
         f:UpdateStateHandler(state)
@@ -519,12 +492,10 @@ function SubModuleMixin:ChangeFocusFrame()
     if not self.FocusNameBackgroundHooked then
         self.FocusNameBackgroundHooked = true
 
-        FocusFrameNameBackground:HookScript('OnShow', function()
-            --          
+        hooksecurefunc(FocusFrameNameBackground, 'Show', function(bg)
             local db = Module.db.profile.focus
             if db.hideNameBackground then
-                -- 
-                FocusFrameNameBackground:Hide()
+                bg:SetAlpha(0)
             end
         end)
     end

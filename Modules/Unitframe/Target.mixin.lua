@@ -601,12 +601,10 @@ function SubModuleMixin:Setup()
     self:AddMobhealth()
     self:CreatThreatIndicator();
 
-    local UpdateTargetStatusBars = function()
-        self:ReApplyTargetFrame()
-    end
-    TargetFrameHealthBar:HookScript('OnValueChanged', UpdateTargetStatusBars)
-    TargetFrameHealthBar:HookScript('OnEvent', function(_, event, arg1)
-        if event == 'UNIT_MAXHEALTH' and arg1 == 'target' then UpdateTargetStatusBars() end
+    hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar, unit)
+        if statusbar == TargetFrameHealthBar and (unit == 'target' or unit == nil) then
+            self:ReApplyTargetFrame()
+        end
     end)
 
     self.ModuleRef:RegisterManaBarCallback(TargetFrameManaBar, function()
@@ -749,18 +747,15 @@ function SubModuleMixin:Update()
         local buffsOnTop = state.buffsOnTop and true or false
         TARGET_FRAME_BUFFS_ON_TOP = buffsOnTop
         TargetFrame.buffsOnTop = buffsOnTop
-        Helper:RefreshUnitAuras(TargetFrame)
+        if UnitExists('target') and not InCombatLockdown() then
+            Helper:RefreshUnitAuras(TargetFrame)
+        end
     end
 
     if AuraDurations and AuraDurations.frame then
         AuraDurations.frame:SetState(state)
     end
     UnitFramePortrait_Update(TargetFrame)
-    if TargetFrame_CheckFaction then
-        TargetFrame_CheckFaction(TargetFrame)
-    else
-        TargetFrame:CheckFaction()
-    end
     f:UpdateStateHandler(state)
 
     self.PreviewTarget:UpdateState(state);
@@ -821,10 +816,12 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
     healthBar:GetStatusBarTexture():SetTexture(
         'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health')
 
-    if not healthBar.DFMask then
+    self.TargetMasks = self.TargetMasks or {}
+
+    if not self.TargetMasks[healthBar] then
         local hpMask = healthBar:CreateMaskTexture()
         healthBar:GetStatusBarTexture():AddMaskTexture(hpMask)
-        healthBar.DFMask = hpMask
+        self.TargetMasks[healthBar] = hpMask
         hpMask:ClearAllPoints()
         hpMask:SetPoint('TOPLEFT', healthBar, 'TOPLEFT', -1, 6)
         hpMask:SetTexture(tex2xBase .. 'uiunitframetargethealthmask2x', 'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
@@ -839,7 +836,7 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
         'Interface\\Addons\\DragonflightUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Target-PortraitOn-Bar-Mana')
     manaBar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
 
-    if not manaBar.DFMask then
+    if not self.TargetMasks[manaBar] then
         local manaMask = manaBar:CreateMaskTexture()
         manaMask:ClearAllPoints()
         manaMask:SetPoint('TOPLEFT', manaBar, 'TOPLEFT', -62, 3)
@@ -847,7 +844,7 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
         manaMask:SetTexCoord(0, 1, 0, 1)
         manaMask:SetSize(256 + 3, 16)
         manaBar:GetStatusBarTexture():AddMaskTexture(manaMask)
-        manaBar.DFMask = manaMask
+        self.TargetMasks[manaBar] = manaMask
     end
 
     if nameBackground then
@@ -1138,59 +1135,35 @@ function SubModuleMixin:ChangeTargetFrame()
     if not self.TargetNameBackgroundHooked then
         self.TargetNameBackgroundHooked = true
 
-        TargetFrameNameBackground:HookScript('OnShow', function()
-            --          
+        hooksecurefunc(TargetFrameNameBackground, 'Show', function(bg)
             local db = self.ModuleRef.db.profile.target
             if db.hideNameBackground then
-                -- 
-                TargetFrameNameBackground:Hide()
+                bg:SetAlpha(0)
             end
         end)
     end
 
     local parent = TargetFrameTextureFrame
     if parent then
-        -- health
-        if not parent.HealthBarText then
-            parent.HealthBarText = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            if TargetFrameHealthBar then TargetFrameHealthBar.TextString = parent.HealthBarText end
-        end
+        local hText = parent.HealthBarText or (TargetFrameHealthBar and TargetFrameHealthBar.TextString)
+        local hLeft = parent.HealthBarTextLeft or (TargetFrameHealthBar and TargetFrameHealthBar.LeftText)
+        local hRight = parent.HealthBarTextRight or (TargetFrameHealthBar and TargetFrameHealthBar.RightText)
+        local mText = parent.ManaBarText or (TargetFrameManaBar and TargetFrameManaBar.TextString)
+        local mLeft = parent.ManaBarTextLeft or (TargetFrameManaBar and TargetFrameManaBar.LeftText)
+        local mRight = parent.ManaBarTextRight or (TargetFrameManaBar and TargetFrameManaBar.RightText)
 
-        if not parent.HealthBarTextLeft then
-            parent.HealthBarTextLeft = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            if TargetFrameHealthBar then TargetFrameHealthBar.LeftText = parent.HealthBarTextLeft end
-        end
-
-        if not parent.HealthBarTextRight then
-            parent.HealthBarTextRight = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            if TargetFrameHealthBar then TargetFrameHealthBar.RightText = parent.HealthBarTextRight end
-        end
-        -- mana
-        if not parent.ManaBarText then
-            parent.ManaBarText = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            if TargetFrameManaBar then TargetFrameManaBar.TextString = parent.ManaBarText end
-        end
-        if not parent.ManaBarTextLeft then
-            parent.ManaBarTextLeft = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            if TargetFrameManaBar then TargetFrameManaBar.LeftText = parent.ManaBarTextLeft end
-        end
-        if not parent.ManaBarTextRight then
-            parent.ManaBarTextRight = parent:CreateFontString(nil, 'OVERLAY', 'TextStatusBarText')
-            if TargetFrameManaBar then TargetFrameManaBar.RightText = parent.ManaBarTextRight end
-        end
-
-        if parent.HealthBarText and TargetFrameHealthBar then
+        if hText and TargetFrameHealthBar then
             local dx = 5
             local deltaSize = 134 - 125
 
-            parent.HealthBarText:SetPoint('CENTER', TargetFrameHealthBar, 'CENTER', 0, 0)
-            if parent.HealthBarTextLeft then parent.HealthBarTextLeft:SetPoint('LEFT', TargetFrameHealthBar, 'LEFT', dx, 0) end
-            if parent.HealthBarTextRight then parent.HealthBarTextRight:SetPoint('RIGHT', TargetFrameHealthBar, 'RIGHT', -dx, 0) end
+            hText:SetPoint('CENTER', TargetFrameHealthBar, 'CENTER', 0, 0)
+            if hLeft then hLeft:SetPoint('LEFT', TargetFrameHealthBar, 'LEFT', dx, 0) end
+            if hRight then hRight:SetPoint('RIGHT', TargetFrameHealthBar, 'RIGHT', -dx, 0) end
 
-            if parent.ManaBarText and TargetFrameManaBar then
-                parent.ManaBarText:SetPoint('CENTER', TargetFrameManaBar, 'CENTER', -deltaSize / 2, 0)
-                if parent.ManaBarTextLeft then parent.ManaBarTextLeft:SetPoint('LEFT', TargetFrameManaBar, 'LEFT', dx, 0) end
-                if parent.ManaBarTextRight then parent.ManaBarTextRight:SetPoint('RIGHT', TargetFrameManaBar, 'RIGHT', -dx - deltaSize, 0) end
+            if mText and TargetFrameManaBar then
+                mText:SetPoint('CENTER', TargetFrameManaBar, 'CENTER', -deltaSize / 2, 0)
+                if mLeft then mLeft:SetPoint('LEFT', TargetFrameManaBar, 'LEFT', dx, 0) end
+                if mRight then mRight:SetPoint('RIGHT', TargetFrameManaBar, 'RIGHT', -dx - deltaSize, 0) end
             end
         end
     end
@@ -1370,16 +1343,9 @@ function SubModuleMixin:ShouldKnowHealth(unit)
 end
 
 function SubModuleMixin:AddMobhealth()
-    hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar, unit)
-        if statusbar == TargetFrameToTHealthBar or statusbar == FocusFrameToTHealthBar then return end
-        local shouldKnow = self:ShouldKnowHealth(unit)
-
-        if shouldKnow then
-            -- print('should know: ', statusbar:GetName(), unit)
-            statusbar.showPercentage = false;
-            TextStatusBar_UpdateTextString(statusbar)
-        end
-    end)
+    -- In WoW Classic (1.15+ / 2.5.6), creature health is natively provided by the server.
+    -- Directly mutating statusbar.showPercentage on TargetFrameHealthBar taints the secure status bar.
+end
 
     --[[    hooksecurefunc("TextStatusBar_UpdateTextStringWithValues",
                    function(statusFrame, textString, value, valueMin, valueMax)

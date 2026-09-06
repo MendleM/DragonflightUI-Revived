@@ -90,8 +90,12 @@ function frame:Update()
     local Helper = addonTable and addonTable.Helper
     if not (Helper and Helper.RefreshUnitAuras) then return end
 
-    Helper:RefreshUnitAuras(TargetFrame)
-    if FocusFrame then Helper:RefreshUnitAuras(FocusFrame) end
+    if UnitExists('target') and not InCombatLockdown() then
+        Helper:RefreshUnitAuras(TargetFrame)
+    end
+    if FocusFrame and UnitExists('focus') and not InCombatLockdown() then
+        Helper:RefreshUnitAuras(FocusFrame)
+    end
 end
 
 frame:SetScript("OnEvent", function(self, event, ...)

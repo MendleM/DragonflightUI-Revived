@@ -419,7 +419,9 @@ function SubModuleMixin:Update()
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 
     self:ReApplyFocusToT()
-    UnitFramePortrait_Update(FocusFrameToT)
+    if UnitExists('focustarget') then
+        UnitFramePortrait_Update(FocusFrameToT)
+    end
 
     self.PreviewFocusTarget:UpdateState(state);
 end

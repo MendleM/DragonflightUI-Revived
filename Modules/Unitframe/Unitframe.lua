@@ -376,7 +376,6 @@ function Module:HookDrag()
         self.db.profile.player.anchorFrame = 'UIParent'
         self:RefreshOptionScreens()
     end
-    PlayerFrame:HookScript('OnDragStop', DragStopPlayerFrame)
     if PlayerFrame_ResetUserPlacedPosition then
         hooksecurefunc('PlayerFrame_ResetUserPlacedPosition', DragStopPlayerFrame)
     end
@@ -388,7 +387,6 @@ function Module:HookDrag()
         self.db.profile.target.anchorFrame = 'UIParent'
         self:RefreshOptionScreens()
     end
-    TargetFrame:HookScript('OnDragStop', DragStopTargetFrame)
     if TargetFrame_ResetUserPlacedPosition then
         hooksecurefunc('TargetFrame_ResetUserPlacedPosition', DragStopTargetFrame)
     end
@@ -401,7 +399,6 @@ function Module:HookDrag()
             self.db.profile.focus.anchorFrame = 'UIParent'
             self:RefreshOptionScreens()
         end
-        FocusFrame:HookScript('OnDragStop', DragStopFocusFrame)
         -- hooksecurefunc('FocusFrame_ResetUserPlacedPosition', DragStopFocusFrame)
     end
 end

@@ -360,7 +360,9 @@ function SubModuleMixin:Update()
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 
     self:ReApplyToT()
-    UnitFramePortrait_Update(TargetFrameToT)
+    if UnitExists('targettarget') then
+        UnitFramePortrait_Update(TargetFrameToT)
+    end
 
     self.PreviewTargetOfTarget:UpdateState(state);
 end
