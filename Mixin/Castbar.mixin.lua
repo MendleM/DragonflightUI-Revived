@@ -46,6 +46,7 @@ function DragonFlightUICastbarMixin:OnLoad(unit)
     -- print('OnLoad', unit)
     self.tickTable = {}
     self.maxHoldTime = 1.0;
+    self.maxHoldTimeInterrupt = 1.0;
     self:SetUnit(unit)
     self:AddTicks(15)
     self:SetPrecision(1, 2)
@@ -671,8 +672,8 @@ function DragonFlightUICastbarMixin:HandleInterruptOrSpellFailed(empoweredInterr
         self.reverseChanneling = nil;
 
         self.fadeOut = true;
-        -- self.holdTime = GetTime() + self.maxHoldTime;
-        self.holdTime = GetTime() + self.maxHoldTimeInterrupt;
+        local holdTimeInterrupt = tonumber(self.maxHoldTimeInterrupt) or tonumber(self.maxHoldTime) or 1.0;
+        self.holdTime = GetTime() + holdTimeInterrupt;
         -- self:PlayInterruptAnims();
     end
 end
@@ -1024,8 +1025,8 @@ function DragonFlightUICastbarMixin:Update()
     self:SetPrecision(state.preci, state.preciMax)
     self:SetCastTimeTextShown(state.castTimeEnabled)
     self:SetCastTimeTextMaxShown(state.castTimeMaxEnabled)
-    self.maxHoldTime = state.holdTime
-    self.maxHoldTimeInterrupt = state.holdTimeInterrupt
+    self.maxHoldTime = tonumber(state.holdTime) or 1.0
+    self.maxHoldTimeInterrupt = tonumber(state.holdTimeInterrupt) or self.maxHoldTime
     self:SetCompactLayout(state.compactLayout)
     self:SetShowTicks(state.showTicks)
     self:SetShowRank(state.showRank)
