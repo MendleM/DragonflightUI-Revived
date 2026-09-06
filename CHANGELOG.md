@@ -2,10 +2,21 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.45.0`.
+May 2026). Current builds report version `0.45.1`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.45.1 — Party Health Bars (6 September 2026)
+Follow-up to 0.45.0: the party health bars keep their colour and their number without being hovered, and a preset Edit Mode layout no longer taints the party frames on every login.
+**Highlights** — health bars stay class-coloured instead of snapping back to green · the health number no longer trails the target frame by a tick · no more taint on the party frames while you are on one of Blizzard's preset layouts
+### Unit Frames
+- Fixed the party health bars falling back to Blizzard's green, and the health number lagging behind. Both had the same cause: these bars carry `frequentUpdates`, so `UNIT_HEALTH` is never registered on them — Blizzard polls them through `UnitFrameHealthBar_OnUpdate`, which calls `SetValue`, which fires `OnValueChanged`, and *that* is where the green is set (`HealthBar_OnValueChanged`, Blizzard_GameTooltip/HealthBar.lua:30). The repaint that replaced `lockColor` in 0.45.0 was hooked to `UnitFrameHealthBar_Update` instead, which barely runs for these frames — measured in a group: 21 green writes from the poll against 4 repaints from the hook. Hooking `OnValueChanged` sorts out the colour and the readout in one place. `HealthBar_OnValueChanged` also turns out to be a second reader of `lockColor`, which is why this survived 0.45.0.
+- The bar art is only re-assigned when it actually changes, instead of on every value change.
+### Edit Mode
+- Fixed the party frames being tainted at every login while a preset layout is active. The raid settings were mirrored onto the party system unconditionally, and that runs Blizzard's applier — which rebuilds `PartyFrame.settingMap` from addon code, the table Blizzard reads on every `ShouldShow`, so on every group event. It only ever showed on presets: a layout of your own already holds the values and the applier is skipped, while on a preset nothing can be stored, every value mismatches, and it ran every single time. `/df log party` reported 25 insecure spots before, none after. The mirror now runs only while raid-style party frames are actually up, which is the only case it was ever for.
+### Debugging
+- `/df log party` reports the bar repaint path — whether the hooks exist, fire, and reach the party bars — the raid-style setting across all five places it passes through, and the live state of a member's bars: colour against the wanted colour, art, fill level against real health, and the fields that gate Blizzard's health poll.
 
 ## 0.45.0 — Party Frames in Combat & a Quiet Startup (2 September 2026)
 The party frames no longer break when someone levels up mid-fight, the chat spam and frame drop at the end of a fight are gone, and the leftover Edit Mode layout is cleaned up without anyone having to do it by hand.
