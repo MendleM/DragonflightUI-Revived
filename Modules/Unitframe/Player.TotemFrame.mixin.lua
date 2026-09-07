@@ -7,47 +7,11 @@ local subModuleName = 'TotemFrame';
 local SubModuleMixin = {};
 addonTable.SubModuleMixins[subModuleName] = SubModuleMixin;
 
--- TotemFrame.leftPadding is Blizzard's, and Blizzard reads it back, so it is never
--- written here.
---
--- Blizzard sets it in TotemFrame.xml as a KeyValue - leftPadding = 38 - which means the
--- XML parser wrote it, and the value is secure. Writing over it from addon code makes it
--- insecure, and Blizzard reads it back on every layout pass:
---
---     LayoutMixin:Layout()               LayoutFrame.lua:253
---       CalculateFrameSize()                          :257
---         GetPadding()                                :241
---           return (self.leftPadding or 0)            :209
---
--- and TotemFrameMixin:Update calls self:Layout() unconditionally at TotemFrame.lua:53.
--- From there Blizzard's own execution picks up our taint on every totem update, and
--- everything it writes after that read comes out insecure too. What it cost was
--- PlayerFrame.unit, written at UnitFrame.lua:178 by way of PlayerFrame.lua:193.
---
--- That variable is read by TargetOfTargetMixin:Update at TargetFrame.lua:947 - two lines
--- before the protected self:Show() at 949, fourteen before self:Hide() at 961. So
--- target-of-target and target-of-focus had both calls refused for the rest of the
--- session once combat started. Same files in 1.15.9, 2.5.6 and 5.5.4, byte for byte.
---
--- How this was pinned down, because none of it was apparent from reading the source:
---
---   Bisect. On 83493a8 issecurevariable(PlayerFrame, "unit") returns true and the frames
---   work; on 05ecd95 - the first code commit of PR #55 - it returns false with
---   DragonflightUI as the blame, and the frames are blocked. No pet, no totems placed.
---
---   Then a temporary switch turned each of that commit's three mechanisms off in turn.
---   Every one of them still read insecure, and only all three together read clean. The
---   reason is that leftPadding had two writers: the explicit assignments, and a
---   hooksecurefunc on TotemFrame's Update that put the field back to 0 whenever it found
---   38 there. Removing either left the other. Removing both, while still calling
---   Layout() ourselves, read clean and the frames stayed up in combat - so the field
---   write was the whole cause, and driving Layout() from here is harmless.
---
--- The blank offset those writes were meant to remove is real: 38 units of padding inside
--- the frame, which made sense while it hung in Blizzard's container below the player
--- frame and not after this module reparents it onto its own baseFrame. It is compensated
--- on our side now, by offsetting the anchor by Blizzard's own value. Reading a secure
--- value taints nothing, and the field stays Blizzard's.
+-- Never write TotemFrame.leftPadding. Blizzard sets it from XML and reads it back in
+-- LayoutMixin:Layout (LayoutFrame.lua:209), which TotemFrameMixin:Update triggers on
+-- every totem event - so writing it made that execution insecure and cost
+-- PlayerFrame.unit, which gates target-of-target (TargetFrame.lua:947, two lines before a
+-- protected Show). Read it and offset the anchor instead.
 local function PadOffset(totemFrame)
     return -(totemFrame.leftPadding or 0)
 end
@@ -296,27 +260,30 @@ function SubModuleMixin:CreateBase()
 
     local totemFrame = _G['TotemFrame']
     if totemFrame then
-        -- Detach from Blizzard's UIParentManagedFrameContainer:
-        -- Blizzard's RemoveManagedFrame (UIParent.lua:214) checks `if not frame.IsInDefaultPosition then frame:ClearAllPoints() end`.
-        -- Setting IsInDefaultPosition prevents Blizzard from wiping anchor points when totems expire.
-        totemFrame.IsInDefaultPosition = function() return false end
+        -- Load-bearing: without it AddManagedFrame (UIParent.lua:163) runs on to
+        -- UpdateFrame and reparents the frame into Blizzard's container. IsInDefaultPosition,
+        -- ignoreInLayout and a showingFrames write used to sit here too and were all
+        -- redundant once this bails - and all were fields Blizzard reads back, like
+        -- leftPadding above. The anchor is guarded by the OnShow hook below instead.
+        --
+        -- Residual: this read taints whoever showed the frame, which on a pet class can be
+        -- PlayerFrame_ToPlayerArt (PetFrame.lua:111). Unreproduced, and impossible without
+        -- a pet. Removing it means letting Blizzard manage the frame and restoring the
+        -- parent after, which SetParent cannot do in combat.
         totemFrame.ignoreFramePositionManager = true
-        totemFrame.ignoreInLayout = true
-
-        if totemFrame.layoutParent and totemFrame.layoutParent.showingFrames then
-            totemFrame.layoutParent.showingFrames[totemFrame] = nil
-        end
 
         totemFrame:ClearAllPoints()
         totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', PadOffset(totemFrame), 0)
         totemFrame:SetParent(baseFrame)
 
+        -- A local, not a field on the frame: fewer of ours for a taint audit to rule out.
+        local settingPoint = false
         hooksecurefunc(totemFrame, 'SetPoint', function(self)
-            if self.DFSettingPoint then return end
-            self.DFSettingPoint = true
+            if settingPoint then return end
+            settingPoint = true
             self:ClearAllPoints()
             self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', PadOffset(self), 0)
-            self.DFSettingPoint = nil
+            settingPoint = false
         end)
 
         totemFrame:HookScript('OnShow', function(self)
