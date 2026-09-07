@@ -585,14 +585,45 @@ function SubModuleMixin:ChangePetFrame()
         PetFrameHappiness:SetPoint('LEFT', PetFrame, 'RIGHT', -3, -1.5)
     end
 
-    -- 1.15.9 backport repairs. PartyMemberAuraMixin renders the buff list
-    -- only when showBuffs is set, but nothing in the modern UI ever sets it
-    -- for the pet frame - pet buffs get parsed into self.buffs and never
-    -- drawn (the classic pet frame always showed them). Opt the frame in.
-    if PetFrame.UpdateAuras and PetFrame.AuraFrameContainer then
-        PetFrame.showBuffs = true
-        PetFrame:UpdateAuras()
-    end
+    -- Pet buffs used to be opted in here, with
+    --
+    --     PetFrame.showBuffs = true
+    --     PetFrame:UpdateAuras()
+    --
+    -- because PartyMemberAuraMixin only draws the buff list when showBuffs is set and
+    -- nothing in the modern UI ever sets it for the pet frame. It worked, and it was
+    -- what blocked target-of-target in combat. Both lines are seeds:
+    --
+    --   showBuffs is read at PartyMemberFrame.lua:84 - the only place it is touched
+    --   anywhere in Blizzard_UnitFrame, checked across all 63 files for 1.15.9, 2.5.6
+    --   and 5.5.4, and never written by Blizzard - so a value there is always an
+    --   addon's, and reading it hands that addon's taint to Blizzard.
+    --
+    --   UpdateAuras() driven from here makes ParseAllAuras create self.buffs and
+    --   self.debuffs inside our execution, and Blizzard reads those back on every
+    --   later pass at lines 73, 76 and 86. Left alone the client creates them itself,
+    --   securely, on its own first UNIT_AURA.
+    --
+    -- Why that costs target-of-target, from the captured stack:
+    --
+    --   PlayerFrame_OnEvent PLAYER_ENTERING_WORLD   PlayerFrame.lua:192
+    --     PlayerFrame_ToPlayerArt
+    --       UnitFrame_SetUnit(PlayerFrame, "player")  :384  .unit still secure here
+    --       PetFrame:Update()                         :386
+    --         PetFrameMixin:Update -> UpdateAuras     PetFrame.lua:75
+    --           UpdateMemberAuras reads self.showBuffs  PartyMemberFrame.lua:84  TAINT
+    --   back in PlayerFrame_OnEvent:
+    --     UnitFrame_SetUnit(PlayerFrame, "player")    :193  .unit written INSECURE
+    --
+    -- and TargetOfTargetMixin:Update reads PlayerFrame.unit at TargetFrame.lua:947,
+    -- two lines before the protected self:Show() at 949 and fourteen before
+    -- self:Hide() at 961. That is the whole bug: both calls refused in combat, and
+    -- every other insecure field a ToT audit reports is downstream of that one read.
+    --
+    -- The pet frame now shows debuffs, which is what the client does on its own. If
+    -- the buff row comes back it has to be our own frames reading Blizzard's parsed
+    -- PetFrame.buffs, because there is no way to set a field on a protected frame and
+    -- have Blizzard read it back without handing over the taint.
 
     -- The frame registers UNIT_HAPPINESS, but the backported client never
     -- dispatches it - SetHappiness only runs on resummon/reload, so the
