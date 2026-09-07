@@ -975,6 +975,8 @@ do
     L["PetFrameHideIndicatorDesc"] = "Hide the hit indicator"
     L["PetFrameHideDebuffs"] = "Hide Debuffs"
     L["PetFrameHideDebuffsDesc"] = "Hides the pet debuffs."
+    L["PetFrameShowBuffs"] = "Show Buffs"
+    L["PetFrameShowBuffsDesc"] = "Shows the pet's buffs in a row of their own, below the debuffs."
 
     -- Focus
     L["FocusFrameName"] = "FocusFrame"
@@ -1000,6 +1002,8 @@ do
     L["PartyFrameBreakUpLargeNumbersDesc"] = L["PlayerFrameBreakUpLargeNumbersDesc"]
     L["PartyFrameDisableBuffTooltip"] = "Disable Buff Tooltip"
     L["PartyFrameDisableBuffTooltipDesc"] = "Disables the (on mouseover) buff tooltip."
+    L["PartyFrameShowBuffs"] = "Show Buffs"
+    L["PartyFrameShowBuffsDesc"] = "Shows each party member's buffs in a row of their own, below the debuffs."
 
     -- raid
     L["RaidFrameName"] = "Raid Frame"

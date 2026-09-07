@@ -12,4 +12,5 @@
 	<Include file="Mixin/UI.mixin.lua" />
 	<Include file="Mixin/ItemColor.mixin.lua" />
 	<Include file="Mixin/StateHandler.mixin.lua" />
+	<Include file="Mixin/MemberAuras.mixin.lua" />
 </UI>

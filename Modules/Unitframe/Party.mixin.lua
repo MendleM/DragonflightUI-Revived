@@ -228,6 +228,10 @@ function SubModuleMixin:SetDefaults()
         orientation = 'vertical',
         disableBuffTooltip = 'INCOMBAT',
         useCompactPartyFrames = false,
+        -- Off by default: unlike the pet frame these never showed buffs, so turning
+        -- them on for everybody would be a change nobody asked for. Drawn by our own
+        -- row - see Mixin/MemberAuras.mixin.lua.
+        showBuffs = false,
         -- Visibility
         alphaNormal = 1.0,
         alphaCombat = 1.0,
@@ -629,6 +633,15 @@ function SubModuleMixin:SetupOptions()
                 group = 'headerStyling',
                 editmode = true,
                 new = false
+            },
+            showBuffs = {
+                type = 'toggle',
+                name = L["PartyFrameShowBuffs"],
+                desc = L["PartyFrameShowBuffsDesc"] .. getDefaultStr('showBuffs', 'party'),
+                order = 4,
+                group = 'headerStyling',
+                editmode = true,
+                new = true
             },
             padding = {
                 type = 'range',
@@ -1696,5 +1709,35 @@ function SubModuleMixin:Update()
     end
 
     if self.RestyleModernParty then self.RestyleModernParty() end
+
+    -- Our own buff row, registered once. Blizzard's row keeps drawing debuffs; this
+    -- sits beside it. Nothing is written onto the member frames -
+    -- Mixin/MemberAuras.mixin.lua explains why that is the whole point.
+    --
+    -- The pool is walked on every refresh rather than remembered, because a pooled
+    -- frame is handed to a different unit whenever the roster changes.
+    if addonTable.AddMemberBuffRowProvider and not self.BuffRowRegistered then
+        self.BuffRowRegistered = true
+        addonTable:AddMemberBuffRowProvider('party', function(add)
+            local db = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile.party
+            if not (db and PartyFrame and PartyFrame.PartyMemberFramePool) then return end
+
+            local enabled = db.showBuffs and true or false
+            for pf in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+                -- To the right of the frame, not under it. The debuff row this module
+                -- anchors at TOPLEFT (48, -43) already fills the width, and these
+                -- frames stack 53 high with a default padding of 10 - a row hung
+                -- below would sit on top of the next member.
+                add(pf, pf.unit, {
+                    enabled = enabled,
+                    point = 'LEFT',
+                    relativePoint = 'RIGHT',
+                    x = 4,
+                    y = 0
+                })
+            end
+        end)
+    end
+    if addonTable.RefreshMemberBuffRows then addonTable:RefreshMemberBuffRows() end
 end
 

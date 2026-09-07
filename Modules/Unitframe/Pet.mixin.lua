@@ -52,6 +52,11 @@ function SubModuleMixin:SetDefaults()
         offset = false,
         hideIndicator = false,
         hideDebuffs = false,
+        -- On by default because the pet frame used to show buffs, by setting
+        -- Blizzard's showBuffs. That is gone - see the note further down - and this
+        -- draws them in a row of ours instead, next to the debuffs rather than
+        -- replacing them.
+        showBuffs = true,
         -- Visibility
         alphaNormal = 1.0,
         alphaCombat = 1.0,
@@ -193,6 +198,15 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PetFrameHideDebuffsDesc"] .. getDefaultStr('hideDebuffs', 'pet'),
                 group = 'headerStyling',
                 order = 12,
+                new = true,
+                editmode = true
+            },
+            showBuffs = {
+                type = 'toggle',
+                name = L["PetFrameShowBuffs"],
+                desc = L["PetFrameShowBuffsDesc"] .. getDefaultStr('showBuffs', 'pet'),
+                group = 'headerStyling',
+                order = 13,
                 new = true,
                 editmode = true
             },
@@ -466,6 +480,31 @@ function SubModuleMixin:Update()
             debuff1:SetPoint('TOPLEFT', PetFrame, 'TOPRIGHT', 5, -20)
         end
     end
+
+    -- Our own buff row, registered once. It reads the auras itself and hangs off
+    -- UIParent, so nothing here touches a field on PetFrame - see
+    -- Mixin/MemberAuras.mixin.lua for why that matters.
+    if addonTable.AddMemberBuffRowProvider and not self.BuffRowRegistered then
+        self.BuffRowRegistered = true
+        addonTable:AddMemberBuffRowProvider('pet', function(add)
+            local db = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile.pet
+            if not (db and PetFrame) then return end
+
+            -- To the right of the frame, not under it. Blizzard's debuff row already
+            -- fills the width - it starts at x=48 (PetFrame.xml:153) and four icons
+            -- reach 114 of 120 - and a row hung below would run into whatever sits
+            -- under the pet frame. Right is also where this addon has always put the
+            -- classic pet debuffs: TOPLEFT, PetFrame, TOPRIGHT, 5, -20.
+            add(PetFrame, 'pet', {
+                enabled = db.showBuffs and true or false,
+                point = 'TOPLEFT',
+                relativePoint = 'TOPRIGHT',
+                x = 5,
+                y = -2
+            })
+        end)
+    end
+    if addonTable.RefreshMemberBuffRows then addonTable:RefreshMemberBuffRows() end
 
     if f.DFStateHandler then f:UpdateStateHandler(state) end
 end
