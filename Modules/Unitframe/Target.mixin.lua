@@ -601,11 +601,29 @@ function SubModuleMixin:Setup()
     self:AddMobhealth()
     self:CreatThreatIndicator();
 
+    -- Two hooks, and OnValueChanged is the one that does the work.
+    --
+    -- UnitFrame_Initialize calls UnitFrameHealthBar_Initialize(unit, healthbar, healthtext,
+    -- true) at UnitFrame.lua:114 - frequentUpdates is hard-coded for every unit frame. That
+    -- means UNIT_HEALTH is never registered on this bar: Blizzard polls it in
+    -- UnitFrameHealthBar_OnUpdate, which calls SetValue, which fires OnValueChanged. So
+    -- UnitFrameHealthBar_Update runs on target changes and little else, and hooking it alone
+    -- would leave the re-apply out of every health change - measured on the party frames,
+    -- where the same mistake cost the bar colour: 4 matches against 21 repaints needed.
+    --
+    -- _Update still earns its place: it covers the setup pass on a target change, where the
+    -- value has not moved yet and OnValueChanged never fires.
     hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar, unit)
         if statusbar == TargetFrameHealthBar and (unit == 'target' or unit == nil) then
             self:ReApplyTargetFrame()
         end
     end)
+
+    if type(UnitFrameHealthBar_OnValueChanged) == 'function' then
+        hooksecurefunc('UnitFrameHealthBar_OnValueChanged', function(statusbar)
+            if statusbar == TargetFrameHealthBar then self:ReApplyTargetFrame() end
+        end)
+    end
 
     self.ModuleRef:RegisterManaBarCallback(TargetFrameManaBar, function()
         self:ReApplyTargetFrame()
@@ -743,6 +761,23 @@ function SubModuleMixin:Update()
     -- server-side copy, and it also survives Blizzard re-applying its layout.
     --
     -- nil means the player has never set it here, so Blizzard's value stands.
+    --
+    -- TargetFrame.buffsOnTop is a field of ours on a protected frame, and Blizzard reads it
+    -- four times in TargetFrame.lua - 596 in UpdateAuras, then 1083, 1089 and 1095 in the
+    -- aura row layout. By the rule that cost us lockColor on the party bars, that makes it a
+    -- taint seed, and it is left in place knowingly:
+    --
+    -- Blizzard never writes this field. Not in TargetFrame.lua, not in TargetFrame.xml - it
+    -- only ever reads it, and TARGET_FRAME_BUFFS_ON_TOP is not consulted on this client. So
+    -- the field is nil unless an addon sets it, and without setting it the option cannot
+    -- work at all. There is no second way in, the way hooksecurefunc was for the colour.
+    --
+    -- What makes it bearable is the blast radius. The party members are pooled and Blizzard
+    -- re-assigns them with SetAttribute, Show and Hide on every roster change, which is what
+    -- the client refuses in combat. TargetFrame is a single frame whose unit attribute never
+    -- changes, so a tainted execution there has no protected call to break. If that
+    -- assumption ever proves wrong, the honest fix is to drop the option rather than to
+    -- keep writing the field.
     if state.buffsOnTop ~= nil then
         local buffsOnTop = state.buffsOnTop and true or false
         TARGET_FRAME_BUFFS_ON_TOP = buffsOnTop

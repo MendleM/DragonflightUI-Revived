@@ -328,11 +328,21 @@ function SubModuleMixin:Setup()
     --
     self:ChangeFocusFrame()
 
+    -- Same pair as the target frame, same reason: frequentUpdates is hard-coded true in
+    -- UnitFrame_Initialize, so this bar is polled rather than event-driven and
+    -- UnitFrameHealthBar_Update sees almost none of its value changes. The long comment sits
+    -- at the target frame's copy of these hooks.
     hooksecurefunc('UnitFrameHealthBar_Update', function(statusbar, unit)
         if statusbar == FocusFrameHealthBar and (unit == 'focus' or unit == nil) then
             self:ReApplyFocusFrame()
         end
     end)
+
+    if type(UnitFrameHealthBar_OnValueChanged) == 'function' then
+        hooksecurefunc('UnitFrameHealthBar_OnValueChanged', function(statusbar)
+            if statusbar == FocusFrameHealthBar then self:ReApplyFocusFrame() end
+        end)
+    end
 
     self.ModuleRef:RegisterManaBarCallback(FocusFrameManaBar, function()
         self:ReApplyFocusFrame()
