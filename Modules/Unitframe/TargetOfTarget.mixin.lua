@@ -352,10 +352,27 @@ function SubModuleMixin:Update()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     f:SetScale(state.scale)
 
+    -- Anchored to the holder with no offset, not to `parent` with the holder's own
+    -- offsets. Repeating state.x/state.y on both frames looks equivalent and is not:
+    -- SetPoint offsets are measured in the frame's own coordinate space, and these two
+    -- frames sit in different scale chains. The holder hangs off UIParent, while
+    -- TargetFrameToT's parent is TargetFrame, which carries the target frame's own
+    -- SetScale - so the same numbers land at different pixels, and the further the
+    -- offset is from zero the wider the two drift apart. Anchoring point-to-point at
+    -- (0, 0) has no offset to scale, so the frame and its Edit Mode placeholder cannot
+    -- disagree whatever either scale is.
+    --
+    -- This does not reparent anything, so the parent contract the comment in
+    -- FocusTarget.mixin.lua spells out is untouched: TargetFrameToT keeps TargetFrame
+    -- as its parent and Blizzard's parent.unit, parent:UpdateAuras() and
+    -- parent.haveToT all still resolve. Blizzard never calls GetPoint or SetPoint on
+    -- either ToT frame - checked across every file in Blizzard_UnitFrame for 1.15.9,
+    -- 2.5.6 and 5.5.4 - so the holder showing up as its anchor is not read anywhere.
+    --
     -- Deferred, not skipped - see the target frame's copy of this for the reasoning.
     Helper:DeferOutOfCombat('target of target position', function()
         f_orig:ClearAllPoints()
-        f_orig:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
         f_orig:SetScale(state.scale)
     end)
 

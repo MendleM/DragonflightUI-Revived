@@ -408,10 +408,21 @@ function SubModuleMixin:Update()
     --
     -- Target-of-target has always anchored without reparenting, on these same
     -- clients, and has none of this. This frame now does the same.
+    --
+    -- Anchored to the holder with no offset, not to `parent` with the holder's own
+    -- offsets. Repeating state.x/state.y on both frames looks equivalent and is not:
+    -- SetPoint offsets are measured in the frame's own coordinate space, and these
+    -- two frames sit in different scale chains. The holder hangs off UIParent, while
+    -- FocusFrameToT's parent is FocusFrame, which carries the focus frame's own
+    -- SetScale - so the same numbers land at different pixels, and the further the
+    -- offset is from zero the wider the two drift apart. Anchoring point-to-point at
+    -- (0, 0) has no offset to scale, so the frame and its Edit Mode placeholder
+    -- cannot disagree whatever either scale is.
+    --
     -- Deferred, not skipped - see the target frame's copy of this for the reasoning.
     Helper:DeferOutOfCombat('focus target position', function()
         f_orig:ClearAllPoints()
-        f_orig:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
+        f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
 
         -- Scale the frame itself, the way target-of-target does. The holder is not
         -- its parent, so scaling the holder alone would never reach it.
