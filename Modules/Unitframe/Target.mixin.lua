@@ -739,11 +739,16 @@ function SubModuleMixin:Update()
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    if not InCombatLockdown() then
+    -- Deferred rather than skipped. SetPoint and SetScale on a protected frame are refused
+    -- in combat, and a plain `if not InCombatLockdown()` drops the change on the floor -
+    -- the frame then keeps the old position until something else happens to call Update
+    -- again. DeferOutOfCombat runs it now when it can and once combat drops when it cannot,
+    -- keyed by label so repeated calls collapse into one.
+    Helper:DeferOutOfCombat('target frame position', function()
         f_orig:ClearAllPoints()
         f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
         f_orig:SetScale(state.scale)
-    end
+    end)
 
     self:ReApplyTargetFrame()
     -- Module.ReApplyToT()

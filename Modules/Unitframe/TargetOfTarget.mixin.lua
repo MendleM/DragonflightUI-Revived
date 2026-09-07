@@ -352,11 +352,12 @@ function SubModuleMixin:Update()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     f:SetScale(state.scale)
 
-    if not InCombatLockdown() then
+    -- Deferred, not skipped - see the target frame's copy of this for the reasoning.
+    Helper:DeferOutOfCombat('target of target position', function()
         f_orig:ClearAllPoints()
         f_orig:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
         f_orig:SetScale(state.scale)
-    end
+    end)
 
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 

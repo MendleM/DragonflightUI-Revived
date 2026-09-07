@@ -408,14 +408,15 @@ function SubModuleMixin:Update()
     --
     -- Target-of-target has always anchored without reparenting, on these same
     -- clients, and has none of this. This frame now does the same.
-    if not InCombatLockdown() then
+    -- Deferred, not skipped - see the target frame's copy of this for the reasoning.
+    Helper:DeferOutOfCombat('focus target position', function()
         f_orig:ClearAllPoints()
         f_orig:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
         -- Scale the frame itself, the way target-of-target does. The holder is not
         -- its parent, so scaling the holder alone would never reach it.
         f_orig:SetScale(state.scale)
-    end
+    end)
 
     f:SetIgnoreParentAlpha(state.fadeOut and true or false)
 

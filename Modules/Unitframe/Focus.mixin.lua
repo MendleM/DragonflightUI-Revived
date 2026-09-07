@@ -465,11 +465,12 @@ function SubModuleMixin:Update()
     f:ClearAllPoints()
     f:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
 
-    if not InCombatLockdown() then
+    -- Deferred, not skipped - see the target frame's copy of this for the reasoning.
+    Helper:DeferOutOfCombat('focus frame position', function()
         f_orig:ClearAllPoints()
         f_orig:SetPoint('CENTER', f, 'CENTER', 0, 0)
         f_orig:SetScale(state.scale)
-    end
+    end)
 
     self:ReApplyFocusFrame()
     -- self:ReApplyFocusToT()
