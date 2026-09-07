@@ -962,10 +962,11 @@ function SubModuleMixin:UpdatePlayerFrameManaBar()
 
         PlayerFrameManaBar:SetStatusBarColor(1, 1, 1, 1)
     else
-        UnitFrameManaBar_UpdateType(PlayerFrameManaBar, true)
+        -- Blizzard's own UnitFrameManaBar_UpdateType would do this, and writing to
+        -- the bar is exactly why we do not call it - see Helper:GetPowerBarColor.
+        PlayerFrameManaBar:SetStatusBarColor(Helper:GetPowerBarColor('player'))
         local customTex = LSM:Fetch("statusbar", state.customPowerBarTexture)
         PlayerFrameManaBar:GetStatusBarTexture():SetTexture(customTex)
-        -- PlayerFrameManaBar:SetStatusBarColor(0.0, 1.0, 0.0, 1)
     end
 end
 

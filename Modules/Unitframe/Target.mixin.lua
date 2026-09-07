@@ -1268,7 +1268,12 @@ function SubModuleMixin:UpdateTargetPowerBarTexture(bar, state, unit)
 
         bar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
     else
-        UnitFrameManaBar_UpdateType(bar, true)
+        -- Blizzard's own UnitFrameManaBar_UpdateType would do this, and writing to
+        -- the bar is exactly why we do not call it - see Helper:GetPowerBarColor.
+        -- This branch is the hot one: ReApplyTargetFrame runs from
+        -- UnitFrameHealthBar_OnValueChanged, so it used to reseed the taint on every
+        -- health poll tick.
+        bar:SetStatusBarColor(Helper:GetPowerBarColor(unit))
         local customTex = LSM:Fetch("statusbar", state.customPowerBarTexture)
         bar:GetStatusBarTexture():SetTexture(customTex)
     end
