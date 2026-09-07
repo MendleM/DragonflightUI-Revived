@@ -1761,41 +1761,20 @@ local function ArmSeedWatcher()
     end)
 end
 
--- The same question for PlayerFrame, which is what blocks target-of-target.
+-- The same question for PlayerFrame.unit, which gates target-of-target: Blizzard reads it
+-- at TargetFrame.lua:947, two lines before a protected Show. Written by UnitFrame_SetUnit
+-- (UnitFrame.lua:178), so hook that and ask straight after, like the party watcher does.
 --
--- TargetOfTargetMixin:Update reads PlayerFrame.unit (TargetFrame.lua:947) two
--- lines before the protected self:Show() at 949, and fourteen before self:Hide()
--- at 961. So a tainted PlayerFrame.unit refuses both of them in combat, and every
--- other insecure field in a ToT audit is downstream of that one read: auraRows and
--- spellbarAnchor come from TargetFrame_Update carrying on tainted after line 124,
--- elapsed from OnUpdate carrying on after line 422, and unitHPPercent, debuffTotal,
--- currValue and disconnected from lines 955-958 inside the tainted ToT update
--- itself. Verified identical in 1.15.9, 2.5.6 and 5.5.4.
---
--- PlayerFrame.unit is written by UnitFrame_SetUnit (UnitFrame.lua:178), so hook
--- that and ask straight afterwards, exactly as the party watcher does. The stack at
--- that instant is the answer.
---
--- The one case this has already caught, for calibration: TotemFrame.leftPadding.
--- Blizzard sets that field from XML, this addon used to write 0 over it, and Blizzard
--- reads it back inside LayoutMixin:Layout (LayoutFrame.lua:209) on every totem update -
--- so its execution came out tainted, and the PlayerFrame.unit it wrote next carried the
--- blame. See the note at the top of Modules/Unitframe/Player.TotemFrame.mixin.lua.
---
--- A warning about how far this report can take you. The stack it captures is pure
--- Blizzard, because the execution arrives already tainted: it names the write site and
--- nothing else. It cannot name the read that did the tainting, and three plausible
--- chains derived from Blizzard's source turned out to be wrong before a bisect plus a
--- temporary on/off switch found the real one. So treat the field walk below as a list of
--- suspects, not a verdict, and settle it by turning candidates off one at a time.
---
--- Note also that the walk only sees writers that have already run. A character with no
--- pet never shows PetFrame, so nothing on that frame is read and its dirty fields are
--- innocent bystanders here - which is exactly the trap that cost the three wrong chains.
+-- Read this before trusting the output. The captured stack is pure Blizzard - the
+-- execution arrives already tainted - so it names the write site and never the read that
+-- tainted it. The field walk is a suspect list, not a verdict: settle it by turning
+-- candidates off one at a time. Three chains derived from Blizzard's source were wrong
+-- before a bisect found the real one (TotemFrame.leftPadding). The walk also only sees
+-- writers that have run - a character with no pet never shows PetFrame, so dirty fields
+-- there are bystanders.
 local playerSeedArmed, playerSeedFound = false, false
--- Latched per frame, not once. PlayerFrame_ToPlayerArt calls UnitFrame_SetUnit for
--- PlayerFrame and then for PetFrame, so a single latch would let whichever went
--- insecure first hide the other - and PlayerFrame is the one that blocks ToT.
+-- Latched per frame: PlayerFrame_ToPlayerArt calls UnitFrame_SetUnit for PlayerFrame and
+-- then PetFrame, and PlayerFrame is the one that matters.
 local playerSeedSeen = {}
 
 local function ArmPlayerSeedWatcher()
@@ -1832,11 +1811,9 @@ local function ArmPlayerSeedWatcher()
             end
         end
 
-        -- TotemFrame, named outright, because this is where the one confirmed cause was.
-        -- Blizzard hangs it off PlayerFrame and TotemFrameMixin:Update lays it out on
-        -- every totem event, so any field of ours on it is read on a hot path. It is also
-        -- a LayoutFrame, which means the padding and layout keys are read too - those are
-        -- Blizzard's, set from XML, and must stay Blizzard's.
+        -- TotemFrame by name, because the one confirmed cause was here. It is a LayoutFrame
+        -- hung off PlayerFrame and TotemFrameMixin:Update lays it out on every totem event,
+        -- so the padding and layout keys are read on a hot path. They are Blizzard's.
         local totem = _G['TotemFrame']
         if totem then
             for _, key in ipairs({'leftPadding', 'rightPadding', 'topPadding', 'bottomPadding', 'spacing',

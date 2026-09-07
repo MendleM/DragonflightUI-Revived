@@ -1803,28 +1803,15 @@ function Helper:GetUnitHealthPercent(unit)
     return health / max_health
 end
 
--- The colour Blizzard would put on a mana bar for this unit's power type, worked
--- out without touching the bar.
+-- The colour Blizzard would put on a mana bar, without touching the bar.
 --
--- UnitFrameManaBar_UpdateType is the obvious way to get this and it is what this
--- addon used to call - from the custom-texture branch of the player, target and
--- target-of-target power bars. It is not usable from addon code. Blizzard's body
--- writes manaBar.powerType, manaBar.powerToken and manaBar.currValue onto a
--- protected frame (UnitFrame.lua:507, 508, 512) and reads all three straight back
--- on its own hot paths: UnitFrameManaBar_UpdateType:506,
--- UnitFrameManaBar_OnUpdate:831, UnitFrameManaBar_Update:865 and :878. Written
--- from our execution they stay tainted for the session, so from then on Blizzard's
--- own code picks our taint up on every power tick and everything it writes after
--- that read comes out insecure too. Same shape as statusbar.lockColor, same price:
--- Show, Hide and SetAttribute refused while in combat.
+-- Not UnitFrameManaBar_UpdateType, which is what this addon used to call: it writes
+-- powerType, powerToken and currValue onto a protected bar (UnitFrame.lua:507-512) and
+-- reads them back on its own hot paths (:506, :831, :865, :878), so driving it from here
+-- tainted them for the session. Reading PowerBarColor cannot.
 --
--- The target frame had it worst - its repaint hangs off
--- UnitFrameHealthBar_OnValueChanged, so this ran on every health poll tick.
---
--- Reading PowerBarColor taints nothing. Atlas-backed power types are drawn white in
--- Blizzard's own body, and STAGGER is a list of three colours instead of one, so
--- both end up white here as well. Verified identical in 1.15.9, 2.5.6 and 5.5.4 -
--- Blizzard ships the same Classic/UnitFrame.lua to all three.
+-- Atlas power types and STAGGER (a list of three colours) come out white, which is what
+-- Blizzard's own body does with them.
 function Helper:GetPowerBarColor(unit)
     local powerType, powerToken = UnitPowerType(unit or 'player')
     local info = PowerBarColor and (PowerBarColor[powerToken] or PowerBarColor[powerType] or PowerBarColor['MANA'])
