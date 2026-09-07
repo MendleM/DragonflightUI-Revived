@@ -42,8 +42,14 @@ DF.ChangelogData = {
                     'Added an Active toggle (activate) to the Player Totem Frame submodule, providing a clean way to hide or disable the totem frame without relying on heavy secure state handlers.',
                     'When toggling the frame back on, Blizzard\'s TotemFrame is immediately shown and refreshed via TotemFrame_Update() so existing active totems appear right away.',
                     'Fixed a minor naming error in Edit Mode options where the Totem Frame reset preset was labelled as \'Pet\'.',
-                    'Fixed Blizzard\'s TotemFrame losing its anchor points and disappearing after totems expire or Totemic Call ("Ruf der Totems") is used, by cleanly disconnecting it from Blizzard\'s UIParent managed container.',
-                    'Removed the blank 38px leftPadding offset on TotemFrame so totem icons align properly.'
+                    'Fixed Blizzard\'s TotemFrame losing its anchor points and disappearing after totems expire or Totemic Call ("Ruf der Totems") is used.',
+                    'Removed the blank 38px gap in front of the totem icons, without writing to the padding field Blizzard reads back on every totem update.',
+                    'The player, target and target-of-target power bars pick up their power colour without writing to Blizzard\'s status bars.'
+                }
+            }, {
+                title = 'Debugging',
+                items = {
+                    '/df log seed now also watches PlayerFrame.unit, the variable the client checks before showing target-of-target.'
                 }
             }
         }

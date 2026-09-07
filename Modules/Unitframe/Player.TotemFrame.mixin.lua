@@ -7,6 +7,15 @@ local subModuleName = 'TotemFrame';
 local SubModuleMixin = {};
 addonTable.SubModuleMixins[subModuleName] = SubModuleMixin;
 
+-- Never write TotemFrame.leftPadding. Blizzard sets it from XML and reads it back in
+-- LayoutMixin:Layout (LayoutFrame.lua:209), which TotemFrameMixin:Update triggers on
+-- every totem event - so writing it made that execution insecure and cost
+-- PlayerFrame.unit, which gates target-of-target (TargetFrame.lua:947, two lines before a
+-- protected Show). Read it and offset the anchor instead.
+local function PadOffset(totemFrame)
+    return -(totemFrame.leftPadding or 0)
+end
+
 function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
@@ -215,7 +224,6 @@ function SubModuleMixin:Update()
     else
         f:Show()
         if totemFrame then
-            totemFrame.leftPadding = 0
             totemFrame:Show()
             if _G['TotemFrame_Update'] then
                 _G['TotemFrame_Update']()
@@ -252,44 +260,37 @@ function SubModuleMixin:CreateBase()
 
     local totemFrame = _G['TotemFrame']
     if totemFrame then
-        -- Detach from Blizzard's UIParentManagedFrameContainer:
-        -- Blizzard's RemoveManagedFrame (UIParent.lua:214) checks `if not frame.IsInDefaultPosition then frame:ClearAllPoints() end`.
-        -- Setting IsInDefaultPosition prevents Blizzard from wiping anchor points when totems expire.
-        totemFrame.IsInDefaultPosition = function() return false end
+        -- Load-bearing: without it AddManagedFrame (UIParent.lua:163) runs on to
+        -- UpdateFrame and reparents the frame into Blizzard's container. IsInDefaultPosition,
+        -- ignoreInLayout and a showingFrames write used to sit here too and were all
+        -- redundant once this bails. The anchor is guarded by the OnShow hook below.
+        --
+        -- Measured, not derived: this field being ours does NOT taint PlayerFrame.unit, on
+        -- a shaman or on a pet class with the pet out - unlike leftPadding above, which
+        -- did. So a field read on this stretch is not automatically fatal, and the next one
+        -- of these should be settled by switching it off and dumping, not by tracing
+        -- Blizzard's call graph.
         totemFrame.ignoreFramePositionManager = true
-        totemFrame.ignoreInLayout = true
 
-        if totemFrame.layoutParent and totemFrame.layoutParent.showingFrames then
-            totemFrame.layoutParent.showingFrames[totemFrame] = nil
-        end
-
-        totemFrame.leftPadding = 0
         totemFrame:ClearAllPoints()
-        totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+        totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', PadOffset(totemFrame), 0)
         totemFrame:SetParent(baseFrame)
 
+        -- A local, not a field on the frame: fewer of ours for a taint audit to rule out.
+        local settingPoint = false
         hooksecurefunc(totemFrame, 'SetPoint', function(self)
-            if self.DFSettingPoint then return end
-            self.DFSettingPoint = true
+            if settingPoint then return end
+            settingPoint = true
             self:ClearAllPoints()
-            self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
-            self.DFSettingPoint = nil
+            self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', PadOffset(self), 0)
+            settingPoint = false
         end)
 
         totemFrame:HookScript('OnShow', function(self)
             if self:GetNumPoints() == 0 and baseFrame then
-                self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+                self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', PadOffset(self), 0)
             end
         end)
-
-        if totemFrame.Update then
-            hooksecurefunc(totemFrame, 'Update', function(self)
-                if self.leftPadding and self.leftPadding ~= 0 then
-                    self.leftPadding = 0
-                    if self.Layout then self:Layout() end
-                end
-            end)
-        end
     end
 end
 

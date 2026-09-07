@@ -962,10 +962,10 @@ function SubModuleMixin:UpdatePlayerFrameManaBar()
 
         PlayerFrameManaBar:SetStatusBarColor(1, 1, 1, 1)
     else
-        UnitFrameManaBar_UpdateType(PlayerFrameManaBar, true)
+        -- Not UnitFrameManaBar_UpdateType - see Helper:GetPowerBarColor.
+        PlayerFrameManaBar:SetStatusBarColor(Helper:GetPowerBarColor('player'))
         local customTex = LSM:Fetch("statusbar", state.customPowerBarTexture)
         PlayerFrameManaBar:GetStatusBarTexture():SetTexture(customTex)
-        -- PlayerFrameManaBar:SetStatusBarColor(0.0, 1.0, 0.0, 1)
     end
 end
 

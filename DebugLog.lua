@@ -1761,6 +1761,92 @@ local function ArmSeedWatcher()
     end)
 end
 
+-- The same question for PlayerFrame.unit, which gates target-of-target: Blizzard reads it
+-- at TargetFrame.lua:947, two lines before a protected Show. Written by UnitFrame_SetUnit
+-- (UnitFrame.lua:178), so hook that and ask straight after, like the party watcher does.
+--
+-- Read this before trusting the output. The captured stack is pure Blizzard - the
+-- execution arrives already tainted - so it names the write site and never the read that
+-- tainted it. The field walk is a suspect list, not a verdict: settle it by switching
+-- candidates off and dumping again. Three chains derived from Blizzard's source were wrong
+-- before a bisect found the real one (TotemFrame.leftPadding), and two dirty fields on
+-- PetFrame that are demonstrably read on the same stretch turned out not to taint it at
+-- all - so being in this list means nothing on its own.
+local playerSeedArmed, playerSeedFound = false, false
+-- Latched per frame: PlayerFrame_ToPlayerArt calls UnitFrame_SetUnit for PlayerFrame and
+-- then PetFrame, and PlayerFrame is the one that matters.
+local playerSeedSeen = {}
+
+local function ArmPlayerSeedWatcher()
+    if playerSeedArmed or not UnitFrame_SetUnit then return end
+    playerSeedArmed = true
+
+    hooksecurefunc('UnitFrame_SetUnit', function(frame, unit)
+        if not frame then return end
+        if frame ~= _G['PlayerFrame'] and frame ~= _G['PetFrame'] then return end
+
+        local name = (frame.GetName and frame:GetName()) or '<anonymous>'
+        if playerSeedSeen[name] then return end
+
+        local ok, who = issecurevariable(frame, 'unit')
+        if ok then return end
+
+        playerSeedSeen[name] = true
+        playerSeedFound = true
+        DF:Log('seed', '=== %s .unit seed ===', name)
+        DF:Log('seed', 'FIRST INSECURE .unit on %s (unit=%s), tainted by %s', name, tostring(unit),
+               tostring(who or '?'))
+        DF:Log('seed', 'combat=%s', tostring(InCombatLockdown()))
+        DF:Log('seed', 'stack: %s', tostring(debugstack(2, 30, 0)):gsub('\n', ' | '):sub(1, 3000))
+
+        -- Named outright, because it is the suspect this watcher was written for and
+        -- a pairs() walk can miss a field Blizzard has cached.
+        local pet = _G['PetFrame']
+        if pet then
+            for _, key in ipairs({'showBuffs', 'ignoreFramePositionManager', 'ignoreInLayout', 'IsInDefaultPosition',
+                                  'breakUpLargeNumbers', 'Portrait', 'Name', 'unit'}) do
+                local safe, blame = issecurevariable(pet, key)
+                DF:Log('seed', 'PetFrame.%s: present=%s secure=%s%s', key, tostring(rawget(pet, key) ~= nil),
+                       tostring(safe), (not safe and blame) and (' tainted by ' .. blame) or '')
+            end
+        end
+
+        -- TotemFrame by name, because the one confirmed cause was here. It is a LayoutFrame
+        -- hung off PlayerFrame and TotemFrameMixin:Update lays it out on every totem event,
+        -- so the padding and layout keys are read on a hot path. They are Blizzard's.
+        local totem = _G['TotemFrame']
+        if totem then
+            for _, key in ipairs({'leftPadding', 'rightPadding', 'topPadding', 'bottomPadding', 'spacing',
+                                  'ignoreInLayout', 'ignoreFramePositionManager', 'IsInDefaultPosition', 'layoutIndex',
+                                  'layoutParent'}) do
+                local safe, blame = issecurevariable(totem, key)
+                DF:Log('seed', 'TotemFrame.%s: present=%s secure=%s%s', key, tostring(rawget(totem, key) ~= nil),
+                       tostring(safe), (not safe and blame) and (' tainted by ' .. blame) or '')
+            end
+        end
+
+        -- Everything Blizzard touches on the PLAYER_ENTERING_WORLD stretch above.
+        LogInsecureFields('PlayerFrame', _G['PlayerFrame'])
+        LogInsecureFields('PlayerFrameHealthBar', _G['PlayerFrameHealthBar'])
+        LogInsecureFields('PlayerFrameManaBar', _G['PlayerFrameManaBar'])
+        LogInsecureFields('PetFrame', pet)
+        LogInsecureFields('PetFrame.AuraFrameContainer', pet and rawget(pet, 'AuraFrameContainer'))
+        LogInsecureFields('PetFrameHealthBar', _G['PetFrameHealthBar'])
+        LogInsecureFields('PetFrameManaBar', _G['PetFrameManaBar'])
+        LogInsecureFields('TotemFrame', totem)
+        LogInsecureFields('TotemFrame.layoutParent', totem and rawget(totem, 'layoutParent'))
+
+        -- UIParent_UpdateTopFramePositions is the other half of
+        -- PlayerFrame_ResetPosition (PlayerFrame.lua:282). It reads
+        -- BuffFrame:IsInDefaultPosition() and EditModeManagerFrame:GetDefaultAnchor,
+        -- so those are the second way onto the same stack.
+        LogInsecureFields('BuffFrame', _G['BuffFrame'])
+        LogInsecureFields('EditModeManagerFrame', _G['EditModeManagerFrame'])
+
+        LogSeedCandidates()
+    end)
+end
+
 -- /df log globals - every global this addon has dirtied.
 --
 -- The seed watcher proved the party taint arrives from OUTSIDE our code: the
@@ -2660,7 +2746,7 @@ function DF:HandleLogCommand(rest)
     elseif sub == 'seed' then
         -- Two watchers, and either one alone is worth reading. The compact one needs no
         -- group, so say which of them fired instead of sending people off to find friends.
-        if seedFound or compactSeedFound then
+        if seedFound or compactSeedFound or playerSeedFound then
             DF:LogCopy('seed')
         else
             print(PREFIX .. 'no taint seed captured yet.')
@@ -2669,6 +2755,9 @@ function DF:HandleLogCommand(rest)
             print(PREFIX .. '  .optionTable watcher (works solo): ' ..
                       (compactSeedArmed and 'armed, nothing dirty at setup time' or
                           'NOT armed - CompactUnitFrame_SetUpFrame missing'))
+            print(PREFIX .. '  PlayerFrame .unit watcher (works solo, this is the ToT one): ' ..
+                      (playerSeedArmed and 'armed, nothing dirty yet' or
+                          'NOT armed - UnitFrame_SetUnit missing'))
         end
     elseif sub == 'party' then
         DF:LogPartyTaint('party')
@@ -2688,6 +2777,7 @@ InstallCapture()
 -- function is already there, and again when it arrives.
 ArmSeedWatcher()
 ArmCompactSeedWatcher()
+ArmPlayerSeedWatcher()
 do
     local armFrame = CreateFrame('Frame')
     armFrame:RegisterEvent('ADDON_LOADED')
@@ -2695,6 +2785,7 @@ do
     armFrame:SetScript('OnEvent', function(self)
         ArmSeedWatcher()
         ArmCompactSeedWatcher()
-        if seedArmed and compactSeedArmed then self:UnregisterAllEvents() end
+        ArmPlayerSeedWatcher()
+        if seedArmed and compactSeedArmed and playerSeedArmed then self:UnregisterAllEvents() end
     end)
 end

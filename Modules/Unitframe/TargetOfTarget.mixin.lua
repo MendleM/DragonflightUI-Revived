@@ -556,7 +556,8 @@ function SubModuleMixin:UpdateToTPowerBarTexture(bar, state, unit)
 
         bar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
     else
-        UnitFrameManaBar_UpdateType(bar, true)
+        -- Not UnitFrameManaBar_UpdateType - see Helper:GetPowerBarColor.
+        bar:SetStatusBarColor(Helper:GetPowerBarColor(unit))
         local customTex = LSM:Fetch("statusbar", state.customPowerBarTexture)
         bar:GetStatusBarTexture():SetTexture(customTex)
     end

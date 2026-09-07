@@ -1288,7 +1288,10 @@ function SubModuleMixin:UpdateTargetPowerBarTexture(bar, state, unit)
 
         bar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
     else
-        UnitFrameManaBar_UpdateType(bar, true)
+        -- Not UnitFrameManaBar_UpdateType - see Helper:GetPowerBarColor. This was the
+        -- worst of the three call sites: ReApplyTargetFrame hangs off the health bar's
+        -- OnValueChanged, so it reseeded on every health poll tick.
+        bar:SetStatusBarColor(Helper:GetPowerBarColor(unit))
         local customTex = LSM:Fetch("statusbar", state.customPowerBarTexture)
         bar:GetStatusBarTexture():SetTexture(customTex)
     end

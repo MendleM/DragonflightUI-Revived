@@ -285,15 +285,19 @@ function SubModuleMixin:Setup()
     --
     -- Collapse it back to our single point. The scale write lands just before
     -- the point write, so this is also the right place to restore ours.
-    if not FocusFrameToT.DFPointHooked then
-        FocusFrameToT.DFPointHooked = true
+    -- Both flags live off the frame now. They were fields on FocusFrameToT, which is
+    -- protected, and every field of ours on one is another thing a taint audit has to
+    -- rule out by hand.
+    if not self.FocusToTPointHooked then
+        self.FocusToTPointHooked = true
+        local settingPoint = false
 
         hooksecurefunc(FocusFrameToT, 'SetPoint', function(frame, _, relativeTo)
             local holder = _G['DragonflightUIFocusToTFrame']
-            if frame.DFSettingPoint or not holder or relativeTo == holder then return end
+            if settingPoint or not holder or relativeTo == holder then return end
             if InCombatLockdown() then return end
 
-            frame.DFSettingPoint = true
+            settingPoint = true
 
             frame:ClearAllPoints()
             frame:SetPoint('CENTER', holder, 'CENTER', 0, 0)
@@ -301,7 +305,7 @@ function SubModuleMixin:Setup()
             local state = self.ModuleRef.db.profile.focusTarget
             if state and state.scale then frame:SetScale(state.scale) end
 
-            frame.DFSettingPoint = false
+            settingPoint = false
         end)
     end
 

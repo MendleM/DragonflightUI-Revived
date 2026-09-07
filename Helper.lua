@@ -1803,6 +1803,24 @@ function Helper:GetUnitHealthPercent(unit)
     return health / max_health
 end
 
+-- The colour Blizzard would put on a mana bar, without touching the bar.
+--
+-- Not UnitFrameManaBar_UpdateType, which is what this addon used to call: it writes
+-- powerType, powerToken and currValue onto a protected bar (UnitFrame.lua:507-512) and
+-- reads them back on its own hot paths (:506, :831, :865, :878), so driving it from here
+-- tainted them for the session. Reading PowerBarColor cannot.
+--
+-- Atlas power types and STAGGER (a list of three colours) come out white, which is what
+-- Blizzard's own body does with them.
+function Helper:GetPowerBarColor(unit)
+    local powerType, powerToken = UnitPowerType(unit or 'player')
+    local info = PowerBarColor and (PowerBarColor[powerToken] or PowerBarColor[powerType] or PowerBarColor['MANA'])
+
+    if not info or info.atlas or not info.r then return 1, 1, 1 end
+
+    return info.r, info.g, info.b
+end
+
 -- override with _G['DragonflightUI_Helper'].UnitFrameColorGradiantTable = [...]
 -- maybe I'll add some color picker on advanced options, but for now a simple macro/addon/weakaura should be enough, if not
 -- contact me on discord!
