@@ -7,6 +7,51 @@ local subModuleName = 'TotemFrame';
 local SubModuleMixin = {};
 addonTable.SubModuleMixins[subModuleName] = SubModuleMixin;
 
+-- TotemFrame.leftPadding is Blizzard's, and Blizzard reads it back, so it is never
+-- written here.
+--
+-- Blizzard sets it in TotemFrame.xml as a KeyValue - leftPadding = 38 - which means the
+-- XML parser wrote it, and the value is secure. Writing over it from addon code makes it
+-- insecure, and Blizzard reads it back on every layout pass:
+--
+--     LayoutMixin:Layout()               LayoutFrame.lua:253
+--       CalculateFrameSize()                          :257
+--         GetPadding()                                :241
+--           return (self.leftPadding or 0)            :209
+--
+-- and TotemFrameMixin:Update calls self:Layout() unconditionally at TotemFrame.lua:53.
+-- From there Blizzard's own execution picks up our taint on every totem update, and
+-- everything it writes after that read comes out insecure too. What it cost was
+-- PlayerFrame.unit, written at UnitFrame.lua:178 by way of PlayerFrame.lua:193.
+--
+-- That variable is read by TargetOfTargetMixin:Update at TargetFrame.lua:947 - two lines
+-- before the protected self:Show() at 949, fourteen before self:Hide() at 961. So
+-- target-of-target and target-of-focus had both calls refused for the rest of the
+-- session once combat started. Same files in 1.15.9, 2.5.6 and 5.5.4, byte for byte.
+--
+-- How this was pinned down, because none of it was apparent from reading the source:
+--
+--   Bisect. On 83493a8 issecurevariable(PlayerFrame, "unit") returns true and the frames
+--   work; on 05ecd95 - the first code commit of PR #55 - it returns false with
+--   DragonflightUI as the blame, and the frames are blocked. No pet, no totems placed.
+--
+--   Then a temporary switch turned each of that commit's three mechanisms off in turn.
+--   Every one of them still read insecure, and only all three together read clean. The
+--   reason is that leftPadding had two writers: the explicit assignments, and a
+--   hooksecurefunc on TotemFrame's Update that put the field back to 0 whenever it found
+--   38 there. Removing either left the other. Removing both, while still calling
+--   Layout() ourselves, read clean and the frames stayed up in combat - so the field
+--   write was the whole cause, and driving Layout() from here is harmless.
+--
+-- The blank offset those writes were meant to remove is real: 38 units of padding inside
+-- the frame, which made sense while it hung in Blizzard's container below the player
+-- frame and not after this module reparents it onto its own baseFrame. It is compensated
+-- on our side now, by offsetting the anchor by Blizzard's own value. Reading a secure
+-- value taints nothing, and the field stays Blizzard's.
+local function PadOffset(totemFrame)
+    return -(totemFrame.leftPadding or 0)
+end
+
 function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
@@ -215,7 +260,6 @@ function SubModuleMixin:Update()
     else
         f:Show()
         if totemFrame then
-            totemFrame.leftPadding = 0
             totemFrame:Show()
             if _G['TotemFrame_Update'] then
                 _G['TotemFrame_Update']()
@@ -263,33 +307,23 @@ function SubModuleMixin:CreateBase()
             totemFrame.layoutParent.showingFrames[totemFrame] = nil
         end
 
-        totemFrame.leftPadding = 0
         totemFrame:ClearAllPoints()
-        totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+        totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', PadOffset(totemFrame), 0)
         totemFrame:SetParent(baseFrame)
 
         hooksecurefunc(totemFrame, 'SetPoint', function(self)
             if self.DFSettingPoint then return end
             self.DFSettingPoint = true
             self:ClearAllPoints()
-            self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+            self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', PadOffset(self), 0)
             self.DFSettingPoint = nil
         end)
 
         totemFrame:HookScript('OnShow', function(self)
             if self:GetNumPoints() == 0 and baseFrame then
-                self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+                self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', PadOffset(self), 0)
             end
         end)
-
-        if totemFrame.Update then
-            hooksecurefunc(totemFrame, 'Update', function(self)
-                if self.leftPadding and self.leftPadding ~= 0 then
-                    self.leftPadding = 0
-                    if self.Layout then self:Layout() end
-                end
-            end)
-        end
     end
 end
 
