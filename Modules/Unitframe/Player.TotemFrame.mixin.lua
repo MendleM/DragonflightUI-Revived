@@ -25,6 +25,28 @@ addonTable.SubModuleMixins[subModuleName] = SubModuleMixin;
 -- /dump issecurevariable(PlayerFrame, "unit"). The variant that reports true is the
 -- culprit.
 --
+-- Round one measured: 1, 2, 3 and 4 each still came back insecure, 5 came back clean.
+-- That is not four innocent suspects, it is one field with two writers. The Update hook
+-- rewrites leftPadding itself:
+--
+--     if self.leftPadding and self.leftPadding ~= 0 then
+--         self.leftPadding = 0
+--         if self.Layout then self:Layout() end
+--     end
+--
+-- so switching off our explicit `= 0` lines (3) leaves Blizzard's XML value of 38 in
+-- place, the hook sees 38 ~= 0 and writes the field anyway; switching off the hook (2)
+-- leaves our explicit lines; switching off our Layout() calls (1) leaves the hook's.
+-- No single variant could ever read clean, and 5 reading clean only says "all of it".
+--
+-- The bisect already clears PR #54: 83493a8 carried ignoreFramePositionManager and the
+-- SetPoint hook and PlayerFrame.unit was secure there. So everything lives in 05ecd95,
+-- and what is left to separate is whether the field write alone does it or whether
+-- calling Layout() from our execution is a second, independent seed.
+--
+-- Switch with /df log totemprobe <n>, then /reload, then
+-- /dump issecurevariable(PlayerFrame, "unit").
+--
 --   0  everything on, current behaviour
 --   1  no totemFrame:Layout() from our execution          (05ecd95)
 --   2  no hooksecurefunc(totemFrame, 'Update', ...)       (05ecd95)
@@ -32,15 +54,27 @@ addonTable.SubModuleMixins[subModuleName] = SubModuleMixin;
 --   4  none of 93fb3f3's writes: IsInDefaultPosition, ignoreInLayout,
 --      showingFrames[totemFrame], the OnShow hook
 --   5  all of the above plus ignoreFramePositionManager and the SetPoint hook
---      (both from PR #54). The control: if PlayerFrame.unit is still insecure at 5,
---      this file is not the source and the search starts over somewhere else.
+--      (both from PR #54)
+--   6  2 + 3 together: nothing writes leftPadding any more, but our Layout() calls
+--      stay. Clean here means the field write is the whole cause and the fix is to
+--      stop writing it.
+--   7  1 + 2 + 3: all of 05ecd95. Clean here but dirty at 6 means calling Layout()
+--      from our execution is a second seed in its own right.
 --
 -- Delete this and every Probe() call once the answer is in.
+local PROBE_SETS = {
+    [1] = {[1] = true},
+    [2] = {[2] = true},
+    [3] = {[3] = true},
+    [4] = {[4] = true},
+    [5] = {[1] = true, [2] = true, [3] = true, [4] = true, [5] = true},
+    [6] = {[2] = true, [3] = true},
+    [7] = {[1] = true, [2] = true, [3] = true}
+}
+
 local function Probe(n)
-    local v = tonumber(_G['DragonflightUITotemProbe'])
-    if not v or v == 0 then return false end
-    if v == 5 then return true end
-    return v == n
+    local set = PROBE_SETS[tonumber(_G['DragonflightUITotemProbe']) or 0]
+    return (set and set[n]) or false
 end
 
 function SubModuleMixin:Init()

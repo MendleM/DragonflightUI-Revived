@@ -39,7 +39,7 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log tot taint    deep taint audit of TargetFrameToT, TargetFrame,
 --                          and their fields/methods, opens the copy window
 --     /df log tottaint     same as /df log tot taint
---     /df log totemprobe <0-5>  TEMPORARY. Bisects Player.TotemFrame.mixin.lua
+--     /df log totemprobe <0-7>  TEMPORARY. Bisects Player.TotemFrame.mixin.lua
 --                          against the target-of-target combat block. Needs a
 --                          /reload to take effect; the legend is printed with no
 --                          argument, and the reasoning sits at the top of
@@ -2966,7 +2966,9 @@ function DF:HandleLogCommand(rest)
             [2] = "no hooksecurefunc(totemFrame, 'Update', ...)",
             [3] = 'no totemFrame.leftPadding = 0',
             [4] = "none of 93fb3f3's writes (IsInDefaultPosition, ignoreInLayout, showingFrames, OnShow hook)",
-            [5] = 'all of the above plus ignoreFramePositionManager and the SetPoint hook (control)'
+            [5] = 'all of the above plus ignoreFramePositionManager and the SetPoint hook',
+            [6] = '2+3: nothing writes leftPadding, our Layout() calls stay',
+            [7] = '1+2+3: all of 05ecd95'
         }
         local n = tonumber(arg)
         if n and LEGEND[n] then
@@ -2976,8 +2978,8 @@ function DF:HandleLogCommand(rest)
         else
             local cur = tonumber(DragonflightUITotemProbe) or 0
             print(PREFIX .. 'totem probe is ' .. cur .. ': ' .. (LEGEND[cur] or '?'))
-            for i = 0, 5 do print(PREFIX .. '  ' .. i .. '  ' .. LEGEND[i]) end
-            print(PREFIX .. 'usage: /df log totemprobe <0-5>, then /reload')
+            for i = 0, 7 do print(PREFIX .. '  ' .. i .. '  ' .. LEGEND[i]) end
+            print(PREFIX .. 'usage: /df log totemprobe <0-7>, then /reload')
         end
     elseif sub == 'party' then
         DF:LogPartyTaint('party')
