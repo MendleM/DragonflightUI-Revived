@@ -263,13 +263,13 @@ function SubModuleMixin:CreateBase()
         -- Load-bearing: without it AddManagedFrame (UIParent.lua:163) runs on to
         -- UpdateFrame and reparents the frame into Blizzard's container. IsInDefaultPosition,
         -- ignoreInLayout and a showingFrames write used to sit here too and were all
-        -- redundant once this bails - and all were fields Blizzard reads back, like
-        -- leftPadding above. The anchor is guarded by the OnShow hook below instead.
+        -- redundant once this bails. The anchor is guarded by the OnShow hook below.
         --
-        -- Residual: this read taints whoever showed the frame, which on a pet class can be
-        -- PlayerFrame_ToPlayerArt (PetFrame.lua:111). Unreproduced, and impossible without
-        -- a pet. Removing it means letting Blizzard manage the frame and restoring the
-        -- parent after, which SetParent cannot do in combat.
+        -- Measured, not derived: this field being ours does NOT taint PlayerFrame.unit, on
+        -- a shaman or on a pet class with the pet out - unlike leftPadding above, which
+        -- did. So a field read on this stretch is not automatically fatal, and the next one
+        -- of these should be settled by switching it off and dumping, not by tracing
+        -- Blizzard's call graph.
         totemFrame.ignoreFramePositionManager = true
 
         totemFrame:ClearAllPoints()

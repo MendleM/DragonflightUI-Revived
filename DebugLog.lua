@@ -1767,11 +1767,11 @@ end
 --
 -- Read this before trusting the output. The captured stack is pure Blizzard - the
 -- execution arrives already tainted - so it names the write site and never the read that
--- tainted it. The field walk is a suspect list, not a verdict: settle it by turning
--- candidates off one at a time. Three chains derived from Blizzard's source were wrong
--- before a bisect found the real one (TotemFrame.leftPadding). The walk also only sees
--- writers that have run - a character with no pet never shows PetFrame, so dirty fields
--- there are bystanders.
+-- tainted it. The field walk is a suspect list, not a verdict: settle it by switching
+-- candidates off and dumping again. Three chains derived from Blizzard's source were wrong
+-- before a bisect found the real one (TotemFrame.leftPadding), and two dirty fields on
+-- PetFrame that are demonstrably read on the same stretch turned out not to taint it at
+-- all - so being in this list means nothing on its own.
 local playerSeedArmed, playerSeedFound = false, false
 -- Latched per frame: PlayerFrame_ToPlayerArt calls UnitFrame_SetUnit for PlayerFrame and
 -- then PetFrame, and PlayerFrame is the one that matters.
