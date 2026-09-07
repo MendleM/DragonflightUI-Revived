@@ -7,6 +7,42 @@ local subModuleName = 'TotemFrame';
 local SubModuleMixin = {};
 addonTable.SubModuleMixins[subModuleName] = SubModuleMixin;
 
+-- TEMPORARY. Bisects this file against the target-of-target combat block.
+--
+-- What is established: on 83493a8 (before PR #55) PlayerFrame.unit reads secure and
+-- target-of-target works; on 05ecd95 (the leftPadding commit, first code change of
+-- PR #55) PlayerFrame.unit reads insecure, TotemFrame.leftPadding reads insecure and
+-- target-of-target is blocked in combat - with no pet and no totems placed. So the
+-- seed is in this file, and it is in that commit's 14 lines.
+--
+-- What is NOT established is which of the three things that commit does builds the
+-- bridge to PlayerFrame.unit. Reading Blizzard's source got as far as the write site
+-- (UnitFrame.lua:178, reached from PlayerFrame.lua:193) but cannot name the read that
+-- tainted the execution, and the guessed chain ran through PetFrameMixin:OnShow -
+-- which never fires on a character with no pet. So it gets measured instead.
+--
+-- Switch with /df log totemprobe <n>, then /reload, then
+-- /dump issecurevariable(PlayerFrame, "unit"). The variant that reports true is the
+-- culprit.
+--
+--   0  everything on, current behaviour
+--   1  no totemFrame:Layout() from our execution          (05ecd95)
+--   2  no hooksecurefunc(totemFrame, 'Update', ...)       (05ecd95)
+--   3  no totemFrame.leftPadding = 0                      (05ecd95)
+--   4  none of 93fb3f3's writes: IsInDefaultPosition, ignoreInLayout,
+--      showingFrames[totemFrame], the OnShow hook
+--   5  all of the above plus ignoreFramePositionManager and the SetPoint hook
+--      (both from PR #54). The control: if PlayerFrame.unit is still insecure at 5,
+--      this file is not the source and the search starts over somewhere else.
+--
+-- Delete this and every Probe() call once the answer is in.
+local function Probe(n)
+    local v = tonumber(_G['DragonflightUITotemProbe'])
+    if not v or v == 0 then return false end
+    if v == 5 then return true end
+    return v == n
+end
+
 function SubModuleMixin:Init()
     self.ModuleRef = DF:GetModule('Unitframe')
     self:SetDefaults()
@@ -215,14 +251,14 @@ function SubModuleMixin:Update()
     else
         f:Show()
         if totemFrame then
-            totemFrame.leftPadding = 0
+            if not Probe(3) then totemFrame.leftPadding = 0 end
             totemFrame:Show()
             if _G['TotemFrame_Update'] then
                 _G['TotemFrame_Update']()
             elseif totemFrame.Update then
                 totemFrame:Update()
             end
-            if totemFrame.Layout then
+            if not Probe(1) and totemFrame.Layout then
                 totemFrame:Layout()
             end
         end
@@ -255,34 +291,41 @@ function SubModuleMixin:CreateBase()
         -- Detach from Blizzard's UIParentManagedFrameContainer:
         -- Blizzard's RemoveManagedFrame (UIParent.lua:214) checks `if not frame.IsInDefaultPosition then frame:ClearAllPoints() end`.
         -- Setting IsInDefaultPosition prevents Blizzard from wiping anchor points when totems expire.
-        totemFrame.IsInDefaultPosition = function() return false end
-        totemFrame.ignoreFramePositionManager = true
-        totemFrame.ignoreInLayout = true
+        if not Probe(4) then
+            totemFrame.IsInDefaultPosition = function() return false end
+            totemFrame.ignoreInLayout = true
 
-        if totemFrame.layoutParent and totemFrame.layoutParent.showingFrames then
-            totemFrame.layoutParent.showingFrames[totemFrame] = nil
+            if totemFrame.layoutParent and totemFrame.layoutParent.showingFrames then
+                totemFrame.layoutParent.showingFrames[totemFrame] = nil
+            end
         end
 
-        totemFrame.leftPadding = 0
+        if not Probe(5) then totemFrame.ignoreFramePositionManager = true end
+        if not Probe(3) then totemFrame.leftPadding = 0 end
+
         totemFrame:ClearAllPoints()
         totemFrame:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
         totemFrame:SetParent(baseFrame)
 
-        hooksecurefunc(totemFrame, 'SetPoint', function(self)
-            if self.DFSettingPoint then return end
-            self.DFSettingPoint = true
-            self:ClearAllPoints()
-            self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
-            self.DFSettingPoint = nil
-        end)
-
-        totemFrame:HookScript('OnShow', function(self)
-            if self:GetNumPoints() == 0 and baseFrame then
+        if not Probe(5) then
+            hooksecurefunc(totemFrame, 'SetPoint', function(self)
+                if self.DFSettingPoint then return end
+                self.DFSettingPoint = true
+                self:ClearAllPoints()
                 self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
-            end
-        end)
+                self.DFSettingPoint = nil
+            end)
+        end
 
-        if totemFrame.Update then
+        if not Probe(4) then
+            totemFrame:HookScript('OnShow', function(self)
+                if self:GetNumPoints() == 0 and baseFrame then
+                    self:SetPoint('TOPLEFT', baseFrame, 'TOPLEFT', 0, 0)
+                end
+            end)
+        end
+
+        if not Probe(2) and totemFrame.Update then
             hooksecurefunc(totemFrame, 'Update', function(self)
                 if self.leftPadding and self.leftPadding ~= 0 then
                     self.leftPadding = 0

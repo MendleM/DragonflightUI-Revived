@@ -39,6 +39,11 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --     /df log tot taint    deep taint audit of TargetFrameToT, TargetFrame,
 --                          and their fields/methods, opens the copy window
 --     /df log tottaint     same as /df log tot taint
+--     /df log totemprobe <0-5>  TEMPORARY. Bisects Player.TotemFrame.mixin.lua
+--                          against the target-of-target combat block. Needs a
+--                          /reload to take effect; the legend is printed with no
+--                          argument, and the reasoning sits at the top of
+--                          Modules/Unitframe/Player.TotemFrame.mixin.lua
 --     /df log party        every party/raid frame field that is tainted, and
 --                          the addon that dirtied it. issecurevariable sees
 --                          what taintLog cannot: taintLog records tainted
@@ -2952,6 +2957,27 @@ function DF:HandleLogCommand(rest)
             print(PREFIX .. '  PlayerFrame .unit watcher (works solo, this is the ToT one): ' ..
                       (playerSeedArmed and 'armed, nothing dirty yet' or
                           'NOT armed - UnitFrame_SetUnit missing'))
+        end
+    elseif sub == 'totemprobe' then
+        -- Temporary, see the block at the top of Player.TotemFrame.mixin.lua.
+        local LEGEND = {
+            [0] = 'everything on (current behaviour)',
+            [1] = 'no totemFrame:Layout() from our execution',
+            [2] = "no hooksecurefunc(totemFrame, 'Update', ...)",
+            [3] = 'no totemFrame.leftPadding = 0',
+            [4] = "none of 93fb3f3's writes (IsInDefaultPosition, ignoreInLayout, showingFrames, OnShow hook)",
+            [5] = 'all of the above plus ignoreFramePositionManager and the SetPoint hook (control)'
+        }
+        local n = tonumber(arg)
+        if n and LEGEND[n] then
+            DragonflightUITotemProbe = n
+            print(PREFIX .. 'totem probe = ' .. n .. ': ' .. LEGEND[n])
+            print(PREFIX .. 'now /reload, then /dump issecurevariable(PlayerFrame, "unit")')
+        else
+            local cur = tonumber(DragonflightUITotemProbe) or 0
+            print(PREFIX .. 'totem probe is ' .. cur .. ': ' .. (LEGEND[cur] or '?'))
+            for i = 0, 5 do print(PREFIX .. '  ' .. i .. '  ' .. LEGEND[i]) end
+            print(PREFIX .. 'usage: /df log totemprobe <0-5>, then /reload')
         end
     elseif sub == 'party' then
         DF:LogPartyTaint('party')
