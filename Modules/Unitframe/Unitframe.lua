@@ -380,6 +380,20 @@ function Module:HookDrag()
         hooksecurefunc('PlayerFrame_ResetUserPlacedPosition', DragStopPlayerFrame)
     end
 
+    -- The drag itself, through Blizzard's own global rather than a script on the frame.
+    --
+    -- This replaces PlayerFrame:HookScript('OnDragStop', ...). PlayerFrame.xml wires its
+    -- drag to the global functions PlayerFrame_OnDragStart and PlayerFrame_OnDragStop, so
+    -- hooksecurefunc reaches the same moment without a handler of ours sitting on a
+    -- protected frame - and it restores the taint state when it returns.
+    --
+    -- Target and focus need no equivalent: both are movable="true" in the template, but
+    -- neither declares OnDragStart or OnDragStop, so nothing ever starts a drag on them and
+    -- the handler that used to hang there could never fire.
+    if PlayerFrame_OnDragStop then
+        hooksecurefunc('PlayerFrame_OnDragStop', DragStopPlayerFrame)
+    end
+
     local DragStopTargetFrame = function(_)
         self:SaveLocalSettings()
 
@@ -513,14 +527,16 @@ function Module:RegisterManaBarCallback(manaBar, func)
 end
 
 function Module:HookEnergyBar()
+    -- The callback lives in ManaBarUpdateFuncs, keyed by the bar.
+    --
+    -- It used to be manaBar.DFUpdateFunc, a field of ours on Blizzard's protected status
+    -- bar. The fallback that read it is gone with the last writer: any field of ours on a
+    -- frame Blizzard reads is a taint seed waiting for the read, and keeping a dead branch
+    -- alive only invites someone to write the field again.
     hooksecurefunc("UnitFrameManaBar_UpdateType", function(manaBar, dontcall)
         if dontcall or not manaBar then return end
         local func = Module.ManaBarUpdateFuncs and Module.ManaBarUpdateFuncs[manaBar]
-        if func and type(func) == 'function' then
-            func()
-        elseif manaBar.DFUpdateFunc and type(manaBar.DFUpdateFunc) == 'function' then
-            manaBar.DFUpdateFunc()
-        end
+        if type(func) == 'function' then func() end
     end)
 end
 
