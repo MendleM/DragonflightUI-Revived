@@ -47,6 +47,17 @@ DF.Wrath = Version.IsWotlk
 DF.Cata = Version.IsCata
 DF.MoP = Version.IsMoP
 
+Version.Expansions = {
+    Classic = 10000,
+    TBC     = 20000,
+    WotLK   = 30000,
+    Wotlk   = 30000,
+    Wrath   = 30000,
+    Cata    = 40000,
+    MoP     = 50000,
+}
+DF.Expansions = Version.Expansions
+
 -- Auto-mirror all Caps to Version table
 for k, v in pairs(DF.Caps) do
     Version[k] = v

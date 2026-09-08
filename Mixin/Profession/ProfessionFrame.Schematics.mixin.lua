@@ -620,7 +620,7 @@ function DFProfessionMixin:SetCurrentProfession()
     end
 
     local isLink, playerName = IsTradeSkillLinked()
-    if (DF.Cata or DF.API.Version.IsWotlk) and isLink and playerName and playerName ~= '' then
+    if DF.InterfaceVersion >= DF.Expansions.WotLK and isLink and playerName and playerName ~= '' then
         local tradeskillName, currentLevel, maxLevel, skillLineModifier = GetTradeSkillLine()
         local skillID = DragonflightUILocalizationData:GetSkillIDFromProfessionName(tradeskillName)
 
@@ -675,7 +675,7 @@ function DFProfessionMixin:UpdateHeader()
         self.RankFrame.DFStatusTexture = base .. prof.profData.bar
     end
 
-    if self.SelectedProfession == 'beast' then
+    if prof.profData and prof.profData.noRank then
         self.RankFrame:Hide()
     else
         self.RankFrame:Show()
