@@ -47,9 +47,18 @@ DF.ChangelogData = {
                     'The player, target and target-of-target power bars pick up their power colour without writing to Blizzard\'s status bars.'
                 }
             }, {
+                title = 'Action Bars',
+                items = {
+                    'Fixed Blizzard\'s MainMenuBarVehicleLeaveButton detaching from DragonflightUI\'s container frame and jumping to the bottom-left above the chat when boarding a flight path or entering a vehicle.',
+                    'Marked MainMenuBarVehicleLeaveButton with ignoreFramePositionManager so Blizzard\'s UIParent_ManageFramePositions leaves its anchors untouched.',
+                    'Re-anchored the button to DragonflightUIVehicleLeaveButton in Update(), OnShow, and via a defensive SetPoint hook.'
+                }
+            }, {
                 title = 'Debugging',
                 items = {
-                    '/df log seed now also watches PlayerFrame.unit, the variable the client checks before showing target-of-target.'
+                    '/df log seed now also watches PlayerFrame.unit, the variable the client checks before showing target-of-target.',
+                    'Added /df log vehicletrace to log every SetPoint, Show, and Hide on MainMenuBarVehicleLeaveButton with caller stacktraces.',
+                    'Added DragonflightUIVehicleLeaveButton to the bars group in /df log watch.'
                 }
             }
         }
