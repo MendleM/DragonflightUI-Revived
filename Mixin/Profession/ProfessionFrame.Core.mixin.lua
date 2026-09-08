@@ -54,9 +54,15 @@ do
         icon = 441139
     } -- archeology
     professionDataTable[666] = {tex = 'ProfessionBackgroundArtAlchemy', bar = 'professionsfxalchemy', icon = 136242} -- poison
-    professionDataTable[667] = {tex = 'professionbackgroundart', bar = 'professionsfxskinning', icon = 132162} -- beast training
-    professionDataTable[668] = {tex = 'professionbackgroundart', bar = 'professionsfxskinning', icon = 237523} -- runeforging
+    professionDataTable[667] = {tex = 'professionbackgroundart', bar = 'professionsfxskinning', icon = 132162, noRank = true} -- beast training
+    professionDataTable[668] = {tex = 'professionbackgroundart', bar = 'professionsfxskinning', icon = 237523, noRank = true} -- runeforging
     DFProfessionMixin.ProfessionDataTable = professionDataTable
+    DFProfessionMixin.NoRankProfessions = {
+        ['beast'] = true,
+        ['runeforging'] = true,
+        [667] = true,
+        [668] = true
+    }
 end
 
 if not PROFESSION_RANKS then
@@ -653,8 +659,10 @@ function DFProfessionMixin:UpdateTabs()
         tab:SetScript('OnEnter', function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
             GameTooltip:SetText(prof.nameLoc, 1.0, 1.0, 1.0);
-            GameTooltip:AddDoubleLine(' ')
-            GameTooltip:AddDoubleLine('Skill: ', '|cFFFFFFFF' .. prof.skill .. '/' .. prof.maxSkill .. '|r')
+            if not (prof.profData and prof.profData.noRank) then
+                GameTooltip:AddDoubleLine(' ')
+                GameTooltip:AddDoubleLine('Skill: ', '|cFFFFFFFF' .. prof.skill .. '/' .. prof.maxSkill .. '|r')
+            end
             GameTooltip:Show()
         end)
     end
@@ -789,7 +797,9 @@ end
 
 function DFProfessionMixin:UpdateProfessionData()
     local skillTable = {}
-    if DF.Cata then
+    -- Cataclysm (4.0.1+) and later (MoP, etc.) use GetProfessions();
+    -- older versions (Era, TBC, Wrath) use legacy GetNumSkillLines()
+    if DF.InterfaceVersion >= DF.Expansions.Cata then
         local prof1, prof2, archaeology, fishing, cooking, firstaid = GetProfessions()
 
         if prof1 then
@@ -1021,6 +1031,22 @@ function DFProfessionMixin:UpdateProfessionData()
                     profData = profData
                 }
             end
+        end
+    end
+
+    local isDK = select(2, UnitClass('player')) == 'DEATHKNIGHT'
+    if not skillTable['runeforging'] and ((IsSpellKnown and IsSpellKnown(53428)) or isDK) then
+        local runeSpellName, _, runeIcon = GetSpellInfo(53428)
+        if runeSpellName then
+            local profData = professionDataTable[profs.runeforging] or professionDataTable[668]
+            skillTable['runeforging'] = {
+                nameLoc = runeSpellName,
+                icon = runeIcon or (profData and profData.icon) or 237523,
+                skillID = profs.runeforging or 668,
+                skill = 1,
+                maxSkill = 1,
+                profData = profData
+            }
         end
     end
 
