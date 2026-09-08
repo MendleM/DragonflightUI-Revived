@@ -381,6 +381,12 @@ function SubModuleMixin.GetRaidStylePartyFrames(self)
     return false
 end
 
+local function CanWriteBlizzardCompactFrameSettings()
+    -- TBC Anniversary runs compact party members through protected secure-layout
+    -- code. Do not write their CVar/Edit Mode state from addon execution.
+    return not DF.TBC
+end
+
 function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     local enabled
     local selfRef
@@ -403,6 +409,12 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
     local needsReload = party ~= nil and (party.useCompactPartyFrames and true or false) ~= val
 
     if party then party.useCompactPartyFrames = val end
+
+    if not CanWriteBlizzardCompactFrameSettings() then
+        local fakeParty = _G['DragonflightUIEditModePartyFramePreview']
+        if fakeParty and fakeParty.Update then pcall(fakeParty.Update, fakeParty) end
+        return
+    end
 
     -- Keep CVar in sync if client supports it
     if C_CVar and C_CVar.GetCVar and C_CVar.GetCVar('useCompactPartyFrames') ~= nil then
@@ -581,14 +593,17 @@ function SubModuleMixin:SetupOptions()
             useCompactPartyFrames = {
                 type = 'toggle',
                 name = USE_RAID_STYLE_PARTY_FRAMES,
-                desc = OPTION_TOOLTIP_USE_RAID_STYLE_PARTY_FRAMES .. '\n\n' ..
-                    'Takes effect after a reload. Blizzard\'s own switch for this reaches into both party displays ' ..
-                    'at once, and run from addon code it leaves them unable to update during combat - so the value ' ..
-                    'is stored and the game applies it itself on the way in.',
+                desc = DF.TBC and
+                    'Managed by Blizzard on TBC Anniversary. DragonflightUI leaves protected compact frames untouched to prevent combat taint.' or
+                    (OPTION_TOOLTIP_USE_RAID_STYLE_PARTY_FRAMES .. '\n\n' ..
+                        'Takes effect after a reload. Blizzard\'s own switch for this reaches into both party displays ' ..
+                        'at once, and run from addon code it leaves them unable to update during combat - so the value ' ..
+                        'is stored and the game applies it itself on the way in.'),
                 group = 'headerStyling',
                 order = 15,
                 blizzard = true,
-                editmode = true
+                editmode = true,
+                disabled = DF.TBC
             },
 
             -- Blizzard's Interface options panel, not the Edit Mode dialog. Named for
@@ -1648,7 +1663,7 @@ function SubModuleMixin:Setup()
     -- Modern pooled party setup (Era 1.15.9+, TBC 2.5.6+, MoP 5.5.4+)
     self:SetupModern()
 
-    if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
+    if CanWriteBlizzardCompactFrameSettings() and addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
         addonTable:SyncRaidStylePartyFrameToBlizzard(self.GetRaidStylePartyFrames(self))
     end
 end
@@ -1697,4 +1712,3 @@ function SubModuleMixin:Update()
 
     if self.RestyleModernParty then self.RestyleModernParty() end
 end
-

@@ -546,6 +546,10 @@ function SubModuleMixin:SetupOptions()
 end
 
 function SubModuleMixin:Setup()
+    -- Defense in depth: callers must treat Blizzard compact frames as read-only
+    -- on TBC Anniversary.
+    if DF.TBC then return end
+
     local function setDefaultSubValues(sub)
         self.ModuleRef:SetDefaultSubValues(sub)
     end
@@ -1168,11 +1172,13 @@ function SubModuleMixin:EnsureRaidMoveFrame()
 end
 
 function SubModuleMixin:UpdateState(state)
+    if DF.TBC then return end
     self.state = state;
     self:Update();
 end
 
 function SubModuleMixin:Update()
+    if DF.TBC then return end
     local state = self.state;
     if not state then return end
 
