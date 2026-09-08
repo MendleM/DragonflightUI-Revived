@@ -283,6 +283,11 @@ function SubModuleMixin:OnEvent(event, ...)
     if ((CanExitVehicle() or UnitOnTaxi("player")) and ActionBarController_GetCurrentActionBarState() ==
         LE_ACTIONBAR_STATE_MAIN) then
         --
+        local f = _G['DragonflightUIVehicleLeaveButton']
+        if f and not Helper:IsCombatLocked() then
+            MainMenuBarVehicleLeaveButton:ClearAllPoints()
+            MainMenuBarVehicleLeaveButton:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        end
         MainMenuBarVehicleLeaveButton:Show();
         MainMenuBarVehicleLeaveButton:Enable();
         self:SetActiveGlow(MainMenuBarVehicleLeaveButton, true)
@@ -399,6 +404,16 @@ function SubModuleMixin:Update()
 
     btn:SetScale(state.scale)
     if btn.DFButtonFrame then btn.DFButtonFrame:SetShown(state.showFrame ~= false) end
+
+    if not Helper:IsCombatLocked() then
+        btn:ClearAllPoints()
+        btn:SetPoint('CENTER', f, 'CENTER', 0, 0)
+    else
+        Helper:DeferOutOfCombat('VehicleLeaveReanchor', function()
+            btn:ClearAllPoints()
+            btn:SetPoint('CENTER', f, 'CENTER', 0, 0)
+        end)
+    end
 
     -- Hiding the holder is not enough on its own: the real button was never
     -- reparented to it (SetParent is commented out in CreateVehicleLeaveButton
@@ -542,9 +557,28 @@ function SubModuleMixin:CreateVehicleLeaveButton()
 
     local btn = _G['MainMenuBarVehicleLeaveButton'];
     if btn then
+        btn.ignoreFramePositionManager = true
         btn:UnregisterAllEvents()
         btn:ClearAllPoints()
         btn:SetPoint('CENTER', f, 'CENTER', 0, 0)
+
+        btn:HookScript('OnShow', function(self)
+            if not Helper:IsCombatLocked() then
+                self:ClearAllPoints()
+                self:SetPoint('CENTER', f, 'CENTER', 0, 0)
+            end
+        end)
+
+        local isReanchoring = false
+        hooksecurefunc(btn, 'SetPoint', function(self, point, relTo)
+            if isReanchoring then return end
+            if relTo ~= f and not Helper:IsCombatLocked() then
+                isReanchoring = true
+                self:ClearAllPoints()
+                self:SetPoint('CENTER', f, 'CENTER', 0, 0)
+                isReanchoring = false
+            end
+        end)
 
         -- era-1159: dress the real button in the retail round exit-arrow
         -- art (shipped by DFUI but previously used only for the edit-mode

@@ -78,6 +78,9 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          saved collapsed state, and each button's anchor,
 --                          visibility and protected status. Run it before and
 --                          after whatever breaks and compare the two
+--     /df log vehicletrace log every SetPoint, Show and Hide on
+--                          MainMenuBarVehicleLeaveButton with caller stacktraces.
+--                          'off' stops it, 'copy' opens the window
 --     /df log raidopts     why the raid Edit Mode options are or are not in the
 --                          config panel: whether Blizzard_EditMode is loaded,
 --                          whether its setting display info exists, which frame
@@ -641,6 +644,7 @@ local WATCH_GROUPS = {
         label = 'bars',
         frames = {'MainMenuBar', 'MultiBarBottomLeft', 'MultiBarBottomRight', 'MultiBarLeft', 'MultiBarRight',
                   'StanceBar', 'PetActionBar', 'PossessActionBar', 'MainMenuBarVehicleLeaveButton',
+                  'DragonflightUIVehicleLeaveButton',
                   'MainStatusTrackingBarContainer', 'SecondaryStatusTrackingBarContainer',
                   'UIParentBottomManagedFrameContainer', 'UIParentRightManagedFrameContainer'}
     }, {
@@ -2343,6 +2347,63 @@ function DF:LogBagTrace(on)
     end
 end
 
+-- /df log vehicletrace - name whoever re-anchors MainMenuBarVehicleLeaveButton.
+local vehicleTraceOn = false
+local vehicleTraceHooked = false
+local VEHICLE_TRACE_MAX = 20
+local vehicleTraceHits = 0
+
+local function VehicleTraceRecord(kind, description)
+    if not vehicleTraceOn then return end
+    if vehicleTraceHits >= VEHICLE_TRACE_MAX then return end
+    vehicleTraceHits = vehicleTraceHits + 1
+
+    DF:Log('vehicletrace', '%s [%s]', description, BagTraceCombat())
+    DF:Log('vehicletrace', '  stack: %s', tostring(debugstack(3, 12, 0)):gsub('\n', ' | '):sub(1, 1200))
+
+    if vehicleTraceHits >= VEHICLE_TRACE_MAX then
+        DF:Log('vehicletrace', 'hit the cap of %d - no more calls will be logged.', VEHICLE_TRACE_MAX)
+    end
+end
+
+function DF:LogVehicleTrace(on)
+    local btn = _G['MainMenuBarVehicleLeaveButton']
+    if on and not vehicleTraceHooked then
+        if btn and btn.SetPoint then
+            hooksecurefunc(btn, 'SetPoint', function(self, point, rel, relPoint, x, y)
+                VehicleTraceRecord('point', string.format('%s:SetPoint(%s -> %s %s, %s, %s)',
+                    (self.GetName and self:GetName()) or '<anon>',
+                    tostring(point), BagTraceName(rel), tostring(relPoint),
+                    tostring(x), tostring(y)))
+            end)
+            if btn.Show then
+                hooksecurefunc(btn, 'Show', function(self)
+                    VehicleTraceRecord('visibility', string.format('%s:Show()', (self.GetName and self:GetName()) or '<anon>'))
+                end)
+            end
+            if btn.Hide then
+                hooksecurefunc(btn, 'Hide', function(self)
+                    VehicleTraceRecord('visibility', string.format('%s:Hide()', (self.GetName and self:GetName()) or '<anon>'))
+                end)
+            end
+            vehicleTraceHooked = true
+        else
+            print(PREFIX .. 'MainMenuBarVehicleLeaveButton does not exist yet.')
+            return
+        end
+    end
+
+    vehicleTraceOn = on and true or false
+
+    if vehicleTraceOn then
+        vehicleTraceHits = 0
+        DF:LogFrame(btn, 'vehicletrace')
+        print(PREFIX .. 'vehicle trace ON - reproduce it, then |cffffff78/df log vehicletrace copy|r')
+    else
+        print(PREFIX .. ('vehicle trace OFF - %d call(s) captured.'):format(vehicleTraceHits))
+    end
+end
+
 -- /df log raidopts - why the raid Edit Mode options are or are not there.
 --
 -- The options are built once, from Blizzard's own EditModeSettingDisplayInfoManager,
@@ -2736,6 +2797,15 @@ function DF:HandleLogCommand(rest)
             DF:LogDump('bagstate', 20)
         else
             DF:LogBagTrace(true)
+        end
+    elseif sub == 'vehicletrace' then
+        local a = arg:lower()
+        if a == 'off' then
+            DF:LogVehicleTrace(false)
+        elseif a == 'copy' then
+            DF:LogCopy('vehicletrace')
+        else
+            DF:LogVehicleTrace(true)
         end
     elseif sub == 'raidopts' then
         DF:LogRaidOptions('raidopts')
