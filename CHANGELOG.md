@@ -7,9 +7,16 @@ May 2026). Current builds report version `0.45.2`.
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
 
-## 0.45.2 — Player Totem Frame Toggle (6 September 2026)
-Added a clean activation toggle for the Player Totem Frame in settings and Edit Mode, allowing the frame to be hidden without reloading.
-**Highlights** — Player Totem Frame can now be toggled on/off under `/df` -> Unitframes -> Player Totem Frame and in HUD Edit Mode · re-enabling the frame immediately restores and updates active totems without requiring a `/reload` · TotemFrame reliably retains its position after totems expire or Totemic Call is used
+## 0.45.2 — Totem Frame, Vehicle UI & Professions (8 September 2026)
+Added a clean activation toggle for the Player Totem Frame, fixed the Profession Frame and Runeforging in MoP Classic, and resolved vehicle button positioning issues.
+**Highlights** — Player Totem Frame can now be toggled on/off under `/df` -> Unitframes -> Player Totem Frame and in HUD Edit Mode · re-enabling the frame immediately restores and updates active totems without requiring a `/reload` · TotemFrame reliably retains its position after totems expire or Totemic Call is used · fixed Runeforging and modern professions failing to open in MoP Classic
+### Professions
+- Fixed the Profession Frame failing to open for Runeforging and modern professions in MoP Classic.
+- Switched `UpdateProfessionData` to use `DF.InterfaceVersion >= DF.Expansions.Cata` so MoP Classic (and future Classic expansions) correctly uses Blizzard's modern `GetProfessions()` API instead of falling back to legacy Vanilla/TBC/Wrath `GetNumSkillLines()`.
+- Registered Runeforging (spell ID `53428`) for all expansions from WotLK onwards using `DF.InterfaceVersion >= DF.Expansions.WotLK`.
+- Added a fallback in `UpdateProfessionData` to ensure `skillTable['runeforging']` is initialized for Death Knights even before the spellbook is scanned.
+- Suppressed the rank progress bar and tab tooltip skill readout (`Skill: 1/1`) for unranked professions (Runeforging, Beast Training) via `noRank = true` in `professionDataTable`.
+- Added `Version.Expansions` and `DF.Expansions` version constants in `API/Version.API.lua` for safe, future-proof expansion comparisons.
 ### Unit Frames
 - Added an **Active** toggle (`activate`) to the Player Totem Frame submodule, providing a clean way to hide or disable the totem frame (e.g. for players using dedicated totem addons like TotemTimers) without relying on heavy secure state handlers.
 - When toggling the frame back on, Blizzard's `TotemFrame` is shown and refreshed straight away so existing active totems appear without a reload. It goes through `TotemFrameMixin:Update`; the older `TotemFrame_Update()` global is tried first but does not exist on any supported client, so that branch never runs.

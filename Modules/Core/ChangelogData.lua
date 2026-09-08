@@ -25,16 +25,27 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 DF.ChangelogData = {
     {
         version = '0.45.2',
-        title = 'Player Totem Frame Toggle',
-        date = '6 September 2026',
-        intro = 'Added a clean activation toggle for the Player Totem Frame in settings and Edit Mode, allowing the frame to be hidden without reloading.',
+        title = 'Totem Frame, Vehicle UI & Professions',
+        date = '8 September 2026',
+        intro = 'Added a clean activation toggle for the Player Totem Frame, fixed the Profession Frame and Runeforging in MoP Classic, and resolved vehicle button positioning issues.',
         sections = {
             {
                 title = 'Highlights',
                 items = {
                     'Player Totem Frame can now be toggled on/off under /df -> Unitframes -> Player Totem Frame and in HUD Edit Mode.',
                     'Re-enabling the frame immediately restores and updates active totems without requiring a /reload.',
-                    'Fixed TotemFrame disappearing and losing anchor points after totems expire or Totemic Call is used.'
+                    'Fixed TotemFrame disappearing and losing anchor points after totems expire or Totemic Call is used.',
+                    'Fixed Runeforging and modern professions failing to open in MoP Classic.'
+                }
+            }, {
+                title = 'Professions',
+                items = {
+                    'Fixed the Profession Frame failing to open for Runeforging and modern professions in MoP Classic.',
+                    'Use GetProfessions() for Cataclysm and later expansions instead of falling back to legacy Vanilla skill lines.',
+                    'Registered Runeforging for all expansions from WotLK onwards via DF.InterfaceVersion >= DF.Expansions.WotLK.',
+                    'Added a fallback to ensure Runeforging is always initialized in the profession table for Death Knights.',
+                    'Suppressed rank progress bar and "Skill: 1/1" tooltip text for unranked professions (Runeforging, Beast Training).',
+                    'Added Version.Expansions constants in Version.API.lua for clean, future-proof expansion version checks.'
                 }
             }, {
                 title = 'Unit Frames',
