@@ -47,7 +47,7 @@ function DragonFlightUICastbarMixin:OnLoad(unit)
     self.tickTable = {}
     self.maxHoldTime = 1.0;
     self:SetUnit(unit)
-    self:AddTicks(15)
+    self:AddTicks(20)
     self:SetPrecision(1, 2)
     self:SetCompactLayout(true)
 
@@ -381,16 +381,34 @@ function DragonFlightUICastbarMixin:OnEvent(event, ...)
 
         -- local tickCount = self.tickTable[name]
         local tickCount = self:GetTickCount(name, spellId)
-        if tickCount and tickCount > 0 then
+        if DF and DF.Log then
+            DF:Log('castbar', 'CHANNEL_START unit=%s spell="%s" id=%s showTicks=%s -> ticks=%s (w=%.1f)',
+                   tostring(unit), tostring(name), tostring(spellId), tostring(self.showTicks),
+                   tostring(tickCount), self:GetWidth() or -1)
+
+            if self.showTicks and (not tickCount or tickCount == 0) then
+                DF:Log('castbar', 'WARNING: showTicks=true but no ticks found for spell="%s" id=%s',
+                       tostring(name), tostring(spellId))
+            end
+        end
+
+        if tickCount and tickCount > 0 and self.ticks then
             local tickDelta = self:GetWidth() / tickCount
+            local maxTicks = #self.ticks
 
             for i = 1, tickCount - 1 do
-                self.ticks[i]:Show()
-                self.ticks[i]:SetPoint('CENTER', self, 'LEFT', i * tickDelta, 0)
-                self.ticks[i]:SetHeight(self:GetHeight() + 8)
+                if self.ticks[i] then
+                    self.ticks[i]:Show()
+                    self.ticks[i]:SetPoint('CENTER', self, 'LEFT', i * tickDelta, 0)
+                    self.ticks[i]:SetHeight(self:GetHeight() + 8)
+                end
             end
 
-            for i = tickCount, 15 do self.ticks[i]:Hide() end
+            for i = tickCount, maxTicks do
+                if self.ticks[i] then
+                    self.ticks[i]:Hide()
+                end
+            end
         else
             self:HideAllTicks()
         end
@@ -572,6 +590,12 @@ function DragonFlightUICastbarMixin:HandleCastStop(event, ...)
         ((self.channeling or self.reverseChanneling) and
             (event == "UNIT_SPELLCAST_CHANNEL_STOP" or event == "UNIT_SPELLCAST_EMPOWER_STOP"))) then
 
+        if (event == "UNIT_SPELLCAST_CHANNEL_STOP" or event == "UNIT_SPELLCAST_EMPOWER_STOP") then
+            if DF and DF.Log then
+                DF:Log('castbar', 'CHANNEL_STOP unit=%s event=%s', tostring(self.unit), tostring(event))
+            end
+        end
+
         local castComplete = select(4, ...);
         if (event == "UNIT_SPELLCAST_EMPOWER_STOP" and not castComplete) then
             self:HandleInterruptOrSpellFailed(true, event, ...);
@@ -666,9 +690,16 @@ function DragonFlightUICastbarMixin:HandleInterruptOrSpellFailed(empoweredInterr
             end
         end
 
+        if self.channeling then
+            if DF and DF.Log then
+                DF:Log('castbar', 'CHANNEL_INTERRUPTED/FAILED unit=%s event=%s', tostring(self.unit), tostring(event))
+            end
+        end
+
         self.casting = nil;
         self.channeling = nil;
         self.reverseChanneling = nil;
+        self:HideAllTicks()
 
         self.fadeOut = true;
         -- self.holdTime = GetTime() + self.maxHoldTime;
@@ -961,8 +992,9 @@ function DragonFlightUICastbarMixin:GetTickCount(spell, spellID)
     -- local tickCount = self.tickTable[name]
 
     if not self.showTicks then return 0 end
+    if not self.tickTable then return 0 end
 
-    return self.tickTable[spellID] or self.tickTable[spell] or 0
+    return (spellID and self.tickTable[spellID]) or (spell and self.tickTable[spell]) or 0
 end
 
 function DragonFlightUICastbarMixin:SetShowTicks(showTicks)

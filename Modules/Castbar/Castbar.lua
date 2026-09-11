@@ -821,81 +821,163 @@ function Module.ChangeDefaultCastbar()
     end
 end
 
-Module.ChannelTicks = DF.Cata and {
-    -- wl
-    [GetSpellInfo(5740)] = 4, -- rain of fire
-    -- [GetSpellInfo(5138)] = 5, -- drain mana
-    [GetSpellInfo(689)] = 5, -- drain life
-    [GetSpellInfo(1120)] = 5, -- drain soul
-    [GetSpellInfo(755)] = 10, -- health funnel
-    [GetSpellInfo(1949)] = 15, -- hellfire
-    -- priest
-    [GetSpellInfo(47540)] = 2, -- penance
-    [GetSpellInfo(15407)] = 3, -- mind flay
-    [GetSpellInfo(64843)] = 4, -- divine hymn
-    [GetSpellInfo(64901)] = 4, -- hymn of hope
-    [GetSpellInfo(48045)] = 5, -- mind sear
-    -- hunter
-    -- [GetSpellInfo(1510)] = 6, -- volley
-    -- druid
-    [GetSpellInfo(740)] = 4, -- tranquility
-    [GetSpellInfo(16914)] = 10, -- hurricane
-    -- mage
-    [5143] = 3, -- arcane missiles rank 1
-    [5144] = 4, -- arcane missiles rank 2
-    -- [GetSpellInfo(5145)] = 5, -- arcane missiles
-    [GetSpellInfo(10)] = 8 -- blizzard
-} or DF.Wrath and {
-    -- wl
-    [GetSpellInfo(5740)] = 4, -- rain of fire
-    [GetSpellInfo(5138)] = 5, -- drain mana
-    [GetSpellInfo(689)] = 5, -- drain life
-    [GetSpellInfo(1120)] = 5, -- drain soul
-    [GetSpellInfo(755)] = 10, -- health funnel
-    [GetSpellInfo(1949)] = 15, -- hellfire
-    -- priest
-    [GetSpellInfo(47540)] = 2, -- penance
-    [GetSpellInfo(15407)] = 3, -- mind flay
-    [GetSpellInfo(64843)] = 4, -- divine hymn
-    [GetSpellInfo(64901)] = 4, -- hymn of hope
-    [GetSpellInfo(48045)] = 5, -- mind sear
-    -- hunter
-    [GetSpellInfo(1510)] = 6, -- volley
-    -- druid
-    [GetSpellInfo(740)] = 4, -- tranquility
-    [GetSpellInfo(16914)] = 10, -- hurricane
-    -- mage
-    [5143] = 3, -- arcane missiles rank 1
-    [5144] = 4, -- arcane missiles rank 2
-    [GetSpellInfo(5145)] = 5, -- arcane missiles
-    [GetSpellInfo(10)] = 8 -- blizzard
-} or DF.Era and {
-    -- wl
-    [GetSpellInfo(5740)] = 4, -- rain of fire
-    [GetSpellInfo(5138)] = 5, -- drain mana
-    [GetSpellInfo(689)] = 5, -- drain life
-    [GetSpellInfo(1120)] = 5, -- drain soul
-    [GetSpellInfo(755)] = 10, -- health funnel
-    [GetSpellInfo(1949)] = 15, -- hellfire
-    -- priest
-    [GetSpellInfo(15407)] = 3, -- mind flay
-    [GetSpellInfo(402174)] = 2, -- penance
-    [GetSpellInfo(413259)] = 2, -- mind sear
-    -- hunter
-    [GetSpellInfo(1510)] = 6, -- volley
-    -- druid
-    [GetSpellInfo(740)] = 4, -- tranquility
-    [GetSpellInfo(16914)] = 10, -- hurricane
-    -- mage
-    [5143] = 3, -- arcane missiles rank 1
-    [5144] = 4, -- arcane missiles rank 2
-    [GetSpellInfo(5145)] = 5, -- arcane missiles
-    [GetSpellInfo(10)] = 8, -- blizzard,
-    [GetSpellInfo(401417)] = 3, -- regeneration
-    [GetSpellInfo(412510)] = 3 -- mass regeneration
-}
+Module.ChannelTicks = {}
+
+function Module:InitChannelTicks()
+    local tbl = Module.ChannelTicks or {}
+    local function Add(spellID, ticks)
+        if not spellID or not ticks then return end
+        tbl[spellID] = ticks
+        local name = GetSpellInfo(spellID)
+        if name then
+            tbl[name] = ticks
+        end
+    end
+
+    if DF.MoP then
+        -- Mists of Pandaria (5.x)
+        -- Mage
+        Add(5143, 5) -- Arcane Missiles (all ranks merged, 5 ticks)
+        Add(10, 8) -- Blizzard
+        Add(12051, 4) -- Evocation
+        -- Warlock
+        Add(689, 6) -- Drain Life (6s / 1s = 6 ticks)
+        Add(1120, 2) -- Drain Soul (4s / 2s = 2 ticks)
+        Add(755, 6) -- Health Funnel (6s / 1s = 6 ticks)
+        Add(1949, 15) -- Hellfire (15 ticks)
+        Add(103103, 4) -- Malefic Grasp (4s / 1s = 4 ticks)
+        Add(108371, 6) -- Harvest Life (6s / 1s = 6 ticks)
+        -- Priest
+        Add(15407, 3) -- Mind Flay (3 ticks)
+        Add(129197, 3) -- Mind Flay (Insanity) (3 ticks)
+        Add(48045, 5) -- Mind Sear (5 ticks)
+        Add(47540, 2) -- Penance (3 missiles total: initial + 2 channel ticks)
+        Add(64843, 4) -- Divine Hymn (4 ticks)
+        Add(64901, 4) -- Hymn of Hope (4 ticks)
+        -- Druid
+        Add(740, 4) -- Tranquility (4 ticks)
+        Add(16914, 10) -- Hurricane (10 ticks)
+        Add(127663, 10) -- Astral Storm (10 ticks)
+        -- Monk
+        Add(115175, 8) -- Soothing Mist (8 ticks)
+        Add(113656, 4) -- Fists of Fury (4 ticks)
+        Add(101546, 3) -- Spinning Crane Kick (3 ticks)
+        Add(117952, 4) -- Crackling Jade Lightning (4 ticks)
+    elseif DF.Cata then
+        -- Cataclysm (4.x)
+        -- Warlock
+        Add(5740, 4) -- Rain of Fire
+        Add(689, 5) -- Drain Life
+        Add(1120, 5) -- Drain Soul
+        Add(755, 10) -- Health Funnel
+        Add(1949, 15) -- Hellfire
+        -- Priest
+        Add(47540, 2) -- Penance
+        Add(15407, 3) -- Mind Flay
+        Add(64843, 4) -- Divine Hymn
+        Add(64901, 4) -- Hymn of Hope
+        Add(48045, 5) -- Mind Sear
+        -- Druid
+        Add(740, 4) -- Tranquility
+        Add(16914, 10) -- Hurricane
+        -- Mage
+        Add(5143, 5) -- Arcane Missiles (in Cata all ranks merged to 5143, 5 missiles)
+        Add(10, 8) -- Blizzard
+        Add(12051, 4) -- Evocation
+    elseif DF.Wrath then
+        -- Wrath of the Lich King (3.x)
+        -- Warlock
+        Add(5740, 4) -- Rain of Fire
+        Add(5138, 5) -- Drain Mana
+        Add(689, 5) -- Drain Life
+        Add(1120, 5) -- Drain Soul
+        Add(755, 10) -- Health Funnel
+        Add(1949, 15) -- Hellfire
+        -- Priest
+        Add(47540, 2) -- Penance
+        Add(15407, 3) -- Mind Flay
+        Add(64843, 4) -- Divine Hymn
+        Add(64901, 4) -- Hymn of Hope
+        Add(48045, 5) -- Mind Sear
+        -- Hunter
+        Add(1510, 6) -- Volley
+        -- Druid
+        Add(740, 4) -- Tranquility
+        Add(16914, 10) -- Hurricane
+        -- Mage
+        Add(5143, 3) -- Arcane Missiles rank 1
+        Add(5144, 4) -- Arcane Missiles rank 2
+        Add(5145, 5) -- Arcane Missiles rank 3+
+        Add(10, 8) -- Blizzard
+        Add(12051, 4) -- Evocation
+    elseif DF.TBC or DF.API.Version.IsTBC then
+        -- The Burning Crusade (2.5.x Anniversary)
+        -- Warlock
+        Add(5740, 4) -- Rain of Fire
+        Add(5138, 5) -- Drain Mana
+        Add(689, 5) -- Drain Life
+        Add(1120, 5) -- Drain Soul
+        Add(755, 10) -- Health Funnel
+        Add(1949, 15) -- Hellfire
+        -- Priest
+        Add(15407, 3) -- Mind Flay
+        -- Hunter
+        Add(1510, 6) -- Volley
+        -- Druid
+        Add(740, 4) -- Tranquility
+        Add(16914, 10) -- Hurricane
+        -- Mage
+        Add(5143, 3) -- Arcane Missiles rank 1
+        Add(5144, 4) -- Arcane Missiles rank 2
+        Add(5145, 5) -- Arcane Missiles rank 3+
+        Add(10, 8) -- Blizzard
+        Add(12051, 4) -- Evocation
+    else
+        -- Era / Classic / SoD
+        -- Warlock
+        Add(5740, 4) -- Rain of Fire
+        Add(5138, 5) -- Drain Mana
+        Add(689, 5) -- Drain Life
+        Add(1120, 5) -- Drain Soul
+        Add(755, 10) -- Health Funnel
+        Add(1949, 15) -- Hellfire
+        -- Priest
+        Add(15407, 3) -- Mind Flay
+        Add(402174, 2) -- Penance (SoD)
+        Add(413259, 2) -- Mind Sear (SoD)
+        -- Hunter
+        Add(1510, 6) -- Volley
+        -- Druid
+        Add(740, 4) -- Tranquility
+        Add(16914, 10) -- Hurricane
+        -- Mage
+        Add(5143, 3) -- Arcane Missiles rank 1
+        Add(5144, 4) -- Arcane Missiles rank 2
+        Add(5145, 5) -- Arcane Missiles rank 3+
+        Add(10, 8) -- Blizzard
+        Add(12051, 4) -- Evocation
+        Add(401417, 3) -- Regeneration (SoD)
+        Add(412510, 3) -- Mass Regeneration (SoD)
+    end
+
+    Module.ChannelTicks = tbl
+
+    local count = 0
+    for _ in pairs(tbl) do count = count + 1 end
+    if DF and DF.Log then
+        DF:Log('castbar', 'InitChannelTicks: flavor=%s, total entries=%d',
+               DF.MoP and 'MoP' or DF.Cata and 'Cata' or DF.Wrath and 'Wrath' or
+               (DF.TBC or (DF.API and DF.API.Version and DF.API.Version.IsTBC)) and 'TBC' or 'Era', count)
+    end
+
+    return tbl
+end
+
+Module:InitChannelTicks()
 
 function Module.AddNewCastbar()
+    Module:InitChannelTicks()
+
     local castbar = CreateFrame('StatusBar', 'DragonflightUIPlayerCastbar', UIParent,
                                 'DragonflightUIPlayerCastbarTemplate')
     castbar:AddTickTable(Module.ChannelTicks)
@@ -904,6 +986,7 @@ function Module.AddNewCastbar()
     local target = CreateFrame('StatusBar', 'DragonflightUITargetCastbar', UIParent,
                                'DragonflightUITargetCastbarTemplate')
     target.DefaultParent = TargetFrame;
+    target:AddTickTable(Module.ChannelTicks)
     if TargetFrameSpellBar then TargetFrameSpellBar.DFCastbar = target end
     Module.TargetCastbar = target
 
@@ -911,6 +994,7 @@ function Module.AddNewCastbar()
         local focus = CreateFrame('StatusBar', 'DragonflightUIFocusCastbar', UIParent,
                                   'DragonflightUIFocusCastbarTemplate')
         focus.DefaultParent = FocusFrame;
+        focus:AddTickTable(Module.ChannelTicks)
         if FocusFrameSpellBar then FocusFrameSpellBar.DFCastbar = focus end
         Module.FocusCastbar = focus
     end
