@@ -127,7 +127,41 @@ do
     L["EditModeVisibleDescFormat"] =
         "Sets the visiblity of the current frame and every other frame with the same category (|cff8080ff%s|r) while edit mode is active." ..
             "\n\nYou can always set this through the |cff8080ffAdvanced Options|r on the main edit mode window, or the DragonflightUI |cff8080ffConfig Window|r."
+    L["EditModeHeaderTitle"] = "HUD Edit Mode"
+    L["EditModeRevertAllChanges"] = "Revert All Changes"
+    L["EditModeSave"] = "Save"
+    L["EditModeShowGrid"] = "Show Grid"
+    L["EditModeGridSize"] = "Grid Size"
+    L["EditModeSnapToGrid"] = "Snap to Grid"
+end
 
+-- StateHandler
+do
+    L["StateHandlerHeaderVis"] = "Visibility"
+    L["StateHandlerAlphaNormal"] = "Alpha"
+    L["StateHandlerAlphaNormalDesc"] = "Frame alpha while non-combat."
+    L["StateHandlerAlphaCombat"] = "Alpha (In Combat)"
+    L["StateHandlerAlphaCombatDesc"] = "Frame alpha while in combat."
+    L["StateHandlerShowMouseover"] = "Show On Mouseover"
+    L["StateHandlerShowMouseoverDesc"] = "This (temporarily) overrides the hide conditions below when mouseover."
+    L["StateHandlerHideAlways"] = "Always Hide"
+    L["StateHandlerHideCombat"] = "Hide In Combat"
+    L["StateHandlerHideOutOfCombat"] = "Hide Out Of Combat"
+    L["StateHandlerHideVehicle"] = "Hide With VehicleUI"
+    L["StateHandlerHidePet"] = "Hide With Pet"
+    L["StateHandlerHideNoPet"] = "Hide Without Pet"
+    L["StateHandlerHideStance"] = "Hide Without Stance/Form"
+    L["StateHandlerHideStealth"] = "Hide In Stealth"
+    L["StateHandlerHideNoStealth"] = "Hide Outside Stealth"
+    L["StateHandlerHideBattlePet"] = "Hide In Pet Battle"
+    L["StateHandlerHideCustom"] = "Use Custom Condition"
+    L["StateHandlerHideCustomDesc"] = "Same syntax as macro conditionals\n|cFFFF0000Note: This will disable all of the above settings!|r"
+    L["StateHandlerHideCustomCond"] = "Set Custom Condition"
+    L["StateHandlerHideCustomCondDesc"] = "Uses macro conditional syntax, but instead of the spell name the |cff8080ff'return'|r should be |cff8080ffshow|r to show the frame, or |cff8080ffhide|r to hide it.\n\nExample: \n|cff8080ff[combat]show;[@target,exists]show;hide|r \n(This shows the frame in combat, or if you have a target)"
+    L["StateHandlerMacroCondition"] = "macro condition: "
+
+    L["RaidFrameSettings"] = "Raid Frame Settings"
+    L["Open"] = "Open"
 end
 
 -- Compat
@@ -182,6 +216,7 @@ end
 
 -- __Settings
 do
+    L["Defaults"] = DEFAULTS or "Defaults"
     L["SettingsDefaultStringFormat"] = "\n(Default: |cff8080ff%s|r)"
     L["SettingsCharacterSpecific"] = "\n\n|cff8080ff[Per-character setting]|r"
 
@@ -213,6 +248,8 @@ end
 do
     L["DarkmodeColor"] = "Color"
     L["DarkmodeDesaturate"] = "Desaturate"
+    L["DarkmodeDarkenPortraitExtra"] = "Darken Elite Symbol"
+    L["DarkmodeDarkenPortraitExtraDesc"] = "Darkens the elite, rare and boss dragon borders around unitframes in Darkmode."
 end
 
 -- actionbar
@@ -1048,6 +1085,24 @@ do
 
     for k, v in pairs(KEY_REPLACEMENTS) do L_EN[k] = v; end
     DF.KEY_REPLACEMENTS = KEY_REPLACEMENTS;
+end
+
+-- Dropdowns
+do
+    L["DropdownBefore"] = "before"
+    L["DropdownAfter"] = "after"
+    L["DropdownNoSeperation"] = "no seperation"
+    L["DropdownSortIndex"] = "Index"
+    L["DropdownSortName"] = "Name"
+    L["DropdownSortTime"] = "Time"
+    L["DropdownLeftToRight"] = "Left To Right"
+    L["DropdownRightToLeft"] = "Right To Left"
+    L["DropdownHorizontal"] = "Horizontal"
+    L["DropdownVertical"] = "Vertical"
+    L["DropdownUp"] = "Up"
+    L["DropdownDown"] = "Down"
+    L["DropdownLeft"] = "Left"
+    L["DropdownRight"] = "Right"
 end
 
 -- see comment above

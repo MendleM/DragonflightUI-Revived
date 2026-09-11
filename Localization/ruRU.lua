@@ -1,4 +1,4 @@
--- print('ruRU')  - Translator ZamestoTV
+-- Russian Translations (originally by ZamestoTV; new/updated entries AI-generated. Community review welcome.)
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L_RU = LibStub("AceLocale-3.0"):NewLocale("DragonflightUI", "ruRU")
 if not L_RU then return end
@@ -169,6 +169,7 @@ end
 
 -- __Settings
 do
+    L["Defaults"] = "По умолчанию"
     L["SettingsDefaultStringFormat"] = "\n(По умолчанию: |cff8080ff%s|r)"
     L["SettingsCharacterSpecific"] = "\n\n|cff8080ff[Настройка для персонажа]|r"
 
@@ -196,6 +197,8 @@ end
 do
     L["DarkmodeColor"] = "Цвет"
     L["DarkmodeDesaturate"] = "Обесцвечивание"
+    L["DarkmodeDarkenPortraitExtra"] = "Затемнять элитный символ"
+    L["DarkmodeDarkenPortraitExtraDesc"] = "Затемняет рамки элитных, редких драконов и боссов в темном режиме."
 end
 
 -- actionbar
@@ -971,6 +974,114 @@ do
 
     for k, v in pairs(KEY_REPLACEMENTS) do L_RU[k] = v; end
     DF.KEY_REPLACEMENTS = KEY_REPLACEMENTS;
+end
+
+
+-- StateHandler, EditMode, Buffs & New Features
+do
+    L["BuffsAura"] = "Аура"
+    L["BuffsHeaderAura"] = "Заголовок аур"
+    L["BuffsHeaderAuraDesc"] = ""
+    L["BuffsPaddingX"] = "Интервал по X"
+    L["BuffsPaddingXDesc"] = "Интервал по X между аурами."
+    L["BuffsPaddingY"] = "Интервал по Y"
+    L["BuffsPaddingYDesc"] = "Интервал по Y между рядами аур."
+    L["BuffsWrapAfter"] = "Перенос после"
+    L["BuffsWrapAfterDesc"] = "Начать новый ряд после указанного количества аур.\nЕсли 0, без переноса."
+    L["BuffsMaxWraps"] = "Макс. рядов"
+    L["BuffsMaxWrapsDesc"] = "Ограничение количества рядов.\nЕсли 0, количество рядов не ограничено."
+    L["BuffsSeperateOwn"] = "Отделять свои ауры"
+    L["BuffsSeperateOwnDesc"] = "Определяет, должны ли свои ауры отображаться до (1) или после (-1) чужих.\nЕсли (0), разделение не применяется."
+    L["BuffsSortMethod"] = "Способ сортировки"
+    L["BuffsSortMethodDesc"] = "Определяет способ сортировки группы."
+    L["BuffsSortDirection"] = "Направление сортировки"
+    L["BuffsSortDirectionDesc"] = "Определяет порядок сортировки."
+    L["BuffsPoint"] = "Точка привязки"
+    L["BuffsPointDesc"] = ""
+    L["BuffsOrientation"] = "Ориентация"
+    L["BuffsOrientationDesc"] = ""
+    L["BuffsGrowthDirection"] = "Направление роста"
+    L["BuffsGrowthDirectionDesc"] = ""
+    L["BuffsHeaderStylingAura"] = "Оформление аур"
+    L["BuffsHeaderStylingAuraDesc"] = ""
+    L["BuffsHideDurationText"] = "Скрыть текст длительности"
+    L["BuffsHideDurationTextDesc"] = ""
+    L["BuffsHideCooldownSwipe"] = "Скрыть анимацию перезарядки"
+    L["BuffsHideCooldownSwipeDesc"] = ""
+    L["BuffsHideCooldownDurationText"] = "Скрыть текст времени перезарядки"
+    L["BuffsHideCooldownDurationTextDesc"] = ""
+
+    L["CompatGearscore"] = "GearScore"
+    L["CompatGearscoreDesc"] = "Добавляет поддержку GearScore/Tacotip в современном окне персонажа."
+    L["CompatQuestie"] = "Questie"
+    L["CompatQuestieDesc"] = "Добавляет поддержку Questie на компасе миникарты."
+
+    L["EditModeGridSize"] = "Размер сетки"
+    L["EditModeHeaderTitle"] = "Режим редактирования интерфейса"
+    L["EditModeRevertAllChanges"] = "Отменить все изменения"
+    L["EditModeSave"] = "Сохранить"
+    L["EditModeShowGrid"] = "Показать сетку"
+    L["EditModeSnapToGrid"] = "Привязать к сетке"
+
+    L["FlyoutInventoryCount"] = "Отображать количество предметов"
+    L["FlyoutInventoryCountDesc"] = "Показывает количество оставшихся реагентов на кнопке."
+
+    L["ModuleGroupLoot"] = "Добыча группы"
+    L["ModuleNameplates"] = "Индикаторы здоровья"
+    L["ModuleTooltipGroupLoot"] = "Отображает броски добычи в современной панели."
+    L["ModuleTooltipNameplates"] = "Включает современные индикаторы здоровья."
+
+    L["MoreOptionsBorderFill"] = "Заполнение рамки"
+    L["MoreOptionsBorderFillDesc"] = "Темное заполнение внутри рамки кнопки действия."
+
+    L["Open"] = "Открыть"
+    L["PlayerFrameGradientColor"] = "Градиентный цвет"
+    L["PlayerFrameGradientColorDesc"] = "Использовать плавный градиент для полосы здоровья."
+    L["PositionTableStandalone"] = "Автономный"
+    L["PositionTableStandaloneDesc"] = "Делает элемент независимо перемещаемым."
+    L["RaidFrameSettings"] = "Настройки рейд-фреймов"
+
+    L["StateHandlerAlphaCombat"] = "Прозрачность (в бою)"
+    L["StateHandlerAlphaCombatDesc"] = "Прозрачность фрейма во время боя."
+    L["StateHandlerAlphaNormal"] = "Прозрачность"
+    L["StateHandlerAlphaNormalDesc"] = "Прозрачность фрейма вне боя."
+    L["StateHandlerHeaderVis"] = "Видимость"
+    L["StateHandlerHideAlways"] = "Всегда скрывать"
+    L["StateHandlerHideBattlePet"] = "Скрывать в битве питомцев"
+    L["StateHandlerHideCombat"] = "Скрывать в бою"
+    L["StateHandlerHideCustom"] = "Пользовательское условие"
+    L["StateHandlerHideCustomCond"] = "Задать условие"
+    L["StateHandlerHideCustomCondDesc"] = "Использует синтаксис макро-условий, возвращающих 'show' или 'hide'."
+    L["StateHandlerHideCustomDesc"] = "Использует макро-условия.\n|cFFFF0000Внимание: отключает настройки выше!|r"
+    L["StateHandlerHideNoPet"] = "Скрывать без питомца"
+    L["StateHandlerHideNoStealth"] = "Скрывать вне незаметности"
+    L["StateHandlerHideOutOfCombat"] = "Скрывать вне боя"
+    L["StateHandlerHidePet"] = "Скрывать с питомцем"
+    L["StateHandlerHideStance"] = "Скрывать без стойки/облика"
+    L["StateHandlerHideStealth"] = "Скрывать в незаметности"
+    L["StateHandlerHideVehicle"] = "Скрывать на транспорте"
+    L["StateHandlerMacroCondition"] = "Макро-условие: "
+    L["StateHandlerShowMouseover"] = "Показывать при наведении"
+    L["StateHandlerShowMouseoverDesc"] = "Временно отменяет условия скрытия при наведении курсора."
+
+    L["WhatsNewOpen"] = "Что нового"
+    L["WhatsNewOpenButton"] = "Открыть"
+    L["WhatsNewOpenDesc"] = "Открывает окно со списком изменений."
+
+    L["DropdownBefore"] = "До"
+    L["DropdownAfter"] = "После"
+    L["DropdownNoSeperation"] = "Без разделения"
+    L["DropdownSortIndex"] = "Индекс"
+    L["DropdownSortName"] = "Имя"
+    L["DropdownSortTime"] = "Время"
+    L["DropdownLeftToRight"] = "Слева направо"
+    L["DropdownRightToLeft"] = "Справа налево"
+    L["DropdownHorizontal"] = "По горизонтали"
+    L["DropdownVertical"] = "По вертикали"
+    L["DropdownUp"] = "Вверх"
+    L["DropdownDown"] = "Вниз"
+    L["DropdownLeft"] = "Влево"
+    L["DropdownRight"] = "Вправо"
 end
 
 -- see comment above
