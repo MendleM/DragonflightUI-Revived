@@ -635,7 +635,7 @@ local WATCH_GROUPS = {
     }, {
         label = 'chat',
         frames = {'ChatFrame1', 'ChatFrame1Tab', 'ChatFrame1EditBox', 'GeneralDockManager',
-                  'DragonflightUIChatFrame'}
+                  'GENERAL_CHAT_DOCK', 'DragonflightUIChatFrame'}
     }, {label = 'micromenu', frames = {'MicroMenuContainer', 'MicroMenu', 'SocialsMicroButton', 'QuickJoinToastButton'}},
     -- Opening a UI panel runs the whole panel manager, and Classic's
     -- UIParentPanelManagerOverrides re-anchors these five by name on every run
