@@ -62,15 +62,15 @@ function DragonflightUIEditModeFrameMixin:SetupFrame()
     self.InstructionText:SetText('InstructionText')
     self.InstructionText:Hide()
     self.CancelDescriptionText:SetText('')
-    self.Header.Text:SetText('HUD Edit Mode')
+    self.Header.Text:SetText(L['EditModeHeaderTitle'] or HUD_EDIT_MODE_TITLE or 'HUD Edit Mode')
 
-    self.RevertButton:SetText('Revert All Changes');
+    self.RevertButton:SetText(L['EditModeRevertAllChanges'] or HUD_EDIT_MODE_REVERT_ALL_CHANGES or 'Revert All Changes');
     self.RevertButton:SetEnabled(false);
     -- self.CancelButton:SetScript("OnClick", function(button, buttonName, down)
     --     self:CancelBinding();
     -- end);
 
-    self.SaveButton:SetText('Save');
+    self.SaveButton:SetText(L['EditModeSave'] or SAVE or 'Save');
     self.SaveButton:SetEnabled(false);
     -- self.OkayButton:SetScript("OnClick", function(button, buttonName, down)
     --     KeybindListener:Commit();
@@ -187,16 +187,16 @@ function DragonflightUIEditModeSelectionOptionsMixin:SetupFrame()
     self.InstructionText:SetText('InstructionTextsss')
     self.InstructionText:Hide()
     self.CancelDescriptionText:SetText('')
-    self.Header.Text:SetText('HUD Edit Modesss')
+    self.Header.Text:SetText(L['EditModeHeaderTitle'] or HUD_EDIT_MODE_TITLE or 'HUD Edit Mode')
 
-    self.RevertButton:SetText('Revert All Changes');
+    self.RevertButton:SetText(L['EditModeRevertAllChanges'] or HUD_EDIT_MODE_REVERT_ALL_CHANGES or 'Revert All Changes');
     self.RevertButton:SetEnabled(false);
     -- self.CancelButton:SetScript("OnClick", function(button, buttonName, down)
     --     self:CancelBinding();
     -- end);
     self.RevertButton:Hide();
 
-    self.SaveButton:SetText('Save');
+    self.SaveButton:SetText(L['EditModeSave'] or SAVE or 'Save');
     self.SaveButton:SetEnabled(false);
     -- self.OkayButton:SetScript("OnClick", function(button, buttonName, down)
     --     KeybindListener:Commit();

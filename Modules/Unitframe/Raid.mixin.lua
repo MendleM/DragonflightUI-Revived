@@ -370,10 +370,10 @@ function SubModuleMixin:SetupOptions()
             -- Blizzard's Interface options panel, not the Edit Mode dialog.
             raidFrameBtn = {
                 type = 'execute',
-                name = 'Blizzard raid profile options',
+                name = L['RaidFrameSettings'] or RAID_FRAMES_LABEL or 'Raid Frame Settings',
                 desc = 'Opens Blizzard\'s own Interface options for raid frames - health text, class colours and ' ..
                     'the like. The Edit Mode settings, frame size and group layout, are above.',
-                btnName = 'Open',
+                btnName = L['Open'] or OPEN_LOG or 'Open',
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
                     PlaySound(SOUNDKIT.IG_MAINMENU_OPTION);
@@ -522,8 +522,8 @@ function SubModuleMixin:SetupOptions()
         args = {
             raidFrameBtn = {
                 type = 'execute',
-                name = 'Raid Frame Settings',
-                btnName = 'Open',
+                name = L['RaidFrameSettings'] or RAID_FRAMES_LABEL or 'Raid Frame Settings',
+                btnName = L['Open'] or OPEN_LOG or 'Open',
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
                     PlaySound(SOUNDKIT.IG_MAINMENU_OPTION);

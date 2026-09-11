@@ -6,15 +6,15 @@ local Helper = addonTable.Helper;
 DragonflightUIBuffContainerMixin = {}
 
 local seperateOwnTable = {
-    {value = '-1', text = 'after', tooltip = 'descr', label = 'label'},
-    {value = '0', text = 'before', tooltip = 'descr', label = 'label'},
-    {value = '1', text = 'no seperation', tooltip = 'descr', label = 'label'}
+    {value = '-1', text = L['DropdownAfter'] or 'after', tooltip = 'descr', label = 'label'},
+    {value = '0', text = L['DropdownBefore'] or 'before', tooltip = 'descr', label = 'label'},
+    {value = '1', text = L['DropdownNoSeperation'] or 'no seperation', tooltip = 'descr', label = 'label'}
 }
 
 local sortMethodTable = {
-    {value = 'INDEX', text = 'Index', tooltip = 'descr', label = 'label'},
-    {value = 'NAME', text = 'Name', tooltip = 'descr', label = 'label'},
-    {value = 'TIME', text = 'Time', tooltip = 'descr', label = 'label'}
+    {value = 'INDEX', text = L['DropdownSortIndex'] or 'Index', tooltip = 'descr', label = 'label'},
+    {value = 'NAME', text = L['DropdownSortName'] or 'Name', tooltip = 'descr', label = 'label'},
+    {value = 'TIME', text = L['DropdownSortTime'] or 'Time', tooltip = 'descr', label = 'label'}
 }
 
 local sortDirectionTable = {
@@ -23,8 +23,8 @@ local sortDirectionTable = {
 }
 
 local orientationTable = {
-    {value = 'leftToRight', text = 'Left To Right', tooltip = 'descr', label = 'label'},
-    {value = 'rightToLeft', text = 'Right To Left', tooltip = 'descr', label = 'label'}
+    {value = 'leftToRight', text = L['DropdownLeftToRight'] or 'Left To Right', tooltip = 'descr', label = 'label'},
+    {value = 'rightToLeft', text = L['DropdownRightToLeft'] or 'Right To Left', tooltip = 'descr', label = 'label'}
 }
 
 local pointTable = {
