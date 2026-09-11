@@ -2,10 +2,31 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.45.2`.
+May 2026). Current builds report version `0.45.3`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.45.3 — Chat Edit Mode, Castbar Ticks & Localization (12 September 2026)
+Fixed custom chat tab overlapping and selection issues in Edit Mode, restored channel ticks on MoP and TBC with target and focus support, added full localization coverage across German, Spanish, Russian and Simplified Chinese, and added an option to customize elite dragon coloring in Dark Mode.
+**Highlights** — User-created chat tabs no longer overlap with General in Edit Mode and are properly preserved when exiting · channel ticks (Arcane Missiles, Penance, Drain Soul, Evocation, Mind Flay, etc.) now reliably display on MoP and TBC Classic · Target and Focus castbars now support channel ticks · full localization coverage added for German (`deDE`), Spanish (`esES`), Russian (`ruRU`), and Simplified Chinese (`zhCN`) · Dark Mode option added to customize whether elite/rare portrait dragon textures are darkened or keep normal coloring
+### Chat
+- Fixed custom/user-created chat tabs overlapping with the General channel when entering or exiting HUD Edit Mode (GitHub issue #40).
+- Fixed the chat frame selection box in Edit Mode being unclickable or missing when viewing a custom chat channel tab.
+- Preserved the player's active chat tab when exiting Edit Mode instead of forcibly jumping back to the General channel.
+- Enforced single-frame visibility for docked chat frames in `FixDockedFrames` and `ApplySettingsInternal` so inactive docked frames are never shown concurrently.
+### Castbars
+- Restored channel ticks on MoP and TBC Classic clients by ensuring tick data, spacing and channel duration scale properly across non-Vanilla clients.
+- Extended channel tick support to Target and Focus castbars (`DragonflightUITargetCastbar`, `DragonflightUIFocusCastbar`) and Boss frames.
+- Added `/df log castbar` diagnostics command to dump client flavor, channel tick tables, player/target/focus castbar states, and active channeling spell info.
+### Localization
+- Added comprehensive AI-generated translations covering all missing strings across German (`deDE`), Spanish (`esES`), Russian (`ruRU`), and Simplified Chinese (`zhCN`).
+- Replaced hardcoded strings across UI mixins, config categories, and Edit Mode with proper `AceLocale-3.0` lookups.
+### Dark Mode
+- Added an option under Dark Mode settings (`/df` -> General -> Dark Mode) to toggle whether the rare/elite portrait dragon ornament is darkened or retains its original coloring.
+### Debugging
+- Added `/df log castbar` diagnostics tool for troubleshooting castbar ticks and channeling state across game versions.
+- Added `GENERAL_CHAT_DOCK` to the `chat` watch group in `/df log watch`.
 
 ## 0.45.2 — Totem Frame, Vehicle UI & Professions (8 September 2026)
 Added a clean activation toggle for the Player Totem Frame, fixed the Profession Frame and Runeforging in MoP Classic, and resolved vehicle button positioning issues.
