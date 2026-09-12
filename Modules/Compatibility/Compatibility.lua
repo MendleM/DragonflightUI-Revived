@@ -212,7 +212,7 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    register('compatibility', {order = 0, name = 'Compatibility', descr = '...', isNew = false})
+    register('compatibility', {order = 0, name = L['CompatName'], descr = '...', isNew = false})
 end
 
 function Module:RegisterOptionScreens()

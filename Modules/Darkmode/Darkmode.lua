@@ -298,12 +298,12 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    register('darkmode', {order = 0, name = 'Dark Mode', descr = 'Darkmodess', isNew = false})
+    register('darkmode', {order = 0, name = L["ModuleDarkmode"], descr = 'Darkmodess', isNew = false})
 end
 
 function Module:RegisterOptionScreens()
     DF.ConfigModule:RegisterSettingsData('darkmode', 'misc', {
-        name = 'Darkmode',
+        name = L["ModuleDarkmode"],
         sub = 'general',
         options = generalOptions,
         sortComparator = generalOptions.sortComparator,

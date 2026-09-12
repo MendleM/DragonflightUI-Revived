@@ -92,13 +92,20 @@ do
     L["ProfilesErrorNewProfile"] = "ОШИБКА: Имя нового профиля не может быть пустым!"
     L["ProfilesDialogueDeleteProfile"] = "Удалить профиль \'%s\'?"
     L["ProfilesDialogueCopyProfile"] = "Добавить новый профиль (скопировать из \'|cff8080ff%s|r\')"
+    L["ProfilesTitle"] = "Профили"
+    L["ProfilesCurrentProfile"] = "Текущий профиль"
+    L["ProfilesNewProfileTitle"] = "Новый профиль"
+    L["ProfilesCreateButton"] = "Создать"
+    L["ProfilesDeleteProfileTitle"] = "Удалить профиль"
+    L["ProfilesProfileToDelete"] = "Удаляемый профиль"
+    L["ProfilesDeleteButton"] = "Удалить"
     L["ProfilesImportShareHeader"] = "Импорт/Поделиться"
     L["ProfilesImportProfile"] = "Импортировать профиль"
     L["ProfilesImportProfileButton"] = HUD_EDIT_MODE_IMPORT_LAYOUT or "Импорт"
     L["ProfilesImportProfileDesc"] = "Открывает диалог импорта."
     L["ProfilesExportProfile"] = "Поделиться профилем"
     L["ProfilesExportProfileButton"] = HUD_EDIT_MODE_SHARE_LAYOUT or "Поделиться"
-    L["ProfilesExportProfileDesc"] = "Открывает диалог分享."
+    L["ProfilesExportProfileDesc"] = "Открывает диалог экспорта."
 end
 
 -- Editmode

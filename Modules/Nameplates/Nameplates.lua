@@ -234,7 +234,7 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, 'misc', data, true)
     end
 
-    register('nameplates', {order = 2, name = 'Nameplates', descr = 'Nameplates', isNew = true})
+    register('nameplates', {order = 2, name = L["ModuleNameplates"], descr = 'Nameplates', isNew = true})
 end
 
 function Module:RefreshOptionScreens()
@@ -483,7 +483,7 @@ function Module:OnEnable()
     self:RestyleAll(true)
 
     DF.ConfigModule:RegisterSettingsData('nameplates', 'misc',
-                                         {name = 'Nameplates', options = options, default = setDefaultValues})
+                                         {name = L["ModuleNameplates"], options = options, default = setDefaultValues})
 
     self:SecureHook(DF, 'RefreshConfig', function()
         Module:ApplySettings()

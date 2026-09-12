@@ -24,7 +24,7 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
-        version = '0.45.3',
+        version = '0.46.0',
         title = 'Chat Edit Mode, Castbar Ticks & Localization',
         date = '12 September 2026',
         intro = 'Fixed custom chat tab overlapping and selection issues in Edit Mode, restored channel ticks on MoP and TBC with target and focus support, added full localization coverage across German, Spanish, Russian and Simplified Chinese, and added an option to customize elite dragon coloring in Dark Mode.',

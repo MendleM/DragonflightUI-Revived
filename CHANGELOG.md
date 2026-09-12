@@ -2,12 +2,12 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.45.3`.
+May 2026). Current builds report version `0.46.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
 
-## 0.45.3 — Chat Edit Mode, Castbar Ticks & Localization (12 September 2026)
+## 0.46.0 — Chat Edit Mode, Castbar Ticks & Localization (12 September 2026)
 Fixed custom chat tab overlapping and selection issues in Edit Mode, restored channel ticks on MoP and TBC with target and focus support, added full localization coverage across German, Spanish, Russian and Simplified Chinese, and added an option to customize elite dragon coloring in Dark Mode.
 **Highlights** — User-created chat tabs no longer overlap with General in Edit Mode and are properly preserved when exiting · channel ticks (Arcane Missiles, Penance, Drain Soul, Evocation, Mind Flay, etc.) now reliably display on MoP and TBC Classic · Target and Focus castbars now support channel ticks · full localization coverage added for German (`deDE`), Spanish (`esES`), Russian (`ruRU`), and Simplified Chinese (`zhCN`) · Dark Mode option added to customize whether elite/rare portrait dragon textures are darkened or keep normal coloring
 ### Chat

@@ -85,6 +85,13 @@ do
     L["ProfilesErrorNewProfile"] = "ERROR: ¡El nombre del nuevo perfil no puede estar vacío!"
     L["ProfilesDialogueDeleteProfile"] = "¿Eliminar el perfil \'%s\'?"
     L["ProfilesDialogueCopyProfile"] = "Añadir nuevo perfil (copiar de \'|cff8080ff%s|r\')"
+    L["ProfilesTitle"] = "Perfiles"
+    L["ProfilesCurrentProfile"] = "Perfil actual"
+    L["ProfilesNewProfileTitle"] = "Nuevo perfil"
+    L["ProfilesCreateButton"] = "Crear"
+    L["ProfilesDeleteProfileTitle"] = "Eliminar perfil"
+    L["ProfilesProfileToDelete"] = "Perfil a eliminar"
+    L["ProfilesDeleteButton"] = "Eliminar"
     L["ProfilesImportShareHeader"] = "Importar/Compartir"
     L["ProfilesImportProfile"] = "Importar perfil"
     L["ProfilesImportProfileButton"] = HUD_EDIT_MODE_IMPORT_LAYOUT or "Importar"
@@ -92,7 +99,6 @@ do
     L["ProfilesExportProfile"] = "Compartir perfil"
     L["ProfilesExportProfileButton"] = HUD_EDIT_MODE_SHARE_LAYOUT or "Compartir"
     L["ProfilesExportProfileDesc"] = "Abre el diálogo de compartir."
-
 end
 
 -- Editmode

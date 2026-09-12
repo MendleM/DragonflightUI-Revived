@@ -145,7 +145,7 @@ function DragonFlightUIConfigMixin:SetupSettingsCategorys()
                           {name = L["ConfigMixinActionBar"], descr = 'descr..', order = 2, isExpanded = true}, nil, true)
     list:RegisterCategory('castbar', {name = L["ConfigMixinCastBar"], descr = 'descr..', order = 3, isExpanded = true},
                           alphaSortComparator, true)
-    list:RegisterCategory('flyout', {name = 'Flyout', descr = 'descr..', order = 3.5, isExpanded = true},
+    list:RegisterCategory('flyout', {name = L["ModuleFlyout"], descr = 'descr..', order = 3.5, isExpanded = true},
                           orderSortComparator, true)
     list:RegisterCategory('misc', {name = L["ConfigMixinMisc"], descr = 'descr..', order = 4, isExpanded = true},
                           alphaSortComparator, true)

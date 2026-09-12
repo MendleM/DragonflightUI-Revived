@@ -1,6 +1,7 @@
 local addonName, addonTable = ...;
 local Helper = addonTable.Helper;
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 local mName = 'Chat'
 local Module = DF:NewModule(mName, 'AceConsole-3.0', 'AceHook-3.0')
 
@@ -232,7 +233,7 @@ function Module:OnEnable()
     end
 
     Module:ApplySettings()
-    DF.ConfigModule:RegisterSettingsData('chat', 'misc', {name = 'Chat', options = options, default = setDefaultValues})
+    DF.ConfigModule:RegisterSettingsData('chat', 'misc', {name = L["ModuleChat"], options = options, default = setDefaultValues})
 
     self:SecureHook(DF, 'RefreshConfig', function()
         -- print('RefreshConfig', mName)
@@ -336,7 +337,7 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    register('chat', {order = 1, name = 'Chat', descr = 'Chatss', isNew = false})
+    register('chat', {order = 1, name = L["ModuleChat"], descr = 'Chatss', isNew = false})
 end
 
 function Module:RefreshOptionScreens()
