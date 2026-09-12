@@ -18,6 +18,7 @@ local defaults = {
             unitframeDesaturate = true,
             -- unitframeHealthDesaturate = true,
             unitframeColor = CreateColor(77 / 255, 77 / 255, 77 / 255):GenerateHexColorNoAlpha(),
+            unitframeDarkenPortraitExtra = false,
             -- Minimap
             minimapDesaturate = true,
             minimapColor = CreateColor(0.4, 0.4, 0.4):GenerateHexColorNoAlpha(),
@@ -105,6 +106,13 @@ local generalOptions = {
             desc = '' .. getDefaultStr('unitframeColor', 'general', '#'),
             group = 'headerUnitframes',
             order = 105
+        },
+        unitframeDarkenPortraitExtra = {
+            type = 'toggle',
+            name = L["DarkmodeDarkenPortraitExtra"],
+            desc = L["DarkmodeDarkenPortraitExtraDesc"] .. getDefaultStr('unitframeDarkenPortraitExtra', 'general'),
+            group = 'headerUnitframes',
+            order = 106
         },
         headerMinimap = {
             type = 'header',
@@ -290,12 +298,12 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    register('darkmode', {order = 0, name = 'Dark Mode', descr = 'Darkmodess', isNew = false})
+    register('darkmode', {order = 0, name = L["ModuleDarkmode"], descr = 'Darkmodess', isNew = false})
 end
 
 function Module:RegisterOptionScreens()
     DF.ConfigModule:RegisterSettingsData('darkmode', 'misc', {
-        name = 'Darkmode',
+        name = L["ModuleDarkmode"],
         sub = 'general',
         options = generalOptions,
         sortComparator = generalOptions.sortComparator,
@@ -544,7 +552,7 @@ function Module:UpdatePlayerFrame(state)
     playerFrameDeco:SetDesaturated(state.unitframeDesaturate)
     playerFrameDeco:SetVertexColor(c:GetRGB())
 
-    local extraColor = isEnabled and 0.6 or 1.0
+    local extraColor = (isEnabled and state.unitframeDarkenPortraitExtra) and 0.6 or 1.0
     playerFramePortaitExtra:SetVertexColor(extraColor, extraColor, extraColor)
 
     -- PlayerFrameHealthBar:GetStatusBarTexture():SetDesaturated(state.unitframeHealthDesaturate)
@@ -604,7 +612,7 @@ function Module:UpdateTargetFrame(state)
         TargetFrameToTBackground:SetVertexColor(c:GetRGB())
     end
 
-    local extraColor = isEnabled and 0.6 or 1.0
+    local extraColor = (isEnabled and state.unitframeDarkenPortraitExtra) and 0.6 or 1.0
     targetPortExtra:SetVertexColor(extraColor, extraColor, extraColor)
 
     -- editmode
@@ -683,7 +691,7 @@ function Module:UpdateFocusFrame(state)
         FocusFrameToTBackground:SetVertexColor(c:GetRGB())
     end
 
-    local extraColor = isEnabled and 0.6 or 1.0
+    local extraColor = (isEnabled and state.unitframeDarkenPortraitExtra) and 0.6 or 1.0
     if focusPortExtra then
         focusPortExtra:SetVertexColor(extraColor, extraColor, extraColor)
     end
@@ -700,7 +708,7 @@ function Module:UpdateBossFrame(state)
     local bossModule = DF:GetModule('Bossframe')
     local c = CreateColorFromRGBHexString(state.unitframeColor)
     local isEnabled = self:IsEnabled()
-    local extraColor = isEnabled and 0.6 or 1.0
+    local extraColor = (isEnabled and state.unitframeDarkenPortraitExtra) and 0.6 or 1.0
 
     -- Module['BossFrame' .. id]
     for i = 1, 4 do

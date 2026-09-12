@@ -2,6 +2,7 @@ local addonName, addonTable = ...;
 local Helper = addonTable.Helper; ---@class DragonflightUI
 ---@diagnostic disable-next-line: assign-type-mismatch
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 local mName = 'Utility'
 ---@diagnostic disable-next-line: undefined-field
 local Module = DF:NewModule(mName, 'AceConsole-3.0', 'AceHook-3.0')
@@ -114,12 +115,12 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    register('utility', {order = 0, name = 'Utility', descr = 'Utilityss', isNew = false})
+    register('utility', {order = 0, name = L["ModuleUtility"], descr = 'Utilityss', isNew = false})
 end
 
 function Module:RegisterOptionScreens()
     DF.ConfigModule:RegisterSettingsData('utility', 'misc', {
-        name = 'Utility',
+        name = L["ModuleUtility"],
         sub = 'first',
         options = utilityOptions,
         default = function()

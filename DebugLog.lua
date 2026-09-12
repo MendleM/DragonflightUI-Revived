@@ -86,8 +86,10 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 --                          whether its setting display info exists, which frame
 --                          the raid system resolves to, and per setting whether
 --                          that frame has it and what value it holds
+--     /df log castbar      dumps client flavor, ChannelTicks table, player/target/focus
+--                          castbar states and current channeling info into copy window
 --     /df log <tag>        only entries carrying that tag, e.g.
---                          /df log error, /df log taint
+--                          /df log error, /df log taint, /df log castbar
 --
 -- frame, regions and bars all take 'mouse' instead of a name, for whatever is
 -- under the cursor - handy when the frame's name is what you want to find out.
@@ -633,7 +635,7 @@ local WATCH_GROUPS = {
     }, {
         label = 'chat',
         frames = {'ChatFrame1', 'ChatFrame1Tab', 'ChatFrame1EditBox', 'GeneralDockManager',
-                  'DragonflightUIChatFrame'}
+                  'GENERAL_CHAT_DOCK', 'DragonflightUIChatFrame'}
     }, {label = 'micromenu', frames = {'MicroMenuContainer', 'MicroMenu', 'SocialsMicroButton', 'QuickJoinToastButton'}},
     -- Opening a UI panel runs the whole panel manager, and Classic's
     -- UIParentPanelManagerOverrides re-anchors these five by name on every run
@@ -2716,6 +2718,67 @@ function DF:LogRaidOptions(tag)
     end
 end
 
+function DF:LogCastbarState(tag)
+    tag = tag or 'castbar'
+    local iface = (GetBuildInfo and select(4, GetBuildInfo())) or '?'
+    DF:Log(tag, '=== Castbar State Diagnostic ===')
+    DF:Log(tag, 'Client: interface=%s Era=%s TBC=%s Wrath=%s Cata=%s MoP=%s',
+           tostring(iface), tostring(DF.Era), tostring(DF.TBC), tostring(DF.Wrath),
+           tostring(DF.Cata), tostring(DF.MoP))
+
+    local castbarMod = DF.GetModule and DF:GetModule('Castbar', true)
+    DF:Log(tag, 'Module: Castbar loaded=%s enabled=%s',
+           tostring(castbarMod ~= nil), tostring(castbarMod and castbarMod:IsEnabled()))
+
+    if castbarMod then
+        local ticks = castbarMod.ChannelTicks
+        local count = 0
+        if ticks then
+            for _ in pairs(ticks) do count = count + 1 end
+        end
+        DF:Log(tag, 'ChannelTicks table: present=%s total_entries=%d', tostring(ticks ~= nil), count)
+
+        local samples = {5143, 689, 10, 15407, 12051, 115175, 47540}
+        for _, id in ipairs(samples) do
+            local name = GetSpellInfo and GetSpellInfo(id)
+            local byId = ticks and ticks[id]
+            local byName = name and ticks and ticks[name]
+            if name or byId or byName then
+                DF:Log(tag, '   spell %d ("%s"): byId=%s byName=%s', id, tostring(name), tostring(byId), tostring(byName))
+            end
+        end
+
+        local pBar = castbarMod.PlayerCastbar
+        if pBar then
+            DF:Log(tag, 'PlayerCastbar: shown=%s visible=%s showTicks=%s width=%.1f height=%.1f ticksArray=%d',
+                   tostring(pBar:IsShown()), tostring(pBar:IsVisible()), tostring(pBar.showTicks),
+                   pBar:GetWidth() or -1, pBar:GetHeight() or -1, pBar.ticks and #pBar.ticks or 0)
+        else
+            DF:Log(tag, 'PlayerCastbar: nil')
+        end
+
+        local tBar = castbarMod.TargetCastbar
+        if tBar then
+            DF:Log(tag, 'TargetCastbar: shown=%s visible=%s showTicks=%s',
+                   tostring(tBar:IsShown()), tostring(tBar:IsVisible()), tostring(tBar.showTicks))
+        end
+
+        local fBar = castbarMod.FocusCastbar
+        if fBar then
+            DF:Log(tag, 'FocusCastbar: shown=%s visible=%s showTicks=%s',
+                   tostring(fBar:IsShown()), tostring(fBar:IsVisible()), tostring(fBar.showTicks))
+        end
+    end
+
+    local name, _, _, startTime, endTime, _, _, spellId = UnitChannelInfo and UnitChannelInfo('player')
+    if name then
+        DF:Log(tag, 'Live player channel: "%s" id=%s start=%s end=%s',
+               tostring(name), tostring(spellId), tostring(startTime), tostring(endTime))
+    else
+        DF:Log(tag, 'Live player channel: none currently active')
+    end
+end
+
 -- Returns true when the input was a log command and has been handled.
 function DF:HandleLogCommand(rest)
     rest = rest or ''
@@ -2835,6 +2898,9 @@ function DF:HandleLogCommand(rest)
         -- other than the player running it, and 80 lines of chat cannot be
         -- pasted anywhere useful.
         DF:LogCopy('party')
+    elseif sub == 'castbar' then
+        DF:LogCastbarState('castbar')
+        DF:LogCopy('castbar')
     else
         DF:LogDump(rest, 60)
     end

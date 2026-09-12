@@ -1,4 +1,5 @@
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 DragonflightUIStateHandlerMixin = {}
 
 -- Whether a restricted snippet is allowed to show or hide this frame.
@@ -398,15 +399,15 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
     }
 
     local function cond(str)
-        return 'macro condition: ' .. '|cff8080ff' .. str .. '|r'
+        return (L['StateHandlerMacroCondition'] or 'macro condition: ') .. '|cff8080ff' .. str .. '|r'
     end
 
     local extraOptions = {
-        headerVis = {type = 'header', name = 'Visibility', desc = '', order = 100, isExpanded = true, editmode = true},
+        headerVis = {type = 'header', name = L['StateHandlerHeaderVis'] or 'Visibility', desc = '', order = 100, isExpanded = true, editmode = true},
         alphaNormal = {
             type = 'range',
-            name = 'Alpha',
-            desc = 'Frame alpha while non-combat.' .. getDefaultStr('alphaNormal', sub),
+            name = L['StateHandlerAlphaNormal'] or 'Alpha',
+            desc = (L['StateHandlerAlphaNormalDesc'] or 'Frame alpha while non-combat.') .. getDefaultStr('alphaNormal', sub),
             min = 0.1,
             max = 1,
             bigStep = 0.01,
@@ -417,8 +418,8 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         alphaCombat = {
             type = 'range',
-            name = 'Alpha (In Combat)',
-            desc = 'Frame alpha while in combat.' .. getDefaultStr('alphaCombat', sub),
+            name = L['StateHandlerAlphaCombat'] or 'Alpha (In Combat)',
+            desc = (L['StateHandlerAlphaCombatDesc'] or 'Frame alpha while in combat.') .. getDefaultStr('alphaCombat', sub),
             min = 0.1,
             max = 1,
             bigStep = 0.01,
@@ -429,8 +430,8 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         showMouseover = {
             type = 'toggle',
-            name = 'Show On Mouseover',
-            desc = 'This (temporarily) overrides the hide conditions below when mouseover.' ..
+            name = L['StateHandlerShowMouseover'] or 'Show On Mouseover',
+            desc = (L['StateHandlerShowMouseoverDesc'] or 'This (temporarily) overrides the hide conditions below when mouseover.') ..
                 getDefaultStr('showMouseover', sub),
             order = 100.5,
             group = 'headerVis',
@@ -439,7 +440,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideAlways = {
             type = 'toggle',
-            name = 'Always Hide',
+            name = L['StateHandlerHideAlways'] or 'Always Hide',
             desc = '' .. cond('hide') .. getDefaultStr('hideAlways', sub),
             order = 101,
             group = 'headerVis',
@@ -448,7 +449,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideCombat = {
             type = 'toggle',
-            name = 'Hide In Combat',
+            name = L['StateHandlerHideCombat'] or 'Hide In Combat',
             desc = '' .. cond('[combat]hide; show') .. getDefaultStr('hideCombat', sub),
             order = 102,
             group = 'headerVis',
@@ -457,7 +458,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideOutOfCombat = {
             type = 'toggle',
-            name = 'Hide Out Of Combat',
+            name = L['StateHandlerHideOutOfCombat'] or 'Hide Out Of Combat',
             desc = '' .. cond('[nocombat]hide; show') .. getDefaultStr('hideOutOfCombat', sub),
             order = 103,
             group = 'headerVis',
@@ -466,7 +467,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideVehicle = {
             type = 'toggle',
-            name = 'Hide With VehicleUI',
+            name = L['StateHandlerHideVehicle'] or 'Hide With VehicleUI',
             desc = '' .. cond('[vehicleui]hide; show') .. getDefaultStr('hideVehicle', sub),
             order = 103.5,
             group = 'headerVis',
@@ -475,7 +476,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hidePet = {
             type = 'toggle',
-            name = 'Hide With Pet',
+            name = L['StateHandlerHidePet'] or 'Hide With Pet',
             desc = '' .. cond('[pet]hide; show') .. getDefaultStr('hidePet', sub),
             order = 104,
             group = 'headerVis',
@@ -484,7 +485,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideNoPet = {
             type = 'toggle',
-            name = 'Hide Without Pet',
+            name = L['StateHandlerHideNoPet'] or 'Hide Without Pet',
             desc = '' .. cond('[nopet]hide; show') .. getDefaultStr('hideNoPet', sub),
             order = 105,
             group = 'headerVis',
@@ -493,7 +494,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideStance = {
             type = 'toggle',
-            name = 'Hide Without Stance/Form',
+            name = L['StateHandlerHideStance'] or 'Hide Without Stance/Form',
             desc = '' .. cond('[stance:X]hide; show') .. ' (X=1..6)' .. getDefaultStr('hideStance', sub),
             order = 106,
             group = 'headerVis',
@@ -502,7 +503,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideStealth = {
             type = 'toggle',
-            name = 'Hide In Stealth',
+            name = L['StateHandlerHideStealth'] or 'Hide In Stealth',
             desc = '' .. cond('[stealth]hide; show') .. getDefaultStr('hideStealth', sub),
             order = 107,
             group = 'headerVis',
@@ -511,7 +512,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideNoStealth = {
             type = 'toggle',
-            name = 'Hide Outside Stealth',
+            name = L['StateHandlerHideNoStealth'] or 'Hide Outside Stealth',
             desc = '' .. cond('[nostealth]hide; show') .. getDefaultStr('hideNoStealth', sub),
             order = 108,
             group = 'headerVis',
@@ -520,7 +521,7 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideBattlePet = {
             type = 'toggle',
-            name = 'Hide In Pet Battle',
+            name = L['StateHandlerHideBattlePet'] or 'Hide In Pet Battle',
             desc = '' .. cond('[petbattle]hide; show') .. getDefaultStr('hideBattlePet', sub),
             order = 108.5,
             group = 'headerVis',
@@ -529,8 +530,8 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideCustom = {
             type = 'toggle',
-            name = 'Use Custom Condition',
-            desc = 'Same syntax as macro conditionals\n|cFFFF0000Note: This will disable all of the above settings!|r' ..
+            name = L['StateHandlerHideCustom'] or 'Use Custom Condition',
+            desc = (L['StateHandlerHideCustomDesc'] or 'Same syntax as macro conditionals\n|cFFFF0000Note: This will disable all of the above settings!|r') ..
                 getDefaultStr('hideCustom', sub),
             order = 109,
             group = 'headerVis',
@@ -539,10 +540,10 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
         },
         hideCustomCond = {
             type = 'editbox',
-            name = 'Set Custom Condition',
-            desc = "Uses macro conditional syntax, but instead of the spell name the |cff8080ff'return'|r should be |cff8080ffshow|r to show the frame, or |cff8080ffhide|r to hide it." ..
+            name = L['StateHandlerHideCustomCond'] or 'Set Custom Condition',
+            desc = L['StateHandlerHideCustomCondDesc'] or ("Uses macro conditional syntax, but instead of the spell name the |cff8080ff'return'|r should be |cff8080ffshow|r to show the frame, or |cff8080ffhide|r to hide it." ..
                 '\n\nExample: \n|cff8080ff[combat]show;[@target,exists]show;hide|r ' ..
-                '\n(This shows the frame in combat, or if you have a target)',
+                '\n(This shows the frame in combat, or if you have a target)'),
             Validate = Validate,
             order = 109.5,
             group = 'headerVis',

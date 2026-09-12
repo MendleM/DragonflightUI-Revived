@@ -28,20 +28,20 @@ DF.Settings.DropdownTopBottomAnchorTable = {
 }
 
 DF.Settings.OrientationTable = {
-    {value = 'horizontal', text = 'Horizontal', tooltip = 'descr', label = 'label'},
-    {value = 'vertical', text = 'Vertical', tooltip = 'descr', label = 'label'}
+    {value = 'horizontal', text = L['DropdownHorizontal'] or 'Horizontal', tooltip = 'descr', label = 'label'},
+    {value = 'vertical', text = L['DropdownVertical'] or 'Vertical', tooltip = 'descr', label = 'label'}
 }
 
 DF.Settings.FlyoutDirectionTable = {
-    {value = 'UP', text = 'Up', tooltip = 'descr', label = 'label'},
-    {value = 'RIGHT', text = 'Right', tooltip = 'descr', label = 'label'},
-    {value = 'DOWN', text = 'Down', tooltip = 'descr', label = 'label'},
-    {value = 'LEFT', text = 'Left', tooltip = 'descr', label = 'label'}
+    {value = 'UP', text = L['DropdownUp'] or 'Up', tooltip = 'descr', label = 'label'},
+    {value = 'RIGHT', text = L['DropdownRight'] or 'Right', tooltip = 'descr', label = 'label'},
+    {value = 'DOWN', text = L['DropdownDown'] or 'Down', tooltip = 'descr', label = 'label'},
+    {value = 'LEFT', text = L['DropdownLeft'] or 'Left', tooltip = 'descr', label = 'label'}
 }
 
 DF.Settings.GrowthDirectionTable = {
-    {value = 'up', text = 'Up', tooltip = 'descr', label = 'label'},
-    {value = 'down', text = 'Down', tooltip = 'descr', label = 'label'}
+    {value = 'up', text = L['DropdownUp'] or 'Up', tooltip = 'descr', label = 'label'},
+    {value = 'down', text = L['DropdownDown'] or 'Down', tooltip = 'descr', label = 'label'}
 }
 
 DF.Settings.ModifierTable = {

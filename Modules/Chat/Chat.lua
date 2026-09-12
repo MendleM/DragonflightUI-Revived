@@ -1,6 +1,7 @@
 local addonName, addonTable = ...;
 local Helper = addonTable.Helper;
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 local mName = 'Chat'
 local Module = DF:NewModule(mName, 'AceConsole-3.0', 'AceHook-3.0')
 
@@ -232,7 +233,7 @@ function Module:OnEnable()
     end
 
     Module:ApplySettings()
-    DF.ConfigModule:RegisterSettingsData('chat', 'misc', {name = 'Chat', options = options, default = setDefaultValues})
+    DF.ConfigModule:RegisterSettingsData('chat', 'misc', {name = L["ModuleChat"], options = options, default = setDefaultValues})
 
     self:SecureHook(DF, 'RefreshConfig', function()
         -- print('RefreshConfig', mName)
@@ -265,9 +266,67 @@ function Module:OnEnable()
             Module.SetDockClamping(chatFrame, false)
         end)
     end
+
+    -- Switching tabs during Edit Mode must not hide ChatFrame1 (which anchors
+    -- the DFUI EditMode selection overlay) nor leave the clicked tab visible
+    -- alongside it (which causes text overlapping).
+    if FCF_SelectDockFrame then
+        self:SecureHook('FCF_SelectDockFrame', function(chatFrame)
+            local EditModeModule = DF:GetModule('Editmode')
+            if EditModeModule and EditModeModule.IsEditMode then
+                if chatFrame and chatFrame.isDocked then
+                    Module.previousSelectedDockFrame = chatFrame
+                    if ChatFrame1 and not ChatFrame1:IsShown() then
+                        ChatFrame1:Show()
+                    end
+                    if chatFrame ~= ChatFrame1 and chatFrame:IsShown() then
+                        chatFrame:Hide()
+                    end
+                end
+            end
+        end)
+    end
+
+    local EditModeModule = DF:GetModule('Editmode')
+    if EditModeModule then
+        EditModeModule:RegisterCallback('OnEditMode', function(_, isEditMode)
+            local dock = GENERAL_CHAT_DOCK
+            if isEditMode then
+                if dock then
+                    local selected = FCFDock_GetSelectedWindow and FCFDock_GetSelectedWindow(dock) or dock.selected
+                    if selected and selected ~= ChatFrame1 and selected.isDocked then
+                        Module.previousSelectedDockFrame = selected
+                    else
+                        Module.previousSelectedDockFrame = nil
+                    end
+                end
+                Module:ApplySettings()
+            else
+                local restoreFrame = Module.previousSelectedDockFrame
+                Module.previousSelectedDockFrame = nil
+                if restoreFrame and restoreFrame.isDocked then
+                    if FCF_SelectDockFrame then
+                        FCF_SelectDockFrame(restoreFrame)
+                    elseif FCFDock_SelectWindow and dock then
+                        FCFDock_SelectWindow(dock, restoreFrame)
+                    end
+                end
+                Module:ApplySettings()
+            end
+        end)
+    end
 end
 
 function Module:OnDisable()
+    local restoreFrame = Module.previousSelectedDockFrame
+    Module.previousSelectedDockFrame = nil
+    if restoreFrame and restoreFrame.isDocked then
+        if FCF_SelectDockFrame then
+            FCF_SelectDockFrame(restoreFrame)
+        elseif FCFDock_SelectWindow and GENERAL_CHAT_DOCK then
+            FCFDock_SelectWindow(GENERAL_CHAT_DOCK, restoreFrame)
+        end
+    end
 end
 
 function Module:RegisterSettings()
@@ -278,7 +337,7 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    register('chat', {order = 1, name = 'Chat', descr = 'Chatss', isNew = false})
+    register('chat', {order = 1, name = L["ModuleChat"], descr = 'Chatss', isNew = false})
 end
 
 function Module:RefreshOptionScreens()
@@ -325,7 +384,24 @@ function Module:ApplySettingsInternal(sub, key)
     ChatFrame1:SetPoint(db.anchor, parent, db.anchorParent, db.x, db.y)
     ChatFrame1:SetSize(db.sizeX, db.sizeY)
     ChatFrame1:SetUserPlaced(true)
-    ChatFrame1:Show()
+
+    local dock = GENERAL_CHAT_DOCK
+    local EditModeModule = DF:GetModule('Editmode')
+    local isEditMode = EditModeModule and EditModeModule.IsEditMode
+
+    if isEditMode then
+        ChatFrame1:Show()
+    elseif dock and ChatFrame1.isDocked then
+        local selected = FCFDock_GetSelectedWindow and FCFDock_GetSelectedWindow(dock) or dock.selected
+        if selected and selected ~= ChatFrame1 then
+            ChatFrame1:Hide()
+            if not selected:IsShown() then selected:Show() end
+        else
+            ChatFrame1:Show()
+        end
+    else
+        ChatFrame1:Show()
+    end
 
     Module.FixDockedFrames()
 
@@ -408,9 +484,29 @@ function Module.FixDockedFrames()
     local dock = GENERAL_CHAT_DOCK
     if not (dock and dock.primary and FCFDock_GetChatFrames) then return end
 
+    local EditModeModule = DF:GetModule('Editmode')
+    local isEditMode = EditModeModule and EditModeModule.IsEditMode
+    local selected = FCFDock_GetSelectedWindow and FCFDock_GetSelectedWindow(dock) or dock.selected
+
     for _, chatFrame in ipairs(FCFDock_GetChatFrames(dock)) do
         chatFrame.ignoreFramePositionManager = true
         Module.SetDockClamping(chatFrame, chatFrame ~= dock.primary)
+
+        if isEditMode then
+            if chatFrame ~= ChatFrame1 and chatFrame.isDocked and chatFrame:IsShown() then
+                chatFrame:Hide()
+            end
+        elseif selected then
+            if chatFrame == selected then
+                if not chatFrame:IsShown() then chatFrame:Show() end
+            elseif chatFrame.isDocked and chatFrame:IsShown() then
+                chatFrame:Hide()
+            end
+        end
+    end
+
+    if isEditMode and not ChatFrame1:IsShown() then
+        ChatFrame1:Show()
     end
 
     -- Anything that left the dock without passing through the

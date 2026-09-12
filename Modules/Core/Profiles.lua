@@ -113,19 +113,19 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    register('profiles', {order = 3, name = 'Profiles', descr = 'Profiless', isNew = false})
+    register('profiles', {order = 3, name = L["ProfilesTitle"], descr = 'Profiless', isNew = false})
 end
 
 function Module:RegisterOptionScreens()
     local options = {
-        name = 'Profiles',
+        name = L["ProfilesTitle"],
         get = getOption,
         set = setOption,
         args = {
-            headerCurrentProfile = {type = 'header', name = 'Current Profile', isExpanded = true, order = 1},
+            headerCurrentProfile = {type = 'header', name = L["ProfilesCurrentProfile"], isExpanded = true, order = 1},
             currentProfile = {
                 type = 'select',
-                name = 'Current Profile',
+                name = L["ProfilesCurrentProfile"],
                 desc = L["ProfilesSetActiveProfile"],
                 dropdownValuesFunc = Module:GeneratorCurrentProfilesWithDefaults(true, function(name)
                     -- print('IsSelected', name)
@@ -141,8 +141,8 @@ function Module:RegisterOptionScreens()
             -- headerNewProfile = {type = 'header', name = 'New Profile', order = 20},
             createNewProfile = {
                 type = 'execute',
-                name = 'New Profile',
-                btnName = 'Create',
+                name = L["ProfilesNewProfileTitle"],
+                btnName = L["ProfilesCreateButton"],
                 desc = L["ProfilesNewProfile"],
                 func = function()
                     -- print('func! *NewProfile*')
@@ -176,10 +176,10 @@ function Module:RegisterOptionScreens()
             --     end,
             --     order = 32
             -- },
-            headerDelete = {type = 'header', name = 'Delete Profile', isExpanded = true, order = 40},
+            headerDelete = {type = 'header', name = L["ProfilesDeleteProfileTitle"], isExpanded = true, order = 40},
             toDelete = {
                 type = 'select',
-                name = 'Profile To Delete',
+                name = L["ProfilesProfileToDelete"],
                 desc = L["ProfilesDeleteProfile"],
                 dropdownValuesFunc = Module:GeneratorCurrentProfilesWithDefaults(false, function(name)
                     return getOption({'toDelete'}) == name;
@@ -191,8 +191,8 @@ function Module:RegisterOptionScreens()
             },
             deleteProfile = {
                 type = 'execute',
-                name = 'Delete Profile',
-                btnName = 'Delete',
+                name = L["ProfilesDeleteProfileTitle"],
+                btnName = L["ProfilesDeleteButton"],
                 desc = L["ProfilesOpenDeleteDialogue"],
                 func = function()
                     -- print('func! *DeleteProfile*')
@@ -230,7 +230,7 @@ function Module:RegisterOptionScreens()
         }
     }
 
-    local config = {name = 'Profiles', options = options}
+    local config = {name = L["ProfilesTitle"], options = options}
     DF.ConfigModule:RegisterSettingsData('profiles', 'general', config)
 end
 

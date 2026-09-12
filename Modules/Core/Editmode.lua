@@ -109,14 +109,14 @@ local generalOptions = {
     args = {
         showGrid = {
             type = 'toggle',
-            name = 'Show Grid',
+            name = HUD_EDIT_MODE_SHOW_GRID or L['EditModeShowGrid'] or 'Show Grid',
             desc = '' .. getDefaultStr('showGrid', 'general'),
             order = 100.5,
             small = true
         },
         gridSize = {
             type = 'range',
-            name = 'Grid Size',
+            name = HUD_EDIT_MODE_GRID_SIZE or L['EditModeGridSize'] or 'Grid Size',
             desc = '' .. getDefaultStr('gridSize', 'general'),
             min = 8,
             max = 128,
@@ -126,7 +126,7 @@ local generalOptions = {
         },
         snapGrid = {
             type = 'toggle',
-            name = 'Snap to Grid',
+            name = HUD_EDIT_MODE_SNAP_TO_GRID or L['EditModeSnapToGrid'] or 'Snap to Grid',
             desc = '' .. getDefaultStr('snapGrid', 'general'),
             order = 102,
             small = true
@@ -153,7 +153,7 @@ if true then
         args = {
             headerActionbar = {
                 type = 'header',
-                name = 'Actionbar',
+                name = L['ConfigMixinActionBar'] or 'Actionbar',
                 desc = '...',
                 order = 100,
                 sortComparator = DFSettingsListMixin.AlphaSortComparator,
@@ -162,7 +162,7 @@ if true then
             },
             headerCombat = {
                 type = 'header',
-                name = 'Combat',
+                name = COMBAT or 'Combat',
                 desc = '...',
                 order = 200,
                 sortComparator = DFSettingsListMixin.AlphaSortComparator,
@@ -171,7 +171,7 @@ if true then
             },
             headerFrames = {
                 type = 'header',
-                name = 'Frames',
+                name = L['ConfigMixinUnitframes'] or 'Frames',
                 desc = '...',
                 order = 300,
                 sortComparator = DFSettingsListMixin.AlphaSortComparator,
@@ -180,7 +180,7 @@ if true then
             },
             headerMisc = {
                 type = 'header',
-                name = 'Misc',
+                name = L['ConfigMixinMisc'] or 'Misc',
                 desc = '...',
                 order = 400,
                 sortComparator = DFSettingsListMixin.AlphaSortComparator,

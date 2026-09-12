@@ -321,7 +321,7 @@ function Module:ApplySettingsInternal(sub, key)
 
     if modules['Darkmode'] then
         Helper:Benchmark(string.format(strFormat, 'Darkmode'), function()
-            DF:EnableModule('Darkmode')
+            DF:EnableModule('Darkmode', true)
             local darkmod = DF:GetModule('Darkmode', true)
             if darkmod then darkmod:ApplySettings() end
         end)

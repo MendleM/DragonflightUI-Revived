@@ -1,5 +1,4 @@
--- print('esES, esMX')
--- Spanish Translations by Woopy
+-- Spanish Translations (originally by Woopy; new/updated entries AI-generated. Community review welcome.)
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L = {}
 
@@ -86,6 +85,13 @@ do
     L["ProfilesErrorNewProfile"] = "ERROR: ¡El nombre del nuevo perfil no puede estar vacío!"
     L["ProfilesDialogueDeleteProfile"] = "¿Eliminar el perfil \'%s\'?"
     L["ProfilesDialogueCopyProfile"] = "Añadir nuevo perfil (copiar de \'|cff8080ff%s|r\')"
+    L["ProfilesTitle"] = "Perfiles"
+    L["ProfilesCurrentProfile"] = "Perfil actual"
+    L["ProfilesNewProfileTitle"] = "Nuevo perfil"
+    L["ProfilesCreateButton"] = "Crear"
+    L["ProfilesDeleteProfileTitle"] = "Eliminar perfil"
+    L["ProfilesProfileToDelete"] = "Perfil a eliminar"
+    L["ProfilesDeleteButton"] = "Eliminar"
     L["ProfilesImportShareHeader"] = "Importar/Compartir"
     L["ProfilesImportProfile"] = "Importar perfil"
     L["ProfilesImportProfileButton"] = HUD_EDIT_MODE_IMPORT_LAYOUT or "Importar"
@@ -93,7 +99,6 @@ do
     L["ProfilesExportProfile"] = "Compartir perfil"
     L["ProfilesExportProfileButton"] = HUD_EDIT_MODE_SHARE_LAYOUT or "Compartir"
     L["ProfilesExportProfileDesc"] = "Abre el diálogo de compartir."
-
 end
 
 -- Editmode
@@ -154,6 +159,7 @@ end
 
 -- __Settings
 do
+    L["Defaults"] = "Predeterminados"
     L["SettingsDefaultStringFormat"] = "\n(Predeterminado: |cff8080ff%s|r)"
     L["SettingsCharacterSpecific"] = "\n\n|cff8080ff[Configuración por personaje]|r"
 
@@ -181,6 +187,8 @@ end
 do
     L["DarkmodeColor"] = "Color"
     L["DarkmodeDesaturate"] = "Desaturar"
+    L["DarkmodeDarkenPortraitExtra"] = "Oscurecer símbolo élite"
+    L["DarkmodeDarkenPortraitExtraDesc"] = "Oscurece los bordes de dragón élite, raro y jefe alrededor de los marcos de unidad en el modo oscuro."
 end
 
 -- actionbar
@@ -858,6 +866,226 @@ do
 
     -- for k, v in pairs(KEY_REPLACEMENTS) do L[k] = v; end
     -- DF.KEY_REPLACEMENTS = KEY_REPLACEMENTS;
+end
+
+
+-- Missing options, StateHandler, EditMode, Buffs & New Features
+do
+    L["ActionbarRangeName"] = "Rango de barra de acción"
+    L["ActionbarRangeNameDesc"] = ""
+    L["ActionbarRangeHeader"] = "Ajustes de rango"
+    L["ActionbarRangeHeaderDesc"] = ""
+    L["ActionbarRangeHeaderHotkey"] = "Atajo de teclado"
+    L["ActionbarRangeHeaderHotkeyDesc"] = ""
+    L["ActionbarRangeHotkeyColor"] = "Normal"
+    L["ActionbarRangeHotkeyColorDesc"] = "Color normal del texto del atajo."
+    L["ActionbarRangeHotkeyOutOfRangeColor"] = "Fuera de rango"
+    L["ActionbarRangeHotkeyOutOfRangeColorDesc"] = "Color del texto del atajo cuando está fuera de rango."
+    L["ActionbarRangeHeaderNotUsable"] = "No utilizable"
+    L["ActionbarRangeHeaderNotUsableDesc"] = ""
+    L["ActionbarRangeHeaderOutOfMana"] = "Sin maná"
+    L["ActionbarRangeHeaderOutOfManaDesc"] = ""
+    L["ActionbarRangeHeaderOutOfRange"] = "Fuera de rango"
+    L["ActionbarRangeHeaderOutOfRangeDesc"] = ""
+
+    L["BossFrameName"] = "Marcos de jefe"
+    L["BossFrameNameDesc"] = "Opciones para marcos de jefe"
+
+    L["CastbarNameFocus"] = "Foco"
+    L["CastbarNamePlayer"] = "Jugador"
+    L["CastbarNameTarget"] = "Objetivo"
+    L["CastbarTableAutoAdjustHeader"] = "Ajuste automático"
+    L["CastbarTableAutoAdjustHeaderDesc"] = "Ajusta la posición automáticamente con respecto a auras o barras."
+    L["CastbarTableAutoAdjustX"] = "Desplazamiento X automático"
+    L["CastbarTableAutoAdjustXDesc"] = ""
+    L["CastbarTableAutoAdjustY"] = "Desplazamiento Y automático"
+    L["CastbarTableAutoAdjustYDesc"] = ""
+    L["CastbarTableAutoAdjust"] = "Ajustar automáticamente"
+    L["CastbarTableAutoAdjustDesc"] = "Mueve la barra de lanzamiento automáticamente."
+
+    L["CharacterStatsArp"] = "Penetración de armadura"
+    L["CharacterStatsArpTooltipFormat"] = "Penetración de armadura: %s"
+    L["CharacterStatsHitMeleeTooltipFormat"] = "Índice de golpe cuerpo a cuerpo: %s"
+    L["CharacterStatsHitSpellTooltipFormat"] = "Índice de golpe con hechizos: %s"
+    L["CharacterStatsSpellPen"] = "Penetración de hechizos"
+    L["CharacterStatsSpellPenTooltipFormat"] = "Penetración de hechizos: %s"
+
+    L["CompatBisTracker"] = "BISTracker"
+    L["CompatBisTrackerDesc"] = "Añade compatibilidad con BISTracker en el marco de personaje."
+    L["CompatPawn"] = "Pawn"
+    L["CompatPawnDesc"] = "Añade soporte para estadísticas de Pawn."
+    L["DebuffsOptionsName"] = "Perjuicios"
+
+    L["EditModeVisible"] = "Visibilidad en modo edición"
+    L["EditModeVisibleDescFormat"] = "Establece la visibilidad en modo edición para este marco."
+
+    L["FocusFrameName"] = "Marco de foco"
+    L["FocusFrameToTName"] = "Objetivo del foco"
+
+    L["GroupLootContainerName"] = "Contenedor de botín de grupo"
+    L["GroupLootContainerDesc"] = "Opciones para las tiradas de botín en grupo."
+
+    L["MinimapDurabilityName"] = "Durabilidad"
+    L["MinimapHideClock"] = "Ocultar reloj"
+    L["MinimapHideClockDesc"] = "Oculta el reloj en el minimapa."
+    L["MinimapHideHeader"] = "Ocultar"
+    L["MinimapHideHeaderDesc"] = ""
+    L["MinimapHideZoneText"] = "Ocultar texto de zona"
+    L["MinimapHideZoneTextDesc"] = "Oculta el nombre de la zona sobre el minimapa."
+    L["MinimapLFGName"] = "Buscador de grupo"
+    L["MinimapRotateDescAdditional"] = ""
+    L["MinimapShape"] = "Forma"
+    L["MinimapShapeDesc"] = "Forma del minimapa (Redondo o Cuadrado)."
+    L["MinimapTrackerName"] = "Seguimiento de objetivos"
+
+    L["ModuleAlreadyLoadedWasDeactivated"] = "El módulo ya estaba cargado y fue desactivado: %s"
+    L["ModuleAlreadyLoadedWasDeactivatedMultiple"] = "Los módulos ya estaban cargados y fueron desactivados:\n%s"
+
+    L["MoreOptionsHideBorder"] = "Ocultar borde"
+    L["MoreOptionsHideBorderDesc"] = "Oculta el borde de los botones de acción."
+    L["MoreOptionsHideDivider"] = "Ocultar divisor"
+    L["MoreOptionsHideDividerDesc"] = "Oculta las líneas divisorias entre botones."
+    L["MoreOptionsUseKeyDown"] = ACTION_BUTTON_USE_KEY_DOWN or "Activar al presionar tecla"
+    L["MoreOptionsUseKeyDownDesc"] = OPTION_TOOLTIP_ACTION_BUTTON_USE_KEY_DOWN or "Activa habilidades al presionar la tecla en lugar de soltarla."
+
+    L["PartyFrameDisableBuffTooltip"] = "Desactivar tooltip de auras"
+    L["PartyFrameDisableBuffTooltipDesc"] = "Desactiva los tooltips en los beneficios de grupo."
+    L["PartyFrameName"] = "Marco de grupo"
+
+    L["PetFrameHideDebuffs"] = "Ocultar perjuicios"
+    L["PetFrameHideDebuffsDesc"] = "Oculta los perjuicios en la mascota."
+    L["PetFrameName"] = "Marco de mascota"
+    L["PlayerFrameName"] = "Marco del jugador"
+    L["ProfessionExpansionFormat"] = "Expansión: %s"
+    L["RaidFrameName"] = "Marco de banda"
+
+    L["TargetFrameAuraOffsetY"] = "Desplazamiento Y de auras"
+    L["TargetFrameAuraOffsetYDesc"] = "Espacio vertical entre filas de auras."
+    L["TargetFrameAuraRowWidth"] = "Ancho de fila de auras"
+    L["TargetFrameAuraRowWidthDesc"] = "Ancho máximo de la fila de auras."
+    L["TargetFrameAuraRowWidthToT"] = "Ancho de fila de auras (OdO)"
+    L["TargetFrameAuraRowWidthToTDesc"] = "Ancho reducido para dejar espacio al objetivo del objetivo."
+    L["TargetFrameHeaderBuffsAdvanced"] = "Auras (Avanzado)"
+    L["TargetFrameName"] = "Marco del objetivo"
+    L["TargetFrameReactionColor"] = "Color de reacción"
+    L["TargetFrameReactionColorDesc"] = "Colorea la barra según la actitud (Amigo/Enemigo)."
+    L["TargetFrameToTAuraRows"] = "Filas de auras OdO"
+    L["TargetFrameToTAuraRowsDesc"] = "Número de filas de auras con ancho reducido."
+    L["TargetOfTargetFrameDesc"] = "Opciones para objetivo del objetivo"
+    L["TargetOfTargetFrameName"] = "Objetivo del objetivo"
+
+    L["TooltipAnchorName"] = "Anclaje del tooltip"
+    L["TooltipDefaultAnchorWhileCombat"] = "Posición predeterminada en combate"
+    L["TooltipDefaultAnchorWhileCombatDesc"] = "Usa la posición fija en lugar del cursor en combate."
+    L["UIName"] = "Interfaz de usuario"
+    L["VehicleLeaveButton"] = "Salir del vehículo"
+    L["VehicleLeaveButtonDesc"] = "Botón para salir de vehículos."
+    L["WidgetBelowName"] = "Widget debajo del minimapa"
+    L["WidgetBelowNameDesc"] = "Posición del widget debajo del minimapa."
+
+    L["BuffsAura"] = "Aura"
+    L["BuffsHeaderAura"] = "Encabezado de auras"
+    L["BuffsHeaderAuraDesc"] = ""
+    L["BuffsPaddingX"] = "Espaciado X"
+    L["BuffsPaddingXDesc"] = "Espaciado X entre auras."
+    L["BuffsPaddingY"] = "Espaciado Y"
+    L["BuffsPaddingYDesc"] = "Espaciado Y entre filas de auras."
+    L["BuffsWrapAfter"] = "Ajustar tras"
+    L["BuffsWrapAfterDesc"] = "Comienza una nueva fila tras esta cantidad de auras.\nSi es 0, no se ajusta."
+    L["BuffsMaxWraps"] = "Máx. filas"
+    L["BuffsMaxWrapsDesc"] = "Limita el número de filas.\nSi es 0, sin límite."
+    L["BuffsSeperateOwn"] = "Separar auras propias"
+    L["BuffsSeperateOwnDesc"] = "Indica si los beneficios propios deben colocarse antes (1) o después (-1).\nSi es (0), no se separan."
+    L["BuffsSortMethod"] = "Método de ordenación"
+    L["BuffsSortMethodDesc"] = "Define cómo se ordena el grupo."
+    L["BuffsSortDirection"] = "Dirección de ordenación"
+    L["BuffsSortDirectionDesc"] = "Define el orden de clasificación."
+    L["BuffsPoint"] = "Punto de anclaje"
+    L["BuffsPointDesc"] = ""
+    L["BuffsOrientation"] = "Orientación"
+    L["BuffsOrientationDesc"] = ""
+    L["BuffsGrowthDirection"] = "Dirección de crecimiento"
+    L["BuffsGrowthDirectionDesc"] = ""
+    L["BuffsHeaderStylingAura"] = "Estilo de auras"
+    L["BuffsHeaderStylingAuraDesc"] = ""
+    L["BuffsHideDurationText"] = "Ocultar texto de duración"
+    L["BuffsHideDurationTextDesc"] = ""
+    L["BuffsHideCooldownSwipe"] = "Ocultar animación de reutilización"
+    L["BuffsHideCooldownSwipeDesc"] = ""
+    L["BuffsHideCooldownDurationText"] = "Ocultar texto de reutilización"
+    L["BuffsHideCooldownDurationTextDesc"] = ""
+
+    L["CompatGearscore"] = "GearScore"
+    L["CompatGearscoreDesc"] = "Añade compatibilidad con GearScore/Tacotip en el marco de personaje."
+    L["CompatQuestie"] = "Questie"
+    L["CompatQuestieDesc"] = "Añade soporte para Questie en el minimapa."
+
+    L["EditModeGridSize"] = "Tamaño de cuadrícula"
+    L["EditModeHeaderTitle"] = "Modo edición de HUD"
+    L["EditModeRevertAllChanges"] = "Revertir todos los cambios"
+    L["EditModeSave"] = "Guardar"
+    L["EditModeShowGrid"] = "Mostrar cuadrícula"
+    L["EditModeSnapToGrid"] = "Ajustar a cuadrícula"
+
+    L["FlyoutInventoryCount"] = "Mostrar cantidad de objetos"
+    L["FlyoutInventoryCountDesc"] = "Muestra la cantidad restante de reactivos en el botón."
+
+    L["ModuleGroupLoot"] = "Botín de grupo"
+    L["ModuleNameplates"] = "Placas de nombre"
+    L["ModuleTooltipGroupLoot"] = "Muestra tiradas de botín en una barra moderna."
+    L["ModuleTooltipNameplates"] = "Habilita placas de nombre modernas."
+
+    L["MoreOptionsBorderFill"] = "Relleno del borde"
+    L["MoreOptionsBorderFillDesc"] = "Relleno oscuro dentro del borde del botón de acción."
+
+    L["Open"] = "Abrir"
+    L["PlayerFrameGradientColor"] = "Color en degradado"
+    L["PlayerFrameGradientColorDesc"] = "Usa un degradado suave en la barra de salud."
+    L["PositionTableStandalone"] = "Independiente"
+    L["PositionTableStandaloneDesc"] = "Hace que el marco se pueda mover independientemente."
+    L["RaidFrameSettings"] = "Ajustes de marco de banda"
+
+    L["StateHandlerAlphaCombat"] = "Transparencia (en combate)"
+    L["StateHandlerAlphaCombatDesc"] = "Transparencia del marco durante el combate."
+    L["StateHandlerAlphaNormal"] = "Transparencia"
+    L["StateHandlerAlphaNormalDesc"] = "Transparencia del marco fuera de combate."
+    L["StateHandlerHeaderVis"] = "Visibilidad"
+    L["StateHandlerHideAlways"] = "Ocultar siempre"
+    L["StateHandlerHideBattlePet"] = "Ocultar en duelo de mascotas"
+    L["StateHandlerHideCombat"] = "Ocultar en combate"
+    L["StateHandlerHideCustom"] = "Usar condición personalizada"
+    L["StateHandlerHideCustomCond"] = "Definir condición personalizada"
+    L["StateHandlerHideCustomCondDesc"] = "Usa sintaxis condicional de macros que devuelvan 'show' o 'hide'."
+    L["StateHandlerHideCustomDesc"] = "Usa condiciones de macros.\n|cFFFF0000Nota: ¡Esto desactivará los ajustes superiores!|r"
+    L["StateHandlerHideNoPet"] = "Ocultar sin mascota"
+    L["StateHandlerHideNoStealth"] = "Ocultar fuera de sigilo"
+    L["StateHandlerHideOutOfCombat"] = "Ocultar fuera de combate"
+    L["StateHandlerHidePet"] = "Ocultar con mascota"
+    L["StateHandlerHideStance"] = "Ocultar sin postura/forma"
+    L["StateHandlerHideStealth"] = "Ocultar en sigilo"
+    L["StateHandlerHideVehicle"] = "Ocultar con interfaz de vehículo"
+    L["StateHandlerMacroCondition"] = "Condición de macro: "
+    L["StateHandlerShowMouseover"] = "Mostrar al pasar el ratón"
+    L["StateHandlerShowMouseoverDesc"] = "Invalida temporalmente las condiciones de ocultación al pasar el ratón."
+
+    L["WhatsNewOpen"] = "Novedades"
+    L["WhatsNewOpenButton"] = "Abrir"
+    L["WhatsNewOpenDesc"] = "Abre la ventana con las notas de la versión."
+
+    L["DropdownBefore"] = "Antes"
+    L["DropdownAfter"] = "Después"
+    L["DropdownNoSeperation"] = "Sin separación"
+    L["DropdownSortIndex"] = "Índice"
+    L["DropdownSortName"] = "Nombre"
+    L["DropdownSortTime"] = "Tiempo"
+    L["DropdownLeftToRight"] = "De izquierda a derecha"
+    L["DropdownRightToLeft"] = "De derecha a izquierda"
+    L["DropdownHorizontal"] = "Horizontal"
+    L["DropdownVertical"] = "Vertical"
+    L["DropdownUp"] = "Arriba"
+    L["DropdownDown"] = "Abajo"
+    L["DropdownLeft"] = "Izquierda"
+    L["DropdownRight"] = "Derecha"
 end
 
 local L_ES = LibStub("AceLocale-3.0"):NewLocale("DragonflightUI", "esES")

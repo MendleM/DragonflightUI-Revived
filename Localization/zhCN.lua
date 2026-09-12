@@ -1,4 +1,4 @@
--- print('enUS')
+-- Chinese Translations (new/updated entries AI-generated. Community review welcome.)
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L_CN = LibStub("AceLocale-3.0"):NewLocale("DragonflightUI", "zhCN")
 if not L_CN then return end
@@ -92,6 +92,13 @@ do
     L["ProfilesErrorNewProfile"] = "错误: 新配置文件名不能为空！"
     L["ProfilesDialogueDeleteProfile"] = "删除配置文件'%s'?"
     L["ProfilesDialogueCopyProfile"] = "新建配置文件(从'|cff8080ff%s|r'复制)"
+    L["ProfilesTitle"] = "配置文件"
+    L["ProfilesCurrentProfile"] = "当前配置文件"
+    L["ProfilesNewProfileTitle"] = "新建配置文件"
+    L["ProfilesCreateButton"] = "创建"
+    L["ProfilesDeleteProfileTitle"] = "删除配置文件"
+    L["ProfilesProfileToDelete"] = "要删除的配置文件"
+    L["ProfilesDeleteButton"] = "删除"
     L["ProfilesImportShareHeader"] = "导入/分享"
     L["ProfilesImportProfile"] = "导入配置"
     L["ProfilesImportProfileButton"] = HUD_EDIT_MODE_IMPORT_LAYOUT or "导入"
@@ -163,6 +170,7 @@ end
 
 -- __Settings
 do
+    L["Defaults"] = "恢复默认"
     L["SettingsDefaultStringFormat"] = "\n(默认: |cff8080ff%s|r)"
     L["SettingsCharacterSpecific"] = "\n\n|cff8080ff[每个角色设置]|r"
 
@@ -190,6 +198,8 @@ end
 do
     L["DarkmodeColor"] = "颜色"
     L["DarkmodeDesaturate"] = "去饱和度"
+    L["DarkmodeDarkenPortraitExtra"] = "暗化精英标志"
+    L["DarkmodeDarkenPortraitExtraDesc"] = "在暗黑模式下暗化单位框体周围的精英、稀有和首领边框。"
 end
 
 -- actionbar
@@ -960,6 +970,114 @@ do
 
     for k, v in pairs(KEY_REPLACEMENTS) do L_CN[k] = v; end
     DF.KEY_REPLACEMENTS = KEY_REPLACEMENTS;
+end
+
+
+-- StateHandler, EditMode, Buffs & New Features
+do
+    L["BuffsAura"] = "光环"
+    L["BuffsHeaderAura"] = "光环布局"
+    L["BuffsHeaderAuraDesc"] = ""
+    L["BuffsPaddingX"] = "X轴间距"
+    L["BuffsPaddingXDesc"] = "光环之间的横向间距。"
+    L["BuffsPaddingY"] = "Y轴间距"
+    L["BuffsPaddingYDesc"] = "光环行之间的纵向间距。"
+    L["BuffsWrapAfter"] = "每行折叠数量"
+    L["BuffsWrapAfterDesc"] = "在此数量的光环后换行。\n为0时永不折叠。"
+    L["BuffsMaxWraps"] = "最大行数/列数"
+    L["BuffsMaxWrapsDesc"] = "限制行数。\n为0时不限制。"
+    L["BuffsSeperateOwn"] = "分离自己的光环"
+    L["BuffsSeperateOwnDesc"] = "指定自己施放的法术排在前面 (1) 还是后面 (-1)。\n为 (0) 则不分离。"
+    L["BuffsSortMethod"] = "排序方式"
+    L["BuffsSortMethodDesc"] = "定义光环组的排序方式。"
+    L["BuffsSortDirection"] = "排序方向"
+    L["BuffsSortDirectionDesc"] = "定义排序的正反顺序。"
+    L["BuffsPoint"] = "锚点"
+    L["BuffsPointDesc"] = ""
+    L["BuffsOrientation"] = "排列方向"
+    L["BuffsOrientationDesc"] = "光环横向排列方向。"
+    L["BuffsGrowthDirection"] = "增长方向"
+    L["BuffsGrowthDirectionDesc"] = "光环纵向增长方向。"
+    L["BuffsHeaderStylingAura"] = "光环外观"
+    L["BuffsHeaderStylingAuraDesc"] = ""
+    L["BuffsHideDurationText"] = "隐藏持续时间文本"
+    L["BuffsHideDurationTextDesc"] = ""
+    L["BuffsHideCooldownSwipe"] = "隐藏冷却动画"
+    L["BuffsHideCooldownSwipeDesc"] = ""
+    L["BuffsHideCooldownDurationText"] = "隐藏冷却数字"
+    L["BuffsHideCooldownDurationTextDesc"] = ""
+
+    L["CompatGearscore"] = "GearScore"
+    L["CompatGearscoreDesc"] = "在现代角色面板中添加GearScore/Tacotip装等支持。"
+    L["CompatQuestie"] = "Questie"
+    L["CompatQuestieDesc"] = "在小地图罗盘添加Questie支持。"
+
+    L["EditModeGridSize"] = "网格大小"
+    L["EditModeHeaderTitle"] = "HUD编辑模式"
+    L["EditModeRevertAllChanges"] = "撤销所有更改"
+    L["EditModeSave"] = "保存"
+    L["EditModeShowGrid"] = "显示网格"
+    L["EditModeSnapToGrid"] = "对齐到网格"
+
+    L["FlyoutInventoryCount"] = "显示物品数量"
+    L["FlyoutInventoryCountDesc"] = "在按钮上显示施法材料剩余数量。"
+
+    L["ModuleGroupLoot"] = "队伍拾取"
+    L["ModuleNameplates"] = "姓名板"
+    L["ModuleTooltipGroupLoot"] = "在现代面板中显示队伍战利品掷骰。"
+    L["ModuleTooltipNameplates"] = "启用现代风格姓名板。"
+
+    L["MoreOptionsBorderFill"] = "边框填充"
+    L["MoreOptionsBorderFillDesc"] = "动作条按钮边框内的深色填充。"
+
+    L["Open"] = "打开"
+    L["PlayerFrameGradientColor"] = "渐变颜色"
+    L["PlayerFrameGradientColorDesc"] = "生命条使用平滑渐变色彩。"
+    L["PositionTableStandalone"] = "独立移动"
+    L["PositionTableStandaloneDesc"] = "使该框架可以完全独立拖拽移动。"
+    L["RaidFrameSettings"] = "团队框架设置"
+
+    L["StateHandlerAlphaCombat"] = "透明度 (战斗中)"
+    L["StateHandlerAlphaCombatDesc"] = "战斗状态下的框架透明度。"
+    L["StateHandlerAlphaNormal"] = "透明度"
+    L["StateHandlerAlphaNormalDesc"] = "非战斗状态下的框架透明度。"
+    L["StateHandlerHeaderVis"] = "可见性"
+    L["StateHandlerHideAlways"] = "始终隐藏"
+    L["StateHandlerHideBattlePet"] = "宠物对战时隐藏"
+    L["StateHandlerHideCombat"] = "战斗中隐藏"
+    L["StateHandlerHideCustom"] = "使用自定义条件"
+    L["StateHandlerHideCustomCond"] = "设置自定义条件"
+    L["StateHandlerHideCustomCondDesc"] = "使用宏条件语句语法，返回 'show' 显示或 'hide' 隐藏。"
+    L["StateHandlerHideCustomDesc"] = "使用宏条件。\n|cFFFF0000注意: 这将禁用上方所有设置!|r"
+    L["StateHandlerHideNoPet"] = "无宠物时隐藏"
+    L["StateHandlerHideNoStealth"] = "非潜行时隐藏"
+    L["StateHandlerHideOutOfCombat"] = "脱战时隐藏"
+    L["StateHandlerHidePet"] = "有宠物时隐藏"
+    L["StateHandlerHideStance"] = "无姿态/形态时隐藏"
+    L["StateHandlerHideStealth"] = "潜行时隐藏"
+    L["StateHandlerHideVehicle"] = "载具UI时隐藏"
+    L["StateHandlerMacroCondition"] = "宏条件: "
+    L["StateHandlerShowMouseover"] = "鼠标悬停时显示"
+    L["StateHandlerShowMouseoverDesc"] = "鼠标悬停时临时覆盖下方的隐藏条件。"
+
+    L["WhatsNewOpen"] = "更新日志"
+    L["WhatsNewOpenButton"] = "打开"
+    L["WhatsNewOpenDesc"] = "打开最新版本更新说明。"
+
+    L["DropdownBefore"] = "之前"
+    L["DropdownAfter"] = "之后"
+    L["DropdownNoSeperation"] = "不分离"
+    L["DropdownSortIndex"] = "索引"
+    L["DropdownSortName"] = "名称"
+    L["DropdownSortTime"] = "时间"
+    L["DropdownLeftToRight"] = "从左到右"
+    L["DropdownRightToLeft"] = "从右到左"
+    L["DropdownHorizontal"] = "水平"
+    L["DropdownVertical"] = "垂直"
+    L["DropdownUp"] = "向上"
+    L["DropdownDown"] = "向下"
+    L["DropdownLeft"] = "向左"
+    L["DropdownRight"] = "向右"
 end
 
 -- see comment above

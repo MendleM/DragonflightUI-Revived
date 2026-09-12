@@ -1,3 +1,4 @@
+local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 ScrollableListItemMixinDF = {}
 
 function ScrollableListItemMixinDF:Init(elementData)
@@ -803,7 +804,7 @@ function SettingsListMixinDF:Display(data, small)
 
     if data.default then
         self.Header.DefaultsButton:Show()
-        self.Header.DefaultsButton:SetText('Defaults')
+        self.Header.DefaultsButton:SetText(L['Defaults'] or DEFAULTS or 'Defaults')
 
         self.Header.DefaultsButton:SetScript('OnClick', function()
             data.default()

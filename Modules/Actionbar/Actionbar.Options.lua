@@ -965,7 +965,7 @@ local function GetBarOption(n)
         args = {}
     }
     AddButtonTable(opt, barname)
-    DF.Settings:AddPositionTable(Module, opt, barname, 'Action Bar' .. n, getDefaultStr,
+    DF.Settings:AddPositionTable(Module, opt, barname, L["ActionbarNameFormat"]:format(n), getDefaultStr,
                                  frameTableWithout('DragonflightUIActionbarFrame' .. n), function()
         return Module['bar' .. n]
     end)
@@ -1981,7 +1981,10 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    for i = 1, 8 do register('actionbar' .. i, {order = i, name = 'Action Bar ' .. i, descr = 'desc', isNew = false}) end
+    for i = 1, 8 do
+        register('actionbar' .. i,
+                 {order = i, name = L["ActionbarNameFormat"]:format(i), descr = 'desc', isNew = false})
+    end
 
     register('petbar', {order = 9, name = petOptions.name, descr = 'desc', isNew = false})
     register('xpbar', {order = 10, name = xpOptions.name, descr = 'desc', isNew = false})
