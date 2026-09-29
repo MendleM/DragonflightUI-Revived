@@ -845,6 +845,8 @@ do
     L["UIChangeInspectFrameDesc"] = "Change the appearance of the inspect frame."
     L["UIChangeTrainerWindow"] = "Change Trainer Window"
     L["UIChangeTrainerWindowDesc"] = "Change the appearance of the trainer window."
+    L["UITrainerTrainAll"] = "Train All"
+    L["UITrainerTrainAllTooltip"] = "Train %d skill(s) for %s"
     L["UIChangeTalentFrame"] = "Change TalentFrame"
     L["UIChangeTalentFrameDesc"] = "Change the layout or appearance of the Talent Frame. (Not available on Wrath)"
     L["UIChangeSpellBook"] = "Change SpellBook"

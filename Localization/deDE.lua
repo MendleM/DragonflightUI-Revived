@@ -801,6 +801,8 @@ do
     L["UIChangeInspectFrameDesc"] = "Aktiviert das moderne Fenster beim Betrachten anderer Spieler."
     L["UIChangeTrainerWindow"] = "Modernes Lehrerfenster"
     L["UIChangeTrainerWindowDesc"] = "Aktiviert das moderne Fenster für Klassen- und Berufsausbilder."
+    L["UITrainerTrainAll"] = "Alle erlernen"
+    L["UITrainerTrainAllTooltip"] = "%d Fertigkeit(en) für %s erlernen"
     L["UIChangeTalentFrame"] = "Modernes Talentfenster"
     L["UIChangeTalentFrameDesc"] = "Aktiviert das moderne Talentfenster."
     L["UIChangeSpellBook"] = "Modernes Zauberbuch"

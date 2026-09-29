@@ -618,6 +618,8 @@ do
     L["UIChangeInspectFrameDesc"] = "Cambia la apariencia del marco de inspección."
     L["UIChangeTrainerWindow"] = "Cambiar ventana de instructor"
     L["UIChangeTrainerWindowDesc"] = "Cambia la apariencia de la ventana del instructor."
+    L["UITrainerTrainAll"] = "Aprender todo"
+    L["UITrainerTrainAllTooltip"] = "Aprender %d habilidad(es) por %s"
     L["UIChangeTalentFrame"] = "Cambiar marco de talentos"
     L["UIChangeTalentFrameDesc"] = "Cambia el diseño o apariencia del marco de talentos. (No disponible en Wrath)"
     L["UIChangeSpellBook"] = "Cambiar libro de hechizos"

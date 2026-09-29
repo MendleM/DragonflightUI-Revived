@@ -4,6 +4,7 @@ local Helper = addonTable.Helper;
 ---@class DragonflightUI
 ---@diagnostic disable-next-line: assign-type-mismatch
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+local L = LibStub('AceLocale-3.0'):GetLocale('DragonflightUI')
 
 local eraFix = true;
 eraFix = DF.API.Version.IsClassic and (DF.API.Version.InterfaceVersion >= 11508) or DF.API.Version.IsTBC
@@ -279,7 +280,11 @@ function DragonflightUIMixin:ChangeTrainerFrame()
         local trainAll = CreateFrame('BUTTON', 'DragonflightUITrainerFrameTrainAllButton', frame,
                                      'UIPanelButtonTemplate')
         trainAll:SetSize(80, 22)
-        trainAll:SetText('Train All')
+        trainAll:SetText(L['UITrainerTrainAll'] or 'Train All')
+        local textWidth = trainAll:GetFontString() and trainAll:GetFontString():GetStringWidth() or 0
+        if textWidth > 70 then
+            trainAll:SetWidth(textWidth + 16)
+        end
         if trainButton then trainAll:SetPoint('RIGHT', trainButton, 'LEFT', -82, 0) end
 
         trainAll:SetScript('OnEnter', function(btn)
@@ -300,7 +305,8 @@ function DragonflightUIMixin:ChangeTrainerFrame()
                 local coinString = C_CurrencyInfo.GetCoinTextureString(cost)
                 GameTooltip:SetOwner(btn, 'ANCHOR_TOP', 0, 4)
                 GameTooltip:ClearLines()
-                GameTooltip:AddLine('Train ' .. count .. ' skill(s) for ' .. coinString)
+                local tooltipFormat = L['UITrainerTrainAllTooltip'] or 'Train %d skill(s) for %s'
+                GameTooltip:AddLine(string.format(tooltipFormat, count, coinString))
                 GameTooltip:Show()
             end
         end)
