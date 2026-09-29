@@ -729,6 +729,8 @@ do
     L["UIChangeInspectFrameDesc"] = "修改观察其他玩家时的窗口外观"
     L["UIChangeTrainerWindow"] = "修改训练师窗口"
     L["UIChangeTrainerWindowDesc"] = "修改训练师窗口外观"
+    L["UITrainerTrainAll"] = "全部学习"
+    L["UITrainerTrainAllTooltip"] = "学习 %d 个技能（费用：%s）"
     L["UIChangeTalentFrame"] = "修改天赋窗口"
     L["UIChangeTalentFrameDesc"] = "修改天赋窗口布局和外观(巫妖王版本不可用)"
     L["UIChangeSpellBook"] = "修改法术书"

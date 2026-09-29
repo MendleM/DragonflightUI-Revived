@@ -24,6 +24,36 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.47.0',
+        title = 'Unitframe Combat & Aggro Threat Alignment',
+        date = '29 September 2026',
+        intro = 'Aligned Player Frame combat indicators and status glow with modern Retail WoW behavior: combat swords reflect active combat status while the red status glow is strictly tied to direct threat/aggro.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'Player Frame combat swords icon now reliably displays for all combat actions, including spells and buffs.',
+                    'Red frame glow now acts strictly as a threat indicator matching Retail WoW, lighting up only when holding mob aggro.',
+                    'Status glow and combat indicators now update dynamically as threat shifts or targets change.'
+                }
+            }, {
+                title = 'Unitframes',
+                items = {
+                    'Aligned Player Frame combat status with modern Retail WoW mechanics.',
+                    'Combat swords indicator reliably reflects active combat state across attacks, spells, and friendly buffs.',
+                    'Red frame status glow now activates only when actively targeted by mobs or holding threat.',
+                    'Buffing or healing allies who are in combat no longer triggers the red aggro glow on your frame.',
+                    'Status glow and combat icons now respond smoothly in real-time to threat and target changes.'
+                }
+            }, {
+                title = 'Localization',
+                items = {
+                    'Localized the Trainer Frame "Train All" button and tooltip across all supported languages.'
+                }
+            }
+        }
+    },
+    {
         version = '0.46.2',
         title = 'Quest Log & XP Bar Localization',
         date = '24 September 2026',

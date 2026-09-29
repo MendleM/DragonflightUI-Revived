@@ -737,6 +737,8 @@ do
     L["UIChangeInspectFrameDesc"] = "Изменить внешний вид окна осмотра."
     L["UIChangeTrainerWindow"] = "Изменить окно тренера"
     L["UIChangeTrainerWindowDesc"] = "Изменить внешний вид окна тренера."
+    L["UITrainerTrainAll"] = "Обучиться всему"
+    L["UITrainerTrainAllTooltip"] = "Обучить %d навык(ов) за %s"
     L["UIChangeTalentFrame"] = "Изменить окно талантов"
     L["UIChangeTalentFrameDesc"] = "Изменить макет или внешний вид окна талантов. (Недоступно в Wrath)"
     L["UIChangeSpellBook"] = "Изменить спеллбук"
