@@ -446,9 +446,9 @@ function SubModuleMixin:Setup()
     self:SetScript('OnEvent', self.OnEvent);
 
     self:RegisterEvent('PLAYER_ENTERING_WORLD')
-    -- self:RegisterEvent('PLAYER_TARGET_CHANGED')
-    -- self:RegisterEvent('UNIT_ENTERED_VEHICLE')
-    -- self:RegisterEvent('UNIT_EXITED_VEHICLE')
+    self:RegisterEvent('PLAYER_TARGET_CHANGED')
+    self:RegisterUnitEvent('UNIT_TARGET', 'target')
+    pcall(self.RegisterEvent, self, 'UNIT_THREAT_SITUATION_UPDATE')
 
     self:RegisterUnitEvent('UNIT_ENTERED_VEHICLE', 'player')
     self:RegisterUnitEvent('UNIT_EXITED_VEHICLE', 'player')
@@ -558,6 +558,8 @@ function SubModuleMixin:OnEvent(event, ...)
     elseif event == 'ZONE_CHANGED' or event == 'ZONE_CHANGED_INDOORS' or event == 'ZONE_CHANGED_NEW_AREA' then
         self:ChangePlayerframe()
         self:SetPlayerBiggerHealthbar(self.ModuleRef.db.profile.player.biggerHealthbar)
+    elseif event == 'UNIT_THREAT_SITUATION_UPDATE' or event == 'PLAYER_TARGET_CHANGED' or event == 'UNIT_TARGET' then
+        self:UpdatePlayerStatus()
     end
 end
 
@@ -757,64 +759,106 @@ function SubModuleMixin:UpdatePlayerStatus()
     -- TODO: fix statusglow
     PlayerStatusGlow:Hide()
 
+    local inCombat = UnitAffectingCombat('player') or (PlayerFrame.inCombat and true or false) or
+                         (PlayerFrame.onHateList and true or false)
+    local isResting = IsResting()
+    local hasAggro = false
+
     if UnitHasVehiclePlayerFrameUI and UnitHasVehiclePlayerFrameUI('player') then
         -- TODO: vehicle stuff
         -- frame.PlayerFrameDeco:Show()
         self.RestIcon:Hide()
         self.RestIconAnimation:Stop()
         -- frame.PlayerFrameDeco:Show()
-    elseif IsResting() then
+        PlayerStatusTexture:Hide()
+        PlayerStatusTexture:SetAlpha(0)
+        PlayerAttackIcon:Hide()
+        PlayerAttackBackground:Hide()
+        self.PlayerFrameBackground:SetVertexColor(1.0, 1.0, 1.0, 1.0)
+    elseif inCombat then
+        self.PlayerFrameDeco:Hide()
+
+        self.RestIcon:Hide()
+        self.RestIconAnimation:Stop()
+
+        -- Retail behavior: Combat swords icon is shown while in combat
+        PlayerAttackIcon:Show()
+        PlayerAttackBackground:Show()
+
+        -- Retail behavior: Red frame glow is strictly for Aggro / Threat
+        if UnitThreatSituation then
+            local status = UnitThreatSituation('player')
+            if status and status >= 1 then
+                hasAggro = true
+            end
+        end
+
+        if not hasAggro and UnitDetailedThreatSituation then
+            local isTanking, status = UnitDetailedThreatSituation('player', 'target')
+            if isTanking or (status and status >= 1) then
+                hasAggro = true
+            end
+        end
+
+        if not hasAggro and UnitExists('target') and UnitCanAttack('player', 'target') and
+            UnitIsUnit('targettarget', 'player') then
+            hasAggro = true
+        end
+
+        if hasAggro then
+            PlayerStatusTexture:Show()
+            PlayerStatusTexture:SetVertexColor(1.0, 0, 0, 1.0)
+            PlayerStatusTexture:SetAlpha(1.0)
+
+            self.PlayerFrameBackground:SetVertexColor(1.0, 0, 0, 1.0)
+        else
+            PlayerStatusTexture:Hide()
+            PlayerStatusTexture:SetAlpha(0)
+
+            self.PlayerFrameBackground:SetVertexColor(1.0, 1.0, 1.0, 1.0)
+        end
+    elseif isResting then
         self.PlayerFrameDeco:Show()
 
         self.RestIcon:Show()
         self.RestIconAnimation:Play()
 
-        PlayerStatusTexture:Show()
-        -- PlayerStatusTexture:SetVertexColor(1.0, 0.88, 0.25, 1.0)
-        PlayerStatusTexture:SetAlpha(1.0)
-    elseif PlayerFrame.onHateList then
-        -- PlayerStatusTexture:Show()
-        -- PlayerStatusTexture:SetVertexColor(1.0, 0, 0, 1.0)
-        self.PlayerFrameDeco:Hide()
-
-        self.RestIcon:Hide()
-        self.RestIconAnimation:Stop()
-
-        self.PlayerFrameBackground:SetVertexColor(1.0, 0, 0, 1.0)
-    elseif PlayerFrame.inCombat then
-        self.PlayerFrameDeco:Hide()
-
-        self.RestIcon:Hide()
-        self.RestIconAnimation:Stop()
-
-        self.PlayerFrameBackground:SetVertexColor(1.0, 0, 0, 1.0)
+        PlayerAttackIcon:Hide()
+        PlayerAttackBackground:Hide()
 
         PlayerStatusTexture:Show()
-        -- PlayerStatusTexture:SetVertexColor(1.0, 0, 0, 1.0)
+        PlayerStatusTexture:SetVertexColor(1.0, 0.88, 0.25, 1.0)
         PlayerStatusTexture:SetAlpha(1.0)
+
+        self.PlayerFrameBackground:SetVertexColor(1.0, 1.0, 1.0, 1.0)
     else
         self.PlayerFrameDeco:Show()
 
         self.RestIcon:Hide()
         self.RestIconAnimation:Stop()
 
+        PlayerAttackIcon:Hide()
+        PlayerAttackBackground:Hide()
+
+        PlayerStatusTexture:Hide()
+        PlayerStatusTexture:SetAlpha(0)
+
         self.PlayerFrameBackground:SetVertexColor(1.0, 1.0, 1.0, 1.0)
     end
 
     local db = self.ModuleRef.db.profile.player
-    if db.hideRedStatus and (PlayerFrame.onHateList or PlayerFrame.inCombat) then
-        --
+    if db.hideRedStatus and hasAggro then
         self.PlayerFrameBackground:SetVertexColor(1.0, 1.0, 1.0, 1.0)
         PlayerStatusTexture:SetAlpha(0)
         PlayerStatusTexture:Hide()
     end
 
-    if db.hideRestingGlow and IsResting() then
+    if db.hideRestingGlow and isResting and not inCombat then
         PlayerStatusTexture:SetAlpha(0)
         PlayerStatusTexture:Hide()
     end
 
-    if db.hideRestingIcon and IsResting() then
+    if db.hideRestingIcon and isResting and not inCombat then
         self.RestIcon:Hide()
         self.RestIconAnimation:Stop()
     end
@@ -871,12 +915,14 @@ function SubModuleMixin:ChangeStatusIcons()
     PlayerAttackIcon:ClearAllPoints()
     PlayerAttackIcon:SetPoint('BOTTOMRIGHT', PlayerPortrait, 'BOTTOMRIGHT', -3, 0)
     PlayerAttackIcon:SetSize(16, 16)
+    PlayerAttackIcon:SetDrawLayer('OVERLAY', 7)
 
     PlayerAttackBackground:SetTexture(base)
     PlayerAttackBackground:SetTexCoord(0.1494140625, 0.1806640625, 0.8203125, 0.8828125)
     PlayerAttackBackground:ClearAllPoints()
     PlayerAttackBackground:SetPoint('CENTER', PlayerAttackIcon, 'CENTER')
     PlayerAttackBackground:SetSize(32, 32)
+    PlayerAttackBackground:SetDrawLayer('OVERLAY', 6)
 
     PlayerFrameGroupIndicator:ClearAllPoints()
     -- PlayerFrameGroupIndicator:SetPoint('BOTTOMRIGHT', PlayerFrameHealthBar, 'TOPRIGHT', 4, 13)
