@@ -24,6 +24,31 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.48.0',
+        title = 'Target Frame Threat & Aggro Glow',
+        date = '29 September 2026',
+        intro = 'Added a pulsating threat and aggro glow effect to the Target Frame for Classic Era and TBC, and unified combat feedback across all versions (including MoP) to reflect active enemy threat.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'Target Frame now features a pulsating red threat and aggro glow when holding enemy threat.',
+                    'Enabled for Classic Era (1.15) and TBC (2.5), where it was previously unavailable.',
+                    'Unified threat behavior across all versions, including Mists of Pandaria (5.5).',
+                    'Enabled the "Threat Glow" configuration toggle in the Target Frame options.'
+                }
+            }, {
+                title = 'Unitframes',
+                items = {
+                    'Enabled pulsating red threat and aggro glow on the Target Frame for Classic Era and TBC.',
+                    'Unified Target Frame glow across all versions to activate strictly when holding active threat.',
+                    'Status glow illuminates and pulses in real-time while aggro is maintained, dimming when lost.',
+                    'Enabled "Threat Glow" toggle under Target Frame styling options.'
+                }
+            }
+        }
+    },
+    {
         version = '0.47.0',
         title = 'Unitframe Combat & Aggro Threat Alignment',
         date = '29 September 2026',

@@ -2,10 +2,18 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.47.0`.
+May 2026). Current builds report version `0.48.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.48.0 — Target Frame Threat & Aggro Glow (29 September 2026)
+Added a pulsating threat and aggro glow effect to the Target Frame for Classic Era and TBC, and unified combat feedback across all versions (including MoP) to reflect active enemy threat.
+### Unitframes
+- Enabled the pulsating red threat and aggro glow on the Target Frame for Classic Era and TBC, where it was previously unavailable.
+- Unified Target Frame glow behavior across all versions (including MoP) to activate strictly when the player holds active threat or aggro from the target.
+- The status glow illuminates and pulses in real-time while aggro is maintained, automatically dimming when aggro is lost, the target dies, or when targeting friendly units.
+- Enabled the "Threat Glow" configuration toggle in the Target Frame settings menu.
 
 ## 0.47.0 — Unitframe Combat & Aggro Threat Alignment (29 September 2026)
 Aligned Player Frame combat indicators and status glow with modern Retail WoW (Dragonflight/The War Within) behavior: the combat swords indicator reliably reflects active combat status across spells, attacks, and friendly buffs, while the red status glow is strictly tied to direct threat/aggro.
