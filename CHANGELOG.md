@@ -2,10 +2,21 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.46.2`.
+May 2026). Current builds report version `0.47.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.47.0 — Unitframe Combat & Aggro Threat Alignment (29 September 2026)
+Aligned Player Frame combat indicators and status glow with modern Retail WoW (Dragonflight/The War Within) behavior: the combat swords indicator reliably reflects active combat status across spells, attacks, and friendly buffs, while the red status glow is strictly tied to direct threat/aggro.
+### Unitframes
+- Aligned Player Frame combat status with modern Retail WoW:
+  - Combat swords icon now reliably displays whenever the player is in combat, including when casting spells or healing/buffing allies.
+  - Red frame status glow now functions strictly as a Retail-style threat indicator, illuminating only when the player has active aggro or mob threat.
+  - Friendly buffs and heals on group members in combat no longer erroneously trigger the red aggro glow on the player frame.
+  - Status glow and combat icons now update dynamically in real-time as threat shifts or targets change.
+### Localization
+- Localized the Trainer Frame "Train All" button and tooltip across English, German, Spanish, Russian, and Simplified Chinese.
 
 ## 0.46.2 — Quest Log & XP Bar Localization (24 September 2026)
 Localized the XP status bar text and tooltip across all supported locales, and localized the completed quest counter across Classic Era, TBC, Wrath, and Cataclysm quest logs.
