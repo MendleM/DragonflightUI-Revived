@@ -257,7 +257,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["TargetFrameThreatGlowDesc"] .. getDefaultStr('enableThreatGlow', 'target'),
                 group = 'headerStyling',
                 order = 10,
-                disabled = true,
                 editmode = true
             },
             hideNameBackground = {
@@ -925,152 +924,113 @@ function SubModuleMixin:ChangeTargetFrameGeneral(self, frame)
         end
     end
 
-    if blizzFlash then
-        local flash = blizzFlash
-        flash:SetTexture('')
+    -- Keyed per frame, the way the background texture right above is.
+    local flashKey = frame:GetName() .. 'Flash'
 
-        -- Keyed per frame, the way the background texture right above is.
-        --
-        -- This function dresses four different frames - the target, the focus,
-        -- each boss frame and the edit-mode preview - and the glow is a child of
-        -- whichever one it was first created for. Cached under one shared key,
-        -- the second frame through here adopts the first frame's texture: the
-        -- glow then draws at the first frame's position and size while a
-        -- different frame is the one in combat, which is a glow sitting away
-        -- from the frame it belongs to and shaped for the wrong one.
-        local flashKey = frame:GetName() .. 'Flash'
+    if not self[flashKey] then
+        local glow = CreateFrame('Frame', 'DragonflightUI' .. frame:GetName() .. 'Flash', frame)
+        glow:SetAllPoints(frame)
+        glow:Hide()
 
-        if not self[flashKey] then
-            -- The glow is the frame's own art, not a picture of a glow.
-            --
-            -- No supplied texture traces this silhouette, because the silhouette
-            -- is a rounded bar with a circular portrait bulging out of one end,
-            -- and the shipped in-combat art does not line up with what DFUI
-            -- actually draws. There is exactly one shape guaranteed to match the
-            -- frame: the frame.
-            --
-            -- So stack copies of the background art underneath it, each a little
-            -- larger than the last and fainter, tinted red and added rather than
-            -- blended. Everything inside the frame is covered by the frame; what
-            -- is left is a halo following the outline exactly, with a soft
-            -- falloff from the layering. It cannot go out of shape, because it
-            -- is derived from the same art at the same cut.
-            local glow = CreateFrame('Frame', 'DragonflightUI' .. frame:GetName() .. 'Flash', frame)
-            glow:SetAllPoints(frame)
-            glow:Hide()
+        local tex = glow:CreateTexture(nil, 'ARTWORK', nil, 3)
+        tex:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
+        glow.Tex = tex
 
-            -- One texture, the shipped in-combat art.
-            --
-            -- Stacking scaled copies of the frame art was wrong: that art has
-            -- internal detail, so enlarging it produces offset copies of the
-            -- whole picture rather than a stroke, which reads as concentric
-            -- ghosts. The in-combat file is already what is wanted - a stroke
-            -- around the silhouette with a falloff, transparent inside.
-            --
-            -- The catch is that a glow lives OUTSIDE the outline, so its art
-            -- covers more ground than the frame does. Drawn at exactly the
-            -- frame's size it cannot line up: the stroke has to sit proud of the
-            -- frame by however much margin the art carries. Hence a tunable
-            -- size rather than a copy of the background's.
-            -- On top of the frame, not behind it.
-            --
-            -- The in-combat art is the same frame with its border recoloured
-            -- solid and a glow either side of that border - inner and outer. It
-            -- is meant to sit over the frame so the red ring takes the place of
-            -- the gold one. Put behind, the opaque ring hides exactly the part
-            -- that matters, which is what made the last attempt look like
-            -- ghosting rather than a lit-up border.
-            -- Two passes: one to replace the ring, more to make it burn.
-            --
-            -- BLEND paints over, so the base pass puts solid red where the gold
-            -- was rather than tinting it. Brightness beyond that cannot come
-            -- from alpha - vertex alpha clamps at 1, which is why the intensity
-            -- slider did nothing past its halfway point - so extra punch comes
-            -- from drawing the same art again additively on top. Each pass adds
-            -- light, and that stacks.
-            local tex = glow:CreateTexture(nil, 'ARTWORK', nil, 3)
-            tex:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
-            glow.Tex = tex
-
-            glow.Adds = {}
-            for i = 1, 2 do
-                local add = glow:CreateTexture(nil, 'ARTWORK', nil, 3 + i)
-                add:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
-                add:SetBlendMode('ADD')
-                glow.Adds[i] = add
-            end
-
-            glow.Blend = 'BLEND'
-
-            -- Geometry dialled in against a live frame: the art's own size and
-            -- cut, nudged two pixels right and one up from where the background
-            -- sits.
-            glow.Width = ART_W
-            glow.Height = ART_H
-            glow.OffsetX = -18
-            glow.OffsetY = 7
-            glow.CoordRight = ART_R
-            glow.CoordBottom = ART_B
-            -- Settled at 0.9 against a live frame: the replacing pass just under
-            -- full, additive passes off. They only come in past 1.
-            glow.Intensity = 0.9
-            glow.Red, glow.Green, glow.Blue = 1.0, 0.0, 0.0
-
-            function glow:ApplyGlow()
-                local function place(t)
-                    t:SetTexCoord(ART_L, self.CoordRight, ART_T, self.CoordBottom)
-                    t:SetSize(self.Width, self.Height)
-                    t:ClearAllPoints()
-                    t:SetPoint('CENTER', frame, 'CENTER', self.OffsetX, self.OffsetY)
-                end
-
-                -- up to 1, the replacing pass fades in; past 1, the additive
-                -- passes take over and keep going
-                local base = math.min(self.Intensity, 1)
-                local extra = math.max(0, self.Intensity - 1)
-
-                self.Tex:SetBlendMode(self.Blend or 'BLEND')
-                place(self.Tex)
-                self.Tex:SetVertexColor(self.Red, self.Green, self.Blue, base)
-
-                for _, add in ipairs(self.Adds) do
-                    place(add)
-                    add:SetVertexColor(self.Red, self.Green, self.Blue, extra * 0.5)
-                    add:SetShown(extra > 0)
-                end
-            end
-
-            glow:ApplyGlow()
-            self[flashKey] = glow
+        glow.Adds = {}
+        for i = 1, 2 do
+            local add = glow:CreateTexture(nil, 'ARTWORK', nil, 3 + i)
+            add:SetTexture(tex2xBase .. 'ui-hud-unitframe-target-portraiton-incombat-2x')
+            add:SetBlendMode('ADD')
+            glow.Adds[i] = add
         end
 
-        -- kept for anything still reading the old field
+        glow.Blend = 'BLEND'
+
+        -- Geometry dialled in against a live frame: the art's own size and
+        -- cut, nudged two pixels right and one up from where the background
+        -- sits.
+        glow.Width = ART_W
+        glow.Height = ART_H
+        glow.OffsetX = -18
+        glow.OffsetY = 7
+        glow.CoordRight = ART_R
+        glow.CoordBottom = ART_B
+        -- Settled at 0.9 against a live frame: the replacing pass just under
+        -- full, additive passes off. They only come in past 1.
+        glow.Intensity = 0.9
+        glow.Red, glow.Green, glow.Blue = 1.0, 0.0, 0.0
+
+        function glow:ApplyGlow()
+            local function place(t)
+                t:SetTexCoord(ART_L, self.CoordRight, ART_T, self.CoordBottom)
+                t:SetSize(self.Width, self.Height)
+                t:ClearAllPoints()
+                t:SetPoint('CENTER', frame, 'CENTER', self.OffsetX, self.OffsetY)
+            end
+
+            -- up to 1, the replacing pass fades in; past 1, the additive
+            -- passes take over and keep going
+            local base = math.min(self.Intensity, 1)
+            local extra = math.max(0, self.Intensity - 1)
+
+            self.Tex:SetBlendMode(self.Blend or 'BLEND')
+            place(self.Tex)
+            self.Tex:SetVertexColor(self.Red, self.Green, self.Blue, base)
+
+            for _, add in ipairs(self.Adds) do
+                place(add)
+                add:SetVertexColor(self.Red, self.Green, self.Blue, extra * 0.5)
+                add:SetShown(extra > 0)
+            end
+        end
+
+        glow:ApplyGlow()
+        self[flashKey] = glow
+    end
+
+    frame.DFGlow = self[flashKey]
+    if frame == TargetFrame then
         self.TargetFrameFlash = self[flashKey]
+    end
 
-        -- Hook once per frame. This runs again on every settings apply, and
-        -- stacked hooks meant every combat flash started another UIFrameFlash on
-        -- the same texture.
-        if not self[flashKey .. 'Hooked'] then
+    -- Blizzard's own combat flash, however this flavour happens to expose it: a
+    -- named Flash on the frame, or an anonymous texture carrying file id 137016.
+    local blizzFlash = flash
+    if not blizzFlash then
+        for _, region in ipairs({frame:GetRegions()}) do
+            if region:GetObjectType() == 'Texture' and region.GetTexture and region:GetTexture() == 137016 then
+                blizzFlash = region
+                break
+            end
+        end
+    end
+
+    if blizzFlash then
+        blizzFlash:SetTexture('')
+        if not self[flashKey .. 'BlizzHooked'] then
+            self[flashKey .. 'BlizzHooked'] = true
+            hooksecurefunc(blizzFlash, 'Show', function()
+                blizzFlash:SetTexture('')
+            end)
+        end
+
+        -- For non-target frames (e.g. Focus or Boss frames) that rely on Blizzard flash events
+        if frame ~= TargetFrame and not self[flashKey .. 'Hooked'] then
             self[flashKey .. 'Hooked'] = true
-
             local ownFlash = self[flashKey]
 
-            hooksecurefunc(flash, 'Show', function()
-                -- print('show')
-                flash:SetTexture('')
+            hooksecurefunc(blizzFlash, 'Show', function()
+                blizzFlash:SetTexture('')
                 ownFlash:Show()
-                if (UIFrameIsFlashing(ownFlash)) then
-                else
-                    -- print('go flash')
+                if not UIFrameIsFlashing(ownFlash) then
                     local dt = 0.5
                     UIFrameFlash(ownFlash, dt, dt, -1)
                 end
             end)
 
-            hooksecurefunc(flash, 'Hide', function()
-                -- print('hide')
-                flash:SetTexture('')
-                if (UIFrameIsFlashing(ownFlash)) then UIFrameFlashStop(ownFlash) end
+            hooksecurefunc(blizzFlash, 'Hide', function()
+                blizzFlash:SetTexture('')
+                if UIFrameIsFlashing(ownFlash) then UIFrameFlashStop(ownFlash) end
                 ownFlash:Hide()
             end)
         end
@@ -1301,8 +1261,11 @@ function SubModuleMixin:ReApplyTargetFrame()
     self:UpdateTargetHealthBarTexture(TargetFrameHealthBar, self.ModuleRef.db.profile.target, 'target')
     self:UpdateTargetPowerBarTexture(TargetFrameManaBar, self.ModuleRef.db.profile.target, 'target')
 
-    if DF.Wrath then TargetFrameFlash:SetTexture('') end
+    if TargetFrameFlash and TargetFrameFlash.SetTexture then
+        TargetFrameFlash:SetTexture('')
+    end
     if self.PortraitExtra then self.PortraitExtra:UpdateStyle() end
+    if self.UpdateThreatIndicator then self:UpdateThreatIndicator() end
 end
 
 function SubModuleMixin:ChangeTargetComboFrame()
@@ -1464,34 +1427,53 @@ function SubModuleMixin:CreatThreatIndicator()
         local threatAnchor = db.target.numericThreatAnchor
         local enableGlow = db.target.enableThreatGlow
 
-        if UnitExists('TARGET') and (enableNumeric or enableGlow) then
-            local isTanking, status, percentage, rawPercentage = UnitDetailedThreatSituation('PLAYER', 'TARGET')
-            local display = rawPercentage;
+        local targetExists = UnitExists('target')
+        local isHostile = targetExists and UnitCanAttack('player', 'target')
 
-            if enableNumeric then
-                if isTanking then
-                    ---@diagnostic disable-next-line: cast-local-type
-                    display = UnitThreatPercentageOfLead('PLAYER', 'TARGET')
-                    -- print('IsTanking')
+        local hasAggro = false
+        if isHostile then
+            if UnitDetailedThreatSituation then
+                local isTanking, status = UnitDetailedThreatSituation('player', 'target')
+                if isTanking or (status and status >= 2) then
+                    hasAggro = true
                 end
-
-                if display and display ~= 0 then
-                    -- print('t:', display)
-                    display = min(display, MAX_DISPLAYED_THREAT_PERCENT);
-                    text:SetText(format("%1.0f", display) .. "%")
-                    bg:SetVertexColor(GetThreatStatusColor(status))
-                    indi:Show()
-                else
-                    indi:Hide()
-                end
-            else
-                indi:Hide()
             end
 
-            if enableGlow then
-                -- show
+            if not hasAggro and UnitThreatSituation then
+                local status = UnitThreatSituation('player', 'target')
+                if status and status >= 2 then
+                    hasAggro = true
+                end
+            end
+
+            if not hasAggro and UnitIsUnit('targettarget', 'player') then
+                hasAggro = true
+            end
+        end
+
+        if targetExists and enableNumeric then
+            local isTanking, status, percentage, rawPercentage
+            if UnitDetailedThreatSituation then
+                isTanking, status, percentage, rawPercentage = UnitDetailedThreatSituation('player', 'target')
+            end
+            local display = rawPercentage
+
+            if isTanking and UnitThreatPercentageOfLead then
+                ---@diagnostic disable-next-line: cast-local-type
+                display = UnitThreatPercentageOfLead('player', 'target')
+            end
+
+            if display and display ~= 0 then
+                display = math.min(display, MAX_DISPLAYED_THREAT_PERCENT)
+                text:SetText(string.format("%1.0f", display) .. "%")
+                if GetThreatStatusColor and status then
+                    bg:SetVertexColor(GetThreatStatusColor(status))
+                else
+                    bg:SetVertexColor(1, 0, 0, 1)
+                end
+                indi:Show()
             else
-                -- hide
+                indi:Hide()
             end
 
             indi:ClearAllPoints()
@@ -1509,12 +1491,39 @@ function SubModuleMixin:CreatThreatIndicator()
             end
         else
             indi:Hide()
-            -- disable glow
+        end
+
+        local targetFlash = self.TargetFrameFlash or self['TargetFrameFlash']
+        if targetFlash then
+            if enableGlow and isHostile and hasAggro then
+                targetFlash:Show()
+                if UIFrameFlash and not (UIFrameIsFlashing and UIFrameIsFlashing(targetFlash)) then
+                    local dt = 0.5
+                    UIFrameFlash(targetFlash, dt, dt, -1)
+                end
+            else
+                if UIFrameFlashStop and (UIFrameIsFlashing and UIFrameIsFlashing(targetFlash)) then
+                    UIFrameFlashStop(targetFlash)
+                end
+                targetFlash:Hide()
+                targetFlash:SetAlpha(1.0)
+            end
         end
     end
 
+    self.UpdateThreatIndicator = UpdateIndicator
+
     indi:RegisterEvent('PLAYER_TARGET_CHANGED')
-    indi:RegisterUnitEvent('UNIT_THREAT_LIST_UPDATE', 'TARGET')
+    indi:RegisterUnitEvent('UNIT_THREAT_LIST_UPDATE', 'target')
+    indi:RegisterUnitEvent('UNIT_TARGET', 'target')
+    indi:RegisterEvent('PLAYER_REGEN_DISABLED')
+    indi:RegisterEvent('PLAYER_REGEN_ENABLED')
+    pcall(function()
+        indi:RegisterUnitEvent('UNIT_THREAT_SITUATION_UPDATE', 'player')
+    end)
+    pcall(function()
+        indi:RegisterUnitEvent('UNIT_FACTION', 'target')
+    end)
 
     indi:SetScript('OnEvent', UpdateIndicator)
     UpdateIndicator()
