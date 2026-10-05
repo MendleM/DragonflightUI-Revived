@@ -128,9 +128,9 @@ function SubModuleMixin:SetupOptions()
     }
 
     local partyBuffTooltipTable = {
-        {value = 'NEVER', text = L["OptionNever"] or 'Never', tooltip = 'descr', label = 'label'},
-        {value = 'ALWAYS', text = L["OptionAlways"] or 'Always', tooltip = 'descr', label = 'label'},
-        {value = 'INCOMBAT', text = L["OptionInCombat"] or 'In Combat', tooltip = 'descr', label = 'label'}
+        {value = 'NEVER', text = L["OptionNever"], tooltip = 'descr', label = 'label'},
+        {value = 'ALWAYS', text = L["OptionAlways"], tooltip = 'descr', label = 'label'},
+        {value = 'INCOMBAT', text = L["OptionInCombat"], tooltip = 'descr', label = 'label'}
     }
 
     if DF.Wrath then
@@ -227,12 +227,22 @@ function SubModuleMixin:SetupOptions()
         if not displayInfo then return 0 end
 
         local raidFrame = addonTable.GetRaidSystemFrameForOptions and addonTable:GetRaidSystemFrameForOptions()
-        if not (raidFrame and raidFrame.HasSetting) then return 0 end
+        if not (raidFrame and (raidFrame.HasSetting or raidFrame.GetSettingValue)) then return 0 end
 
         local added = 0
 
         local types = Enum.EditModeSettingDisplayType
         local order = 20
+
+        local emufs = Enum and Enum.EditModeUnitFrameSetting
+
+        local function IsAuraSetting(setting)
+            if not emufs then return false end
+            return (emufs.IconSize and setting == emufs.IconSize) or
+                (emufs.DebuffIconSize and setting == emufs.DebuffIconSize) or
+                (emufs.BuffIconSize and setting == emufs.BuffIconSize) or
+                (emufs.BigDefensiveIconSize and setting == emufs.BigDefensiveIconSize)
+        end
 
         for _, info in ipairs(displayInfo) do
             local setting = info.setting
@@ -241,12 +251,14 @@ function SubModuleMixin:SetupOptions()
             -- which is truthy, so testing only the second one would treat every
             -- failure as "yes, it has this setting".
             local hasIt = false
-            if setting ~= nil then
+            if setting ~= nil and raidFrame.HasSetting then
                 local ok, has = pcall(raidFrame.HasSetting, raidFrame, setting)
                 hasIt = ok and has and true or false
             end
 
-            if hasIt then
+            local isAura = IsAuraSetting(setting)
+
+            if hasIt or isAura then
                 order = order + 0.01
 
                 -- Said out loud, per setting, where it does and does not show up.
@@ -262,28 +274,60 @@ function SubModuleMixin:SetupOptions()
                 -- honest option: a control that silently does nothing is worse than one
                 -- that explains itself.
                 local NOTES = {
-                    RowSize = ' Only applies when Groups is set to one of the combined options.',
-                    SortPlayersBy = ' Affects the real raid frames; the preview does not reorder.',
-                    IconSize = ' Affects the real raid frames; not shown in the preview.'
+                    RowSize = L['RaidFrameNoteRowSize'],
+                    SortPlayersBy = L['RaidFrameNoteSortPlayersBy'],
+                    IconSize = L['RaidFrameNotePreviewNotShown'],
+                    DebuffIconSize = L['RaidFrameNotePreviewNotShown'],
+                    BuffIconSize = L['RaidFrameNotePreviewNotShown'],
+                    BigDefensiveIconSize = L['RaidFrameNotePreviewNotShown'],
+                    AuraOrganizationType = L['RaidFrameNoteAuraOrganization']
                 }
 
                 local note = ''
-                if Enum and Enum.EditModeUnitFrameSetting then
+                if emufs then
                     for key, text in pairs(NOTES) do
-                        if Enum.EditModeUnitFrameSetting[key] == setting then note = text end
+                        if emufs[key] == setting then note = text end
                     end
                 end
 
+                local optionName = info.name
+                if emufs then
+                    if emufs.AuraOrganizationType and setting == emufs.AuraOrganizationType then
+                        optionName = L['RaidFrameAuraLayout']
+                    elseif not optionName or optionName == '' or tonumber(optionName) ~= nil then
+                        if emufs.BigDefensiveIconSize and setting == emufs.BigDefensiveIconSize then
+                            optionName = L['RaidFrameBigDefensiveIconSize']
+                        elseif emufs.BuffIconSize and setting == emufs.BuffIconSize then
+                            optionName = L['RaidFrameBuffIconSize']
+                        elseif emufs.DebuffIconSize and setting == emufs.DebuffIconSize then
+                            optionName = L['RaidFrameAuraIconSize']
+                        elseif emufs.IconSize and setting == emufs.IconSize then
+                            optionName = L['RaidFrameAuraIconSize']
+                        end
+                    end
+                end
+                if not optionName or optionName == '' then
+                    optionName = tostring(setting)
+                end
+
+                local baseDesc = L['BlizzEditModeSettingDesc']
                 local option = {
-                    name = info.name or tostring(setting),
-                    desc = 'Blizzard Edit Mode setting. Applied at once and kept in this addon\'s profile.' .. note,
+                    name = optionName,
+                    desc = baseDesc .. note,
                     order = order,
                     editmode = true
                 }
 
                 -- Same two helpers the group handlers use. These per-option ones are not
                 -- what the widgets call, but they must not disagree with the ones that are.
-                local function GetStored() return GetBlizzRaidStored(setting) end
+                local function GetStored()
+                    local val = GetBlizzRaidStored(setting)
+                    if val ~= nil then return val end
+                    if info.type == types.Slider then
+                        return info.defaultValue or 100
+                    end
+                    return nil
+                end
                 local function SetStored(value) SetBlizzRaidStored(setting, value) end
 
                 if info.type == types.Checkbox then
@@ -336,6 +380,77 @@ function SubModuleMixin:SetupOptions()
             end
         end
 
+        -- Ensure aura icon size settings from Enum are exposed if displayInfo didn't include them
+        if emufs then
+            local auraCandidates = {
+                {
+                    setting = emufs.DebuffIconSize,
+                    name = HUD_EDIT_MODE_SETTING_UNIT_FRAME_AURA_ICON_SIZE or L['RaidFrameAuraIconSize'],
+                    min = 50,
+                    max = 200,
+                    step = 10,
+                    default = 100
+                },
+                {
+                    setting = emufs.BuffIconSize,
+                    name = HUD_EDIT_MODE_SETTING_UNIT_FRAME_BUFF_AURA_ICON_SIZE or L['RaidFrameBuffIconSize'],
+                    min = 50,
+                    max = 200,
+                    step = 10,
+                    default = 100
+                },
+                {
+                    setting = emufs.BigDefensiveIconSize,
+                    name = HUD_EDIT_MODE_SETTING_UNIT_FRAME_BIGDEFENSIVE_AURA_ICON_SIZE or L['RaidFrameBigDefensiveIconSize'],
+                    min = 50,
+                    max = 100,
+                    step = 5,
+                    default = 100
+                },
+                {
+                    setting = emufs.IconSize,
+                    name = HUD_EDIT_MODE_SETTING_UNIT_FRAME_AURA_ICON_SIZE or L['RaidFrameAuraIconSize'],
+                    min = 50,
+                    max = 200,
+                    step = 10,
+                    default = 100
+                }
+            }
+
+            for _, cand in ipairs(auraCandidates) do
+                local setting = cand.setting
+                if setting ~= nil then
+                    local key = 'blizzRaid' .. tostring(setting)
+                    if not args[key] then
+                        order = order + 0.01
+                        local function GetStored() return GetBlizzRaidStored(setting) or cand.default end
+                        local function SetStored(value) SetBlizzRaidStored(setting, value) end
+
+                        local baseDesc = L['BlizzEditModeSettingDesc']
+                        local previewNote = L['RaidFrameNotePreviewNotShown']
+                        args[key] = {
+                            name = cand.name,
+                            desc = baseDesc .. previewNote,
+                            type = 'range',
+                            min = cand.min,
+                            max = cand.max,
+                            bigStep = cand.step,
+                            get = GetStored,
+                            set = function(_, value) SetStored(value) end,
+                            order = order,
+                            editmode = true
+                        }
+                        blizzRaidSettings[key] = {
+                            setting = setting,
+                            info = {defaultValue = cand.default, minValue = cand.min, maxValue = cand.max, stepSize = cand.step},
+                            kind = 'range'
+                        }
+                        added = added + 1
+                    end
+                end
+            end
+        end
+
         addonTable.RaidEditModeOptionCount = added
         return added
     end
@@ -355,11 +470,9 @@ function SubModuleMixin:SetupOptions()
             -- Blizzard's Interface options panel, not the Edit Mode dialog.
             raidFrameBtn = {
                 type = 'execute',
-                name = L['RaidFrameSettings'] or RAID_FRAMES_LABEL or 'Raid Frame Settings',
-                desc = L['RaidFrameSettingsDesc'] or
-                    ('Opens Blizzard\'s own Interface options for raid frames - health text, class colours and ' ..
-                    'the like. The Edit Mode settings, frame size and group layout, are above.'),
-                btnName = L['Open'] or OPEN_LOG or 'Open',
+                name = L['RaidFrameSettings'],
+                desc = L['RaidFrameSettingsDesc'],
+                btnName = L['Open'],
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
                     PlaySound(SOUNDKIT.IG_MAINMENU_OPTION);
@@ -398,7 +511,17 @@ function SubModuleMixin:SetupOptions()
                 -- One frame later: PLAYER_ENTERING_WORLD fires before some systems
                 -- finish registering themselves with the Edit Mode manager.
                 C_Timer.After(0, function()
-                    if self.BuildEditModeArgs() > 0 then watcherSelf:UnregisterAllEvents() end
+                    if self.BuildEditModeArgs() > 0 then
+                        watcherSelf:UnregisterAllEvents()
+                        local f = self.RaidMoveFrame
+                        if f and f.DFEditModeSelection and f.DFEditModeSelection.RegisterOptions then
+                            f.DFEditModeSelection:RegisterOptions({
+                                options = self.Options,
+                                extra = self.OptionsEditmode,
+                                moduleRef = self.ModuleRef
+                            })
+                        end
+                    end
                 end)
             end)
         end
@@ -420,6 +543,7 @@ function SubModuleMixin:SetupOptions()
                 local stored = GetBlizzRaidStored(blizz.setting)
 
                 if blizz.kind == 'toggle' then return (stored or 0) ~= 0 end
+                if blizz.kind == 'range' then return stored or (blizz.info and blizz.info.defaultValue) or 100 end
 
                 return stored
             end
@@ -483,6 +607,11 @@ function SubModuleMixin:SetupOptions()
                     if editmode and editmode.RefreshOptionScreens then
                         pcall(editmode.RefreshOptionScreens, editmode)
                     end
+
+                    local f = self.RaidMoveFrame
+                    if f and f.DFEditModeSelection and f.DFEditModeSelection.RefreshOptionScreen then
+                        pcall(f.DFEditModeSelection.RefreshOptionScreen, f.DFEditModeSelection)
+                    end
                 end
 
                 return
@@ -500,19 +629,17 @@ function SubModuleMixin:SetupOptions()
         end
     end
     local optionsRaidEditmode = {
-        name = 'Raid',
-        desc = 'Raid',
+        name = L["RaidFrameName"],
+        desc = L["RaidFrameName"],
         get = getOption,
         set = setOption,
         type = 'group',
         args = {
             raidFrameBtn = {
                 type = 'execute',
-                name = L['RaidFrameSettings'] or RAID_FRAMES_LABEL or 'Raid Frame Settings',
-                desc = L['RaidFrameSettingsDesc'] or
-                    ('Opens Blizzard\'s own Interface options for raid frames - health text, class colours and ' ..
-                    'the like. The Edit Mode settings, frame size and group layout, are above.'),
-                btnName = L['Open'] or OPEN_LOG or 'Open',
+                name = L['RaidFrameSettings'],
+                desc = L['RaidFrameSettingsDesc'],
+                btnName = L['Open'],
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
                     PlaySound(SOUNDKIT.IG_MAINMENU_OPTION);
@@ -562,6 +689,7 @@ function SubModuleMixin:Setup()
         -- mode did nothing while the party one worked.
         local f = self:EnsureRaidMoveFrame()
         if not f then return end
+        self.RaidMoveFrame = f
 
         local resizer = _G['CompactRaidFrameManagerContainerResizeFrameResizer']
         if resizer then resizer:SetFrameLevel(15) end
