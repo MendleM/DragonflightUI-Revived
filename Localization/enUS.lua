@@ -220,6 +220,26 @@ do
     L["StateHandlerMacroCondition"] = "macro condition: "
 
     L["RaidFrameSettings"] = "Raid Frame Settings"
+    L["RaidFrameAuraIconSize"] = "Aura Icon Size"
+    L["RaidFrameBuffIconSize"] = "Buff Icon Size"
+    L["RaidFrameBigDefensiveIconSize"] = "Defensive Icon Size"
+    L["RaidFrameAuraLayout"] = "Aura Layout"
+    L["BlizzEditModeSettingDesc"] = "Blizzard Edit Mode setting. Applied at once and kept in this addon's profile."
+    L["RaidFrameNoteRowSize"] = " Only applies when Groups is set to one of the combined options."
+    L["RaidFrameNoteSortPlayersBy"] = " Affects the real raid frames; the preview does not reorder."
+    L["RaidFrameNotePreviewNotShown"] = " Affects the real raid frames; not shown in the preview."
+    L["RaidFrameNoteAuraOrganization"] = " Controls how buffs and debuffs are arranged on the raid frames (e.g. Classic or Buffs on top)."
+    L["PartyFrameCompactSettingsHeader"] = "Raid-Style Party Settings"
+    L["PartyFrameCompactSettingsHeaderDesc"] = "Settings for the raid-style party frames when 'Use Raid-Style Party Frames' is enabled."
+    L["PartyFrameNoteSortPlayersBy"] = " Affects the real party frames; the preview does not reorder."
+    L["PartyFrameNotePreviewNotShown"] = " Affects the real party frames; not shown in the preview."
+    L["PartyFrameNoteAuraOrganization"] = " Controls how buffs and debuffs are arranged on the party frames (e.g. Classic or Buffs on top)."
+    L["PartyFrameRaidStyleNoticeText"] = "DragonflightUI has switched your party frames to the raid-style (compact) frames.\n\nYou can now configure them directly on this page under |cffffff78Raid-Style Party Settings|r, as well as in DragonflightUI's Edit Mode.\n\nBlizzard's own raid profile options open from the button below. Nothing here needs Blizzard's Edit Mode."
+    L["PartyFrameRaidStyleNoticeDismiss"] = "Do not show again"
+    L["PartyFrameRaidStyleNoticeDismissed"] = "Notice about raid-style party frames will not be shown again. Type /df raidnotice to bring it back."
+    L["PartyFrameRaidStyleReloadText"] = "The raid-style party frame setting has been saved.\n\nIt takes effect after a reload - Blizzard applies it while the interface loads, which is the only way it can be done without leaving the party frames unable to update during combat.\n\nReload now?"
+    L["PartyFrameRaidStyleReloadCombat"] = "Cannot reload during combat - type |cffffff78/reload|r once the fight is over."
+    L["PartyFrameRaidStyleSaved"] = "Raid-style party frames: setting saved, it applies on the next reload."
     L["Open"] = "Open"
 end
 
@@ -1146,7 +1166,7 @@ do
     L["PartyFrameDisableBuffTooltipDesc"] = "Disables the (on mouseover) buff tooltip."
     L["PartyFrameUseCompactPartyFramesNote"] = "Takes effect after a reload. Blizzard's own switch for this reaches into both party displays at once, and run from addon code it leaves them unable to update during combat - so the value is stored and the game applies it itself on the way in."
     L["PartyFrameRaidProfileOptions"] = "Blizzard raid profile options"
-    L["PartyFrameRaidProfileOptionsDesc"] = "Opens Blizzard's own Interface options for raid frames - health text, class colours and the like. Frame size and group layout are Edit Mode settings and are in DragonflightUI's Raid section."
+    L["PartyFrameRaidProfileOptionsDesc"] = "Opens Blizzard's own Interface options for raid frames - health text, class colours and the like."
 
     -- raid
     L["RaidFrameName"] = "Raid Frame"

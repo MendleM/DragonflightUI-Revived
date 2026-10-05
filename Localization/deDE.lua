@@ -219,6 +219,26 @@ do
     L["StateHandlerHideCustomCondDesc"] = "Verwendet Makro-Bedingungssyntax, aber anstelle des Zaubernamens sollte die Rückgabe |cff8080ff'show'|r zum Einblenden oder |cff8080ff'hide'|r zum Ausblenden sein.\n\nBeispiel:\n|cff8080ff[combat]show;[@target,exists]show;hide|r\n(Blendet das Fenster im Kampf oder bei existierendem Ziel ein)"
     L["StateHandlerMacroCondition"] = "Makro-Bedingung: "
     L["RaidFrameSettings"] = "Schlachtzugsfenster-Einstellungen"
+    L["RaidFrameAuraIconSize"] = "Aura-Symbolgröße"
+    L["RaidFrameBuffIconSize"] = "Stärkungszauber-Symbolgröße"
+    L["RaidFrameBigDefensiveIconSize"] = "Große Defensivsymbol-Größe"
+    L["RaidFrameAuraLayout"] = "Aura-Layout (Vorlage)"
+    L["BlizzEditModeSettingDesc"] = "Einstellung aus dem Blizzard-Bearbeitungsmodus. Wird sofort angewendet und im Profil dieses Addons gespeichert."
+    L["RaidFrameNoteRowSize"] = " Gilt nur, wenn Gruppen auf eine der kombinierten Optionen gesetzt ist."
+    L["RaidFrameNoteSortPlayersBy"] = " Wirkt sich auf die echten Schlachtzugsfenster aus; die Vorschau wird nicht neu sortiert."
+    L["RaidFrameNotePreviewNotShown"] = " Wirkt sich auf die echten Schlachtzugsfenster aus; wird in der Vorschau nicht angezeigt."
+    L["RaidFrameNoteAuraOrganization"] = " Steuert die Anordnung von Stärkungs- und Schwächungszaubern (z. B. Klassisch oder Stärkungszauber oben)."
+    L["PartyFrameCompactSettingsHeader"] = "Schlachtzugs-Gruppenfenster Einstellungen"
+    L["PartyFrameCompactSettingsHeaderDesc"] = "Einstellungen für die Schlachtzugs-Gruppenfenster, wenn 'Gruppen wie Schlachtzüge anzeigen' aktiviert ist."
+    L["PartyFrameNoteSortPlayersBy"] = " Wirkt sich auf die echten Gruppenfenster aus; die Vorschau wird nicht neu sortiert."
+    L["PartyFrameNotePreviewNotShown"] = " Wirkt sich auf die echten Gruppenfenster aus; wird in der Vorschau nicht angezeigt."
+    L["PartyFrameNoteAuraOrganization"] = " Steuert die Anordnung von Stärkungs- und Schwächungszaubern an den Gruppenfenstern (z. B. Klassisch oder Stärkungszauber oben)."
+    L["PartyFrameRaidStyleNoticeText"] = "DragonflightUI hat deine Gruppenfenster auf die Schlachtzugs-Darstellung (kompakt) umgestellt.\n\nDu kannst sie jetzt direkt auf dieser Seite unter |cffffff78Schlachtzugs-Gruppenfenster Einstellungen|r sowie im Bearbeitungsmodus von DragonflightUI konfigurieren.\n\nBlizzards eigene Schlachtzugsprofil-Optionen öffnest du über die Schaltfläche darunter. Dafür wird Blizzards Bearbeitungsmodus nicht benötigt."
+    L["PartyFrameRaidStyleNoticeDismiss"] = "Nicht mehr anzeigen"
+    L["PartyFrameRaidStyleNoticeDismissed"] = "Der Hinweis zu Schlachtzugs-Gruppenfenstern wird nicht mehr angezeigt. Mit /df raidnotice wird er wieder eingeblendet."
+    L["PartyFrameRaidStyleReloadText"] = "Die Einstellung für Schlachtzugs-Gruppenfenster wurde gespeichert.\n\nSie wird nach einem Neuladen wirksam - Blizzard wendet sie beim Laden der Oberfläche an, nur so bleiben die Gruppenfenster im Kampf aktualisierbar.\n\nJetzt neu laden?"
+    L["PartyFrameRaidStyleReloadCombat"] = "Im Kampf ist kein Neuladen möglich - gib |cffffff78/reload|r ein, sobald der Kampf vorbei ist."
+    L["PartyFrameRaidStyleSaved"] = "Schlachtzugs-Gruppenfenster: Einstellung gespeichert, sie wird beim nächsten Neuladen wirksam."
     L["Open"] = "Öffnen"
 end
 
@@ -1121,7 +1141,7 @@ do
     L["PartyFrameDisableBuffTooltipDesc"] = "Deaktiviert Tooltips für Stärkungs- und Schwächungszauber an Gruppenfenstern."
     L["PartyFrameUseCompactPartyFramesNote"] = "Wird nach einem Neuladen (/reload) wirksam. Blizzards eigene Einstellung greift auf beide Gruppenanzeigen gleichzeitig zu und verhindert bei Ausführung durch Addon-Code Aktualisierungen während des Kampfes – daher wird der Wert gespeichert und beim Laden vom Spiel selbst angewendet."
     L["PartyFrameRaidProfileOptions"] = "Blizzard Schlachtzugsprofile"
-    L["PartyFrameRaidProfileOptionsDesc"] = "Öffnet Blizzards eigene Interface-Optionen für Schlachtzugsfenster – Gesundheitstext, Klassenfarben und Ähnliches. Fenstergröße und Gruppenlayout sind Bearbeitungsmodus-Einstellungen und befinden sich im Bereich „Schlachtzugsfenster“ von DragonflightUI."
+    L["PartyFrameRaidProfileOptionsDesc"] = "Öffnet Blizzards eigene Interface-Optionen für Schlachtzugsfenster – Gesundheitstext, Klassenfarben und Ähnliches."
 end
 
 -- raid
