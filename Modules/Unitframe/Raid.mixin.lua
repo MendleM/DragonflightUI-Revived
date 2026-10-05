@@ -211,21 +211,6 @@ function SubModuleMixin:SetupOptions()
         if saved then saved[tostring(setting)] = value end
 
         addonTable:SetRaidEditModeSettingBySetting(setting, value)
-
-        -- Raid-style party frames are their own Edit Mode system reading their own values,
-        -- so the same number has to land there too or this page has no effect on them.
-        -- Helper skips the settings the party system does not have.
-        --
-        -- Only while those frames are actually up, for the reason spelled out at the other
-        -- mirror call in PushStoredSettings: the party applier rebuilds
-        -- PartyFrame.settingMap from our execution, and Blizzard reads that map on every
-        -- ShouldShow. With raid-style off there is nothing to configure and the taint is
-        -- all that would be left. The number is kept in the profile either way, and
-        -- PushStoredSettings mirrors it at the next login if raid-style is on by then.
-        if addonTable.MirrorRaidSettingToParty and addonTable.RaidStylePartyFramesShown and
-            addonTable:RaidStylePartyFramesShown() then
-            addonTable:MirrorRaidSettingToParty(setting, value)
-        end
     end
 
     self.GetBlizzRaidStored = GetBlizzRaidStored
@@ -884,37 +869,6 @@ function SubModuleMixin:Setup()
                     -- cost. /df log seed caught it through ViewRaidSize.
                     if IsInRaid and IsInRaid() then
                         addonTable:SetRaidEditModeSettingBySetting(setting, value)
-                    end
-
-                    -- The mirror, and only where there is something to mirror TO.
-                    --
-                    -- It exists for one reason: raid-style party frames read their size
-                    -- from the PARTY system, because CompactUnitFrame asks
-                    -- GetRaidFrameWidth(frame.groupType) and groupType is the system index.
-                    -- With raid-style off those frames do not exist, so the mirror serves
-                    -- nobody - and it is not free.
-                    --
-                    -- This used to run regardless, on the reasoning that the party appliers
-                    -- end in PartyFrame:UpdatePaddingAndLayout rather than TryUpdate and
-                    -- are therefore harmless. They take no protected action, true. But
-                    -- OnSystemSettingChange rebuilds PartyFrame.settingMap through
-                    -- UpdateSettingMap, from our execution, and Blizzard reads that map on
-                    -- every ShouldShow - which is every group event. /df log party on 2.5.6
-                    -- reported it plainly, solo, straight after login, with the switch
-                    -- never touched:
-                    --
-                    --   ShouldShow read path: 25 insecure spot(s)
-                    --     SEED PartyFrame.settingMap, .settingMap[n].value, .systemInfo
-                    --     CompactPartyFrameMember1..5.optionTable / isLootObject
-                    --
-                    -- It never showed on a client with layouts of its own, because there
-                    -- the stored values already match and BlizzardHoldsSettingValue skips
-                    -- the applier. On a preset with no saved layout nothing can persist, so
-                    -- every value mismatches and the applier ran at every single login.
-                    --
-                    -- Helper skips SortPlayersBy, the one exception.
-                    if raidStyle and addonTable.MirrorRaidSettingToParty then
-                        addonTable:MirrorRaidSettingToParty(setting, value)
                     end
                 end
             end
