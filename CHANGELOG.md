@@ -2,10 +2,21 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.48.0`.
+May 2026). Current builds report version `0.49.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.49.0 — Raid-Style Party Frame Settings (5 October 2026)
+Raid-style party frames now have their own settings, independent of the Raid Frame, and the Raid Frame gained aura size and layout options.
+### Unitframes
+- Raid-style party frames are now configured on the Party Frame page under "Raid-Style Party Settings", and in the Party Frame entry of DragonflightUI's Edit Mode.
+- The new section offers frame width and height, horizontal groups, border, opacity, aura icon size, aura layout and sort order, and is only shown while raid-style party frames are enabled.
+- Party and Raid frame settings no longer overwrite each other: changing the Raid Frame no longer resizes your raid-style party frames.
+- Added aura icon size, buff icon size, defensive icon size and aura layout options to the Raid Frame settings.
+- Settings in the Edit Mode panel are updated right away when changed.
+### Localization
+- Localized the raid-style party frame notices, the reload prompt and the new settings in English, German, Spanish, Russian, and Simplified Chinese.
 
 ## 0.48.0 — Target Frame Threat & Aggro Glow (29 September 2026)
 Added a pulsating threat and aggro glow effect to the Target Frame for Classic Era and TBC, and unified combat feedback across all versions (including MoP) to reflect active enemy threat.
