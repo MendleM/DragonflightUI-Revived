@@ -43,7 +43,13 @@ DF.ChangelogData = {
                     'The new section only shows while raid-style party frames are enabled.',
                     'Changing the Raid Frame no longer resizes your raid-style party frames.',
                     'Added aura, buff and defensive icon size plus aura layout to the Raid Frame settings.',
-                    'Edit Mode panel settings update right away when changed.'
+                    'Edit Mode panel settings update right away when changed.',
+                    'The Edit Mode placeholder for raid-style party frames and the Raid Frame now follows your settings: size, opacity, border, class colors, power bar, aura icon size, aura layout and sort order, with sample buff and debuff icons.',
+                    'In a group, the placeholder of raid-style party frames gives way to the real frames, as it already did for the Raid Frame.',
+                    'Raid-style party frames now sit exactly where their placeholder is, and opacity and frame size apply to them.',
+                    'Real party frames now move together with the placeholder while you drag it.',
+                    'Party Frame options that only affect the regular party frame are hidden while raid-style party frames are enabled.',
+                    'In the Raid Frame settings, Sort by and Column size only show while groups are combined, and Show border only while they are not.'
                 }
             }, {
                 title = 'Localization',

@@ -15,6 +15,12 @@ Raid-style party frames now have their own settings, independent of the Raid Fra
 - Party and Raid frame settings no longer overwrite each other: changing the Raid Frame no longer resizes your raid-style party frames.
 - Added aura icon size, buff icon size, defensive icon size and aura layout options to the Raid Frame settings.
 - Settings in the Edit Mode panel are updated right away when changed.
+- The Edit Mode placeholder for raid-style party frames and the Raid Frame now follows your settings: frame width and height, opacity, frame size, border, class colors, the power bar, aura icon size, aura layout and sort order. It also shows sample buff and debuff icons and a sample group that is re-sorted by "Sort by".
+- While you are in a group, the placeholder of raid-style party frames gives way to the real frames, as it already did for the Raid Frame.
+- Raid-style party frames now sit exactly where their placeholder is, and opacity and frame size apply to them. Position, anchor and scale follow DragonflightUI's settings.
+- The real party frames now move together with the placeholder while you drag it, instead of jumping after you let go.
+- Party Frame options that only affect the regular party frame (class color, gradient, orientation, spacing and so on) are hidden while raid-style party frames are enabled.
+- In the Raid Frame settings, "Sort by" and "Column size" only show while groups are combined, and "Show border" only while they are not, like in Blizzard's own Edit Mode.
 ### Localization
 - Localized the raid-style party frame notices, the reload prompt and the new settings in English, German, Spanish, Russian, and Simplified Chinese.
 
