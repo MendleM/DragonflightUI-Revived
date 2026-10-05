@@ -24,6 +24,42 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.49.0',
+        title = 'Raid-Style Party Frame Settings',
+        date = '5 October 2026',
+        intro = 'Raid-style party frames now have their own settings, independent of the Raid Frame, and the Raid Frame gained aura size and layout options.',
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'Raid-style party frames are configured under "Raid-Style Party Settings" on the Party Frame page.',
+                    'Party and Raid frame settings no longer overwrite each other.',
+                    'New aura icon size and aura layout options for the Raid Frame.'
+                }
+            }, {
+                title = 'Unitframes',
+                items = {
+                    'Added frame size, horizontal groups, border, opacity, aura size, aura layout and sort order for raid-style party frames.',
+                    'The new section only shows while raid-style party frames are enabled.',
+                    'Changing the Raid Frame no longer resizes your raid-style party frames.',
+                    'Added aura, buff and defensive icon size plus aura layout to the Raid Frame settings.',
+                    'Edit Mode panel settings update right away when changed.',
+                    'The Edit Mode placeholder for raid-style party frames and the Raid Frame now follows your settings: size, opacity, border, class colors, power bar, aura icon size, aura layout and sort order, with sample buff and debuff icons.',
+                    'In a group, the placeholder of raid-style party frames gives way to the real frames, as it already did for the Raid Frame.',
+                    'Raid-style party frames now sit exactly where their placeholder is, and opacity and frame size apply to them.',
+                    'Real party frames now move together with the placeholder while you drag it.',
+                    'Party Frame options that only affect the regular party frame are hidden while raid-style party frames are enabled.',
+                    'In the Raid Frame settings, Sort by and Column size only show while groups are combined, and Show border only while they are not.'
+                }
+            }, {
+                title = 'Localization',
+                items = {
+                    'Localized the raid-style party notices, reload prompt and new settings in all supported languages.'
+                }
+            }
+        }
+    },
+    {
         version = '0.48.0',
         title = 'Target Frame Threat & Aggro Glow',
         date = '29 September 2026',
