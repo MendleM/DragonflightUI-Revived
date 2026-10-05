@@ -275,10 +275,6 @@ function SubModuleMixin:SetupOptions()
                 -- that explains itself.
                 local NOTES = {
                     RowSize = L['RaidFrameNoteRowSize'],
-                    SortPlayersBy = L['RaidFrameNoteSortPlayersBy'],
-                    IconSize = L['RaidFrameNotePreviewNotShown'],
-                    DebuffIconSize = L['RaidFrameNotePreviewNotShown'],
-                    BuffIconSize = L['RaidFrameNotePreviewNotShown'],
                     BigDefensiveIconSize = L['RaidFrameNotePreviewNotShown'],
                     AuraOrganizationType = L['RaidFrameNoteAuraOrganization']
                 }
@@ -317,6 +313,22 @@ function SubModuleMixin:SetupOptions()
                     order = order,
                     editmode = true
                 }
+
+                -- Mirrors Blizzard's ShouldShowSetting: sort and row size only when groups are combined, border only when not.
+                if emufs and emufs.RaidGroupDisplayType and Enum.RaidGroupDisplayType then
+                    local function UseCombinedGroups()
+                        local t = Enum.RaidGroupDisplayType
+                        local v = GetBlizzRaidStored(emufs.RaidGroupDisplayType)
+                        return v == t.CombineGroupsVertical or v == t.CombineGroupsHorizontal
+                    end
+
+                    if (emufs.SortPlayersBy and setting == emufs.SortPlayersBy) or
+                        (emufs.RowSize and setting == emufs.RowSize) then
+                        option.hidden = function() return not UseCombinedGroups() end
+                    elseif emufs.DisplayBorder and setting == emufs.DisplayBorder then
+                        option.hidden = function() return UseCombinedGroups() end
+                    end
+                end
 
                 -- Same two helpers the group handlers use. These per-option ones are not
                 -- what the widgets call, but they must not disagree with the ones that are.
@@ -427,7 +439,8 @@ function SubModuleMixin:SetupOptions()
                         local function SetStored(value) SetBlizzRaidStored(setting, value) end
 
                         local baseDesc = L['BlizzEditModeSettingDesc']
-                        local previewNote = L['RaidFrameNotePreviewNotShown']
+                        -- Buff and debuff sizes are drawn in the placeholder now; the big defensive one is not.
+                        local previewNote = (setting == emufs.BigDefensiveIconSize) and L['RaidFrameNotePreviewNotShown'] or ''
                         args[key] = {
                             name = cand.name,
                             desc = baseDesc .. previewNote,
@@ -1118,7 +1131,11 @@ local function GetRaidPreviewLayout()
         horizontal = horizontal,
         combined = combined,
         displayBorder = (setting('DisplayBorder') or 0) ~= 0,
-        opacity = setting('Opacity')
+        opacity = setting('Opacity'),
+        -- Aura icon size, a percentage. classic_era only has the one IconSize setting.
+        iconPct = tonumber(setting('IconSize')) or 100,
+        auraLayout = DragonflightUIEditModePreviewRaidMixin.ResolveAuraLayout(setting('AuraOrganizationType')),
+        sortBy = setting('SortPlayersBy')
     }
 end
 
@@ -1142,6 +1159,18 @@ function SubModuleMixin:EnsureRaidPreview(holder)
     end
 
     if #self.PreviewFrames == 0 then self.PreviewFrames = nil end
+
+    if self.PreviewFrames and not self.PreviewCVarWatcher then
+        local watcher = CreateFrame('Frame')
+        watcher:RegisterEvent('CVAR_UPDATE')
+        watcher:SetScript('OnEvent', function(_, _, name)
+            if name == 'raidFramesDisplayClassColor' or name == 'raidFramesDisplayPowerBars' or
+                name == 'raidFramesHealthBarColor' then
+                self:Update()
+            end
+        end)
+        self.PreviewCVarWatcher = watcher
+    end
 
     return self.PreviewFrames
 end
@@ -1169,6 +1198,9 @@ function SubModuleMixin:UpdateRaidPreview(holder)
         return 0, 0
     end
 
+    local profile = DragonflightUIEditModePreviewRaidMixin.GetCompactProfile()
+    local displayPowerBar = profile.displayPowerBar
+
     -- Blizzard's own state shape, so the template's UpdateState needs no changes.
     local state = {
         frameWidth = layout.frameWidth,
@@ -1176,12 +1208,14 @@ function SubModuleMixin:UpdateRaidPreview(holder)
         keepGroupsTogether = layout.combined,
         horizontalGroups = layout.horizontal,
         displayBorder = layout.displayBorder,
-        displayPowerBar = true,
-        useClassColors = true
+        displayPowerBar = displayPowerBar,
+        useClassColors = profile.useClassColors,
+        healthBarColor = profile.healthBarColor
     }
 
     local maxX, maxY = 0, 0
     local wanted = GetRaidPreviewMemberCount()
+    local roster = DragonflightUIEditModePreviewRaidMixin.BuildRoster(wanted, layout.sortBy)
 
     for i, frame in ipairs(frames) do
         if i > wanted then
@@ -1207,6 +1241,12 @@ function SubModuleMixin:UpdateRaidPreview(holder)
             frame:ClearAllPoints()
             frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', x, -y)
             frame:SetSize(layout.frameWidth, layout.frameHeight)
+
+            -- Icon size follows the icon size setting only, never the frame size.
+            if frame.UpdateAuras then
+                frame:UpdateAuras(layout.iconPct, displayPowerBar, layout.auraLayout)
+            end
+            if frame.SetFakeMember then frame:SetFakeMember(roster[i]) end
 
             -- Opacity is not one of the seven fields the template's UpdateState reads, but
             -- it is the one remaining setting the preview can honour honestly: it is a

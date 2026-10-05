@@ -608,6 +608,14 @@ end
 function DragonflightUIEditModePreviewPartyFrameMixin:OnUpdate(elapsed)
     local updateInterval = 0.15;
 
+    -- While dragging, the holder with the real frames follows the placeholder live.
+    local holder = self.DFDragHolder
+    if holder and self.state and not InCombatLockdown() then
+        local anchor = self.state.anchor or 'TOPLEFT'
+        holder:ClearAllPoints()
+        holder:SetPoint(anchor, self, anchor, 0, 0)
+    end
+
     if not self.DFEditMode then return; end
 
     if GetTime() - self.LastUpdate >= updateInterval then
@@ -638,8 +646,8 @@ function DragonflightUIEditModePreviewPartyFrameMixin:Update()
     self:SetPoint(state.anchor or 'TOPLEFT', parent, state.anchorParent or 'TOPLEFT', state.x or 16, state.y or -160)
     self:SetScale(state.scale or 1.0)
 
-    local useRaidStyle = false
     local UnitframeModule = DF:GetModule('Unitframe')
+    local useRaidStyle = false
     if UnitframeModule and UnitframeModule.SubParty and UnitframeModule.SubParty.GetRaidStylePartyFrames then
         useRaidStyle = UnitframeModule.SubParty.GetRaidStylePartyFrames()
     elseif C_CVar and C_CVar.GetCVar then
@@ -656,7 +664,41 @@ function DragonflightUIEditModePreviewPartyFrameMixin:Update()
             rHeight = DefaultCompactUnitFrameSetupOptions.height or rHeight
         end
 
-        if state.orientation == 'vertical' then
+        -- Same Edit Mode settings as the real raid-style party frames.
+        local partySub = UnitframeModule and UnitframeModule.SubParty
+        local function partySetting(key)
+            local id = Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting[key]
+            if id == nil or not (partySub and partySub.GetBlizzPartyStored) then return nil end
+            return partySub.GetBlizzPartyStored(id)
+        end
+
+        rWidth = tonumber(partySetting('FrameWidth')) or rWidth
+        rHeight = tonumber(partySetting('FrameHeight')) or rHeight
+
+        local rOpacity = tonumber(partySetting('Opacity'))
+
+        local profile = DragonflightUIEditModePreviewRaidMixin.GetCompactProfile()
+        local displayPowerBar = profile.displayPowerBar
+        local displayBorder = tonumber(partySetting('DisplayBorder')) == 1
+
+        -- Aura icon size in percent; classic_era only has IconSize.
+        local iconPct = tonumber(partySetting('IconSize')) or 100
+        local auraLayout = DragonflightUIEditModePreviewRaidMixin.ResolveAuraLayout(partySetting('AuraOrganizationType'))
+        local roster = DragonflightUIEditModePreviewRaidMixin.BuildRoster(5, partySetting('SortPlayersBy'), true)
+
+        -- Fenstergröße is a percent scale, folded into placeholder and holder scale.
+        local sizePct = tonumber(partySetting('FrameSize'))
+        if sizePct and sizePct > 0 then self:SetScale((state.scale or 1.0) * sizePct / 100) end
+
+        local horizontalSetting = partySetting('UseHorizontalGroups')
+        local horizontal
+        if horizontalSetting ~= nil then
+            horizontal = horizontalSetting == true or tonumber(horizontalSetting) == 1
+        else
+            horizontal = state.orientation ~= 'vertical'
+        end
+
+        if not horizontal then
             self:SetSize(rWidth, rHeight * 5 + 4 * rGap)
         else
             self:SetSize(rWidth * 5 + 4 * rGap, rHeight)
@@ -666,11 +708,27 @@ function DragonflightUIEditModePreviewPartyFrameMixin:Update()
             local rf = self.RaidPartyFrames and self.RaidPartyFrames[i]
             if rf then
                 rf:SetSize(rWidth, rHeight)
+                rf:UpdateState({
+                    frameWidth = rWidth,
+                    frameHeight = rHeight,
+                    keepGroupsTogether = false,
+                    horizontalGroups = horizontal,
+                    displayBorder = displayBorder,
+                    displayPowerBar = displayPowerBar,
+                    useClassColors = profile.useClassColors,
+                    healthBarColor = profile.healthBarColor
+                })
+                if rOpacity then rf:SetAlpha(math.max(rOpacity, 1) / 100) end
+                if rf.UpdateAuras then
+                    -- Icon size follows the icon size setting only, never the frame size.
+                    rf:UpdateAuras(iconPct, displayPowerBar, auraLayout)
+                end
+                if rf.SetFakeMember then rf:SetFakeMember(roster[i]) end
                 rf:ClearAllPoints()
                 if i == 1 then
                     rf:SetPoint('TOPLEFT', self, 'TOPLEFT', 0, 0)
                 else
-                    if state.orientation == 'vertical' then
+                    if not horizontal then
                         rf:SetPoint('TOPLEFT', self.RaidPartyFrames[i - 1], 'BOTTOMLEFT', 0, -rGap)
                     else
                         rf:SetPoint('TOPLEFT', self.RaidPartyFrames[i - 1], 'TOPRIGHT', rGap, 0)
@@ -722,6 +780,51 @@ function DragonflightUIEditModePreviewPartyFrameMixin:Update()
             end
         end
     end
+
+    -- In a party the real raid-style frames are on screen, so the selection fits them and the stand-ins go.
+    local realW, realH
+    if useRaidStyle then realW, realH = self:GetRealMemberSize(true) end
+    if realW and realH then
+        for _, pf in ipairs(self.PartyFrames or {}) do pf:Hide() end
+        for _, rf in ipairs(self.RaidPartyFrames or {}) do rf:Hide() end
+        self:SetSize(realW, realH)
+    end
+end
+
+-- Size of the shown real member frames, in this frame's own units; nil outside a party.
+function DragonflightUIEditModePreviewPartyFrameMixin:GetRealMemberSize(raidStyle)
+    if IsInRaid() or GetNumSubgroupMembers() == 0 then return nil end
+
+    local members = {}
+    if raidStyle then
+        for i = 1, 5 do
+            local f = _G['CompactPartyFrameMember' .. i]
+            if f and f:IsShown() then table.insert(members, f) end
+        end
+    elseif PartyFrame and PartyFrame.PartyMemberFramePool then
+        for f in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            if f:IsShown() then table.insert(members, f) end
+        end
+    end
+    if #members == 0 then return nil end
+
+    local left, right, top, bottom
+    for _, f in ipairs(members) do
+        local es = f:GetEffectiveScale()
+        local l, r, t, b = f:GetLeft(), f:GetRight(), f:GetTop(), f:GetBottom()
+        if not (l and r and t and b and es) then return nil end
+
+        l, r, t, b = l * es, r * es, t * es, b * es
+        left = left and math.min(left, l) or l
+        right = right and math.max(right, r) or r
+        top = top and math.max(top, t) or t
+        bottom = bottom and math.min(bottom, b) or b
+    end
+
+    local es = self:GetEffectiveScale()
+    if not es or es <= 0 then return nil end
+
+    return (right - left) / es, (top - bottom) / es
 end
 
 function DragonflightUIEditModePreviewPartyFrameMixin:UpdateVisibility()
@@ -732,10 +835,13 @@ function DragonflightUIEditModePreviewPartyFrameMixin:OnEvent(event, arg1, ...)
     -- print(event, arg1, ...)
 
     if event == 'GROUP_ROSTER_UPDATE' then
+        -- The real frames lay out a moment after the roster changes.
+        C_Timer.After(0.3, function() self:UpdateVisibility() end)
         --
         -- print('GROUP_ROSTER_UPDATE')
         self:UpdateVisibility()
-    elseif event == 'CVAR_UPDATE' and arg1 == 'useCompactPartyFrames' then
+    elseif event == 'CVAR_UPDATE' and (arg1 == 'useCompactPartyFrames' or arg1 == 'raidFramesDisplayClassColor' or
+        arg1 == 'raidFramesDisplayPowerBars' or arg1 == 'raidFramesHealthBarColor') then
         self:UpdateVisibility()
     end
 end
@@ -1425,10 +1531,224 @@ function DragonflightUIEditModePreviewRaidMixin:SetupFrame()
     frame.vertRightBorder = frame.healthBar:CreateTexture(nil, 'BORDER')
     frame.horizDivider = frame.healthBar:CreateTexture(nil, 'BORDER')
 
+    -- Stand-in aura icons, hidden until UpdateAuras (Blizzard shows up to 6 buffs / 5 debuffs, 4 / 3 here).
+    frame.fakeAuras = {buffs = {}, debuffs = {}}
+    local buffTextures = {
+        'Interface\\Icons\\Spell_Holy_WordFortitude', 'Interface\\Icons\\Spell_Nature_Regeneration',
+        'Interface\\Icons\\Spell_Holy_PowerWordShield', 'Interface\\Icons\\Spell_Holy_Renew'
+    }
+    local debuffTextures = {
+        'Interface\\Icons\\Spell_Shadow_ShadowWordPain', 'Interface\\Icons\\Spell_Shadow_CurseOfTounges',
+        'Interface\\Icons\\Spell_Nature_Slow'
+    }
+    for i, tex in ipairs(buffTextures) do
+        local t = frame.iconFrame:CreateTexture(nil, 'ARTWORK')
+        t:SetTexture(tex)
+        t:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        t:Hide()
+        frame.fakeAuras.buffs[i] = t
+    end
+    for i, tex in ipairs(debuffTextures) do
+        local t = frame.iconFrame:CreateTexture(nil, 'ARTWORK')
+        t:SetTexture(tex)
+        t:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        t:Hide()
+        frame.fakeAuras.debuffs[i] = t
+    end
+
     self.HealthBar = frame.healthBar
     self.ManaBar = frame.powerBar
     self.FontName = frame.name
     self.RoleIcon = frame.roleIcon
+end
+
+-- Stand-in group so "Sortieren nach" has something to reorder.
+local PREVIEW_NAMES = {
+    'Zimtschnecke', 'Norbert', 'Matada', 'Baldvin', 'Schokobon', 'Talgrin', 'Kalypsoh', 'Dratini', 'Nalany',
+    'Orwin', 'Vexa', 'Bromm', 'Ilyana', 'Torvald', 'Mirabel', 'Gunnar', 'Selwyn', 'Haldor', 'Xandra', 'Piet',
+    'Rúna', 'Cedric', 'Lioba', 'Fenris', 'Aurel', 'Yara', 'Dorian', 'Wilma', 'Eskil', 'Ottilie', 'Ragnar',
+    'Jolene', 'Kasimir', 'Thea', 'Ulf', 'Brynja', 'Osric', 'Merle', 'Hagen', 'Quirin'
+}
+
+local function PreviewRole(i)
+    if i % 10 == 2 then return 'TANK' end
+    if i % 5 == 4 then return 'HEALER' end
+    return 'DAMAGER'
+end
+
+local PREVIEW_ROLE_ORDER = {TANK = 1, HEALER = 2, DAMAGER = 3}
+
+-- Which sort the setting value stands for, by the enum's own key names.
+local function ResolveSortKey(value)
+    local e = Enum and Enum.SortPlayersBy
+    if e and value ~= nil then
+        for name, v in pairs(e) do
+            if v == value then
+                local key = tostring(name):lower()
+                if key:find('role') then return 'role' end
+                if key:find('alpha') then return 'alphabetical' end
+                if key:find('group') then return 'group' end
+            end
+        end
+    end
+    return 'group'
+end
+
+-- The first `count` stand-ins, in the order the sort setting would put them.
+function DragonflightUIEditModePreviewRaidMixin.BuildRoster(count, sortValue, isParty)
+    local list = {}
+    for i = 1, math.min(count or 5, #PREVIEW_NAMES) do
+        list[i] = {name = PREVIEW_NAMES[i], role = PreviewRole(i), group = ((i * 7) % 8) + 1, index = i}
+    end
+
+    -- Mirrors CRFSort_*: role ties fall back to name, a party has no subgroups so group sort is by index.
+    local key = ResolveSortKey(sortValue)
+    table.sort(list, function(a, b)
+        if key == 'role' then
+            if a.role ~= b.role then return PREVIEW_ROLE_ORDER[a.role] < PREVIEW_ROLE_ORDER[b.role] end
+            if a.name ~= b.name then return a.name < b.name end
+        elseif key == 'alphabetical' then
+            if a.name ~= b.name then return a.name < b.name end
+        elseif not isParty and a.group ~= b.group then
+            return a.group < b.group
+        end
+        return a.index < b.index
+    end)
+
+    return list
+end
+
+-- Raid profile CVars shared by all compact frames; unset CVars fall back to Blizzard's defaults.
+function DragonflightUIEditModePreviewRaidMixin.GetCompactProfile()
+    local function cvar(name)
+        return C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(name)
+    end
+    local function bool(name, default)
+        local v = cvar(name)
+        if v == nil then return default end
+        return v == '1'
+    end
+
+    local color
+    local hex = cvar('raidFramesHealthBarColor')
+    if hex and CreateColorFromHexString then
+        local ok, c = pcall(CreateColorFromHexString, hex)
+        if ok then color = c end
+    end
+
+    return {
+        displayPowerBar = bool('raidFramesDisplayPowerBars', true),
+        useClassColors = bool('raidFramesDisplayClassColor', true),
+        healthBarColor = color or CreateColor(0, 1, 0, 1)
+    }
+end
+
+function DragonflightUIEditModePreviewRaidMixin:SetFakeMember(entry)
+    if not entry then return end
+    if self.name and self.name.SetName then self.name:SetName(entry.name) end
+    if self.roleIcon and self.roleIcon.UpdateRoleIcon then self.roleIcon:UpdateRoleIcon(entry.role) end
+end
+
+-- Resolves the aura organisation enum by key name; unknown values draw as legacy.
+function DragonflightUIEditModePreviewRaidMixin.ResolveAuraLayout(value)
+    if value == nil or not Enum then return 'legacy' end
+
+    local function lookup(e)
+        if type(e) ~= 'table' then return nil end
+        for name, v in pairs(e) do
+            if v == value then
+                local key = tostring(name):lower()
+                if key:find('legacy') then return 'legacy' end
+                if key:find('buffstop') then return 'buffsTop' end
+                if key:find('buffsright') then return 'buffsRight' end
+            end
+        end
+    end
+
+    local found = lookup(Enum.RaidAuraOrganizationType) or lookup(Enum.AuraOrganizationType)
+    if found then return found end
+
+    -- Different name on this client: any enum that has a Legacy key is the one.
+    for _, e in pairs(Enum) do
+        if type(e) == 'table' and rawget(e, 'Legacy') ~= nil then
+            found = lookup(e)
+            if found then return found end
+        end
+    end
+
+    return 'legacy'
+end
+
+-- Copied from Blizzard's PrivateAuraUnitFrameLayoutTemplates (classic_era); y includes CUF_AURA_BOTTOM_OFFSET.
+local AURA_LAYOUTS = {
+    -- Legacy and BuffsRightDebuffsLeft share the aura layout and differ only in name/role placement.
+    legacy = {
+        buffs = {point = 'BOTTOMRIGHT', dx = -1, dy = 1, stride = 3, x = -3, y = 2, bottom = true},
+        debuffs = {point = 'BOTTOMLEFT', dx = 1, dy = 1, stride = 3, x = 3, y = 2, bottom = true}
+    },
+    buffsTop = {
+        buffs = {point = 'TOPRIGHT', dx = -1, dy = -1, stride = 6, x = -3, y = -3},
+        debuffs = {point = 'BOTTOMRIGHT', dx = -1, dy = 1, stride = 3, x = -3, y = 2, bottom = true}
+    }
+}
+AURA_LAYOUTS.buffsRight = AURA_LAYOUTS.legacy
+
+-- Name and role icon, per CompactUnitFrameLayoutTemplates.
+function DragonflightUIEditModePreviewRaidMixin:LayoutNameAndRole(layout)
+    if not (self.name and self.roleIcon) then return end
+
+    self.roleIcon:ClearAllPoints()
+    self.name:ClearAllPoints()
+
+    if layout == 'buffsTop' then
+        self.roleIcon:SetPoint('TOPLEFT', self, 'TOPLEFT', 3, -2)
+        self.name:SetPoint('CENTER', self, 'CENTER', 0, 0)
+        self.name:SetJustifyH('CENTER')
+    elseif layout == 'buffsRight' then
+        local roleSize = self.roleIcon:GetWidth() or 12
+        self.roleIcon:SetPoint('TOPRIGHT', self, 'TOPRIGHT', -3, -2)
+        self.name:SetPoint('TOPLEFT', self, 'TOPLEFT', roleSize + 3, -3)
+        self.name:SetPoint('TOPRIGHT', self, 'TOPRIGHT', -roleSize - 3, -3)
+        self.name:SetJustifyH('CENTER')
+    else
+        self.roleIcon:SetPoint('TOPLEFT', self, 'TOPLEFT', 3, -2)
+        self.name:SetPoint('TOPLEFT', self.roleIcon, 'TOPRIGHT', 0, -1)
+        self.name:SetPoint('TOPRIGHT', self, 'TOPRIGHT', -3, -3)
+        self.name:SetJustifyH('LEFT')
+    end
+end
+
+-- Icons are 11px times the icon size percent (clamped 50-200%); a nil iconPct hides them.
+function DragonflightUIEditModePreviewRaidMixin:UpdateAuras(iconPct, showPowerBar, layout)
+    if not self.fakeAuras then return end
+
+    layout = AURA_LAYOUTS[layout] and layout or 'legacy'
+    self:LayoutNameAndRole(layout)
+
+    if not iconPct then
+        for _, t in ipairs(self.fakeAuras.buffs) do t:Hide() end
+        for _, t in ipairs(self.fakeAuras.debuffs) do t:Hide() end
+        return
+    end
+
+    local size = 11 * math.min(math.max(iconPct / 100, 0.5), 2)
+    local powerBar = showPowerBar and 8 or 0
+
+    local function place(list, spec)
+        for i, t in ipairs(list) do
+            local col = (i - 1) % spec.stride
+            local row = math.floor((i - 1) / spec.stride)
+            local y = spec.y + (spec.bottom and powerBar or 0)
+
+            t:SetSize(size, size)
+            t:ClearAllPoints()
+            t:SetPoint(spec.point, self, spec.point, spec.x + col * size * spec.dx, y + row * size * spec.dy)
+            t:Show()
+        end
+    end
+
+    place(self.fakeAuras.buffs, AURA_LAYOUTS[layout].buffs)
+    place(self.fakeAuras.debuffs, AURA_LAYOUTS[layout].debuffs)
 end
 
 function DragonflightUIEditModePreviewRaidMixin:UpdateState(state)
@@ -1482,6 +1802,8 @@ function DragonflightUIEditModePreviewRaidMixin:UpdateState(state)
 
     if state.useClassColors then
         self.HealthBar:SetClass(self.Unit.class)
+    elseif state.healthBarColor then
+        self.HealthBar:SetStatusBarColor(state.healthBarColor.r, state.healthBarColor.g, state.healthBarColor.b)
     else
         self.HealthBar:SetClass('')
     end
