@@ -243,7 +243,9 @@ function SubModuleMixin:SetDefaults()
         hideNoStealth = false,
         hideBattlePet = false,
         hideCustom = false,
-        hideCustomCond = ''
+        hideCustomCond = '',
+        -- Blizzard's own party (CompactPartyFrame) Edit Mode settings, keyed by setting id as a string.
+        blizzSettings = {}
     };
     self.Defaults = defaults;
 end
@@ -301,17 +303,11 @@ end
 local raidStyleNoticeShown = false
 
 StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
-    text = 'DragonflightUI has switched your party frames to the raid-style (compact) frames.\n\n' ..
-        'From now on these frames are configured under |cffffff78Unitframes > Raid Frame|r, not on this page - ' ..
-        'position, scale, raid size, frame width and height, how groups are split, the border and the rest.\n\n' ..
-        'You can also select |cffffff78Raid Frame|r in DragonflightUI\'s own Edit Mode to move it and change the ' ..
-        'same settings there, with a preview.\n\n' ..
-        'Blizzard\'s own raid profile options open from a button on the same page. Nothing here needs Blizzard\'s ' ..
-        'Edit Mode or a reload.',
+    text = L['PartyFrameRaidStyleNoticeText'],
     -- button1 silences it for good, button2 just closes - the same way round as the
     -- leftover-layout notice, so the two behave alike.
-    button1 = 'Do not show again',
-    button2 = CLOSE or 'Close',
+    button1 = L['PartyFrameRaidStyleNoticeDismiss'],
+    button2 = CLOSE,
     showAlert = true,
     timeout = 0,
     whileDead = true,
@@ -320,8 +316,7 @@ StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
     OnAccept = function()
         local db = DF.db and DF.db.global
         if db then db.raidStyleNoticeDismissed = true end
-        DF:Print('Notice about raid-style party frames will not be shown again. ' ..
-                     'Type /df raidnotice to bring it back.')
+        DF:Print(L['PartyFrameRaidStyleNoticeDismissed'])
     end
 }
 
@@ -334,11 +329,9 @@ StaticPopupDialogs['DragonflightUIRaidStylePartyNotice'] = {
 -- the game already do. This asks once, at the moment it matters, and then stays out of the
 -- way.
 StaticPopupDialogs['DragonflightUIRaidStylePartyReload'] = {
-    text = 'The raid-style party frame setting has been saved.\n\n' ..
-        'It takes effect after a reload - Blizzard applies it while the interface loads, which is the only way it ' ..
-        'can be done without leaving the party frames unable to update during combat.\n\n' .. 'Reload now?',
-    button1 = RELOADUI or 'Reload',
-    button2 = LATER or 'Later',
+    text = L['PartyFrameRaidStyleReloadText'],
+    button1 = RELOADUI,
+    button2 = LATER,
     showAlert = true,
     timeout = 0,
     whileDead = true,
@@ -346,7 +339,7 @@ StaticPopupDialogs['DragonflightUIRaidStylePartyReload'] = {
     preferredIndex = 3,
     OnAccept = function()
         if InCombatLockdown() or UnitAffectingCombat('player') then
-            DF:Print('Cannot reload during combat - type |cffffff78/reload|r once the fight is over.')
+            DF:Print(L['PartyFrameRaidStyleReloadCombat'])
 
             return
         end
@@ -418,7 +411,7 @@ function SubModuleMixin.SetRaidStylePartyFrames(selfOrEnabled, maybeEnabled)
         -- broken switch. Only when the two actually disagreed, so setting the value it
         -- already has stays quiet.
         if needsReload then
-            DF:Print('Raid-style party frames: setting saved, it applies on the next reload.')
+            DF:Print(L['PartyFrameRaidStyleSaved'])
             StaticPopup_Show('DragonflightUIRaidStylePartyReload')
         end
     end
@@ -508,9 +501,9 @@ function SubModuleMixin:SetupOptions()
     }
 
     local partyBuffTooltipTable = {
-        {value = 'NEVER', text = L["OptionNever"] or 'Never', tooltip = 'descr', label = 'label'},
-        {value = 'ALWAYS', text = L["OptionAlways"] or 'Always', tooltip = 'descr', label = 'label'},
-        {value = 'INCOMBAT', text = L["OptionInCombat"] or 'In Combat', tooltip = 'descr', label = 'label'}
+        {value = 'NEVER', text = L["OptionNever"], tooltip = 'descr', label = 'label'},
+        {value = 'ALWAYS', text = L["OptionAlways"], tooltip = 'descr', label = 'label'},
+        {value = 'INCOMBAT', text = L["OptionInCombat"], tooltip = 'descr', label = 'label'}
     }
 
     if DF.Wrath then
@@ -598,12 +591,9 @@ function SubModuleMixin:SetupOptions()
             -- directly in the Raid section.
             raidFrameBtn = {
                 type = 'execute',
-                name = L["PartyFrameRaidProfileOptions"] or 'Blizzard raid profile options',
-                desc = L["PartyFrameRaidProfileOptionsDesc"] or
-                    ('Opens Blizzard\'s own Interface options for raid frames - health text, class colours and ' ..
-                    'the like. Frame size and group layout are Edit Mode settings and are in DragonflightUI\'s ' ..
-                    'Raid section.'),
-                btnName = L['Open'] or OPEN_LOG or 'Open',
+                name = L["PartyFrameRaidProfileOptions"],
+                desc = L["PartyFrameRaidProfileOptionsDesc"],
+                btnName = L['Open'],
                 func = function()
                     Settings.OpenToCategory(Settings.INTERFACE_CATEGORY_ID, RAID_FRAMES_LABEL);
                     PlaySound(SOUNDKIT.IG_MAINMENU_OPTION);
@@ -647,9 +637,250 @@ function SubModuleMixin:SetupOptions()
 
         for k, v in pairs(moreOptions) do optionsParty.args[k] = v end
 
+        local blizzPartySettings = {}
+
+        local function BlizzPartyProfileTable()
+            local profile = Module.db and Module.db.profile
+            return profile and profile.party and profile.party.blizzSettings
+        end
+
+        local function GetBlizzPartyStored(setting)
+            local saved = BlizzPartyProfileTable()
+            local key = tostring(setting)
+            if saved and saved[key] ~= nil then return saved[key] end
+
+            return addonTable:GetPartyEditModeSettingBySetting(setting)
+        end
+
+        local function SetBlizzPartyStored(setting, value)
+            local saved = BlizzPartyProfileTable()
+            if saved then saved[tostring(setting)] = value end
+
+            addonTable:SetPartyEditModeSettingBySetting(setting, value)
+        end
+
+        self.GetBlizzPartyStored = GetBlizzPartyStored
+        self.SetBlizzPartyStored = SetBlizzPartyStored
+
+        local function BuildPartyEditModeArgs(args)
+            addonTable.PartyEditModeOptionCount = addonTable.PartyEditModeOptionCount or 0
+
+            if not (addonTable.SetPartyEditModeSetting and Enum and Enum.EditModeSettingDisplayType) then return 0 end
+
+            local displayInfo = (addonTable.GetUnitFrameDisplayInfo and addonTable:GetUnitFrameDisplayInfo())
+            if not displayInfo then return 0 end
+
+            local partyFrame = addonTable.GetPartySystemFrameForOptions and addonTable:GetPartySystemFrameForOptions()
+            if not (partyFrame and (partyFrame.HasSetting or partyFrame.GetSettingValue)) then return 0 end
+
+            local added = 0
+            local types = Enum.EditModeSettingDisplayType
+            local order = 25.0
+
+            local emufs = Enum and Enum.EditModeUnitFrameSetting
+
+            local partySupportedSettings = {
+                FrameWidth = true,
+                FrameHeight = true,
+                UseHorizontalGroups = true,
+                DisplayBorder = true,
+                AuraOrganizationType = true,
+                Opacity = true,
+                DebuffIconSize = true,
+                SortPlayersBy = true
+            }
+
+            local function IsPartySetting(setting)
+                if not emufs then return false end
+                for k, v in pairs(partySupportedSettings) do
+                    if emufs[k] and setting == emufs[k] then return true end
+                end
+                return false
+            end
+
+            local function IsCompactPartyActive()
+                return SubModuleMixin.GetRaidStylePartyFrames()
+            end
+
+            if not args['headerCompactParty'] then
+                args['headerCompactParty'] = {
+                    type = 'header',
+                    name = L['PartyFrameCompactSettingsHeader'],
+                    desc = L['PartyFrameCompactSettingsHeaderDesc'],
+                    order = 25,
+                    isExpanded = true,
+                    editmode = true,
+                    hidden = function() return not IsCompactPartyActive() end
+                }
+            end
+
+            for _, info in ipairs(displayInfo) do
+                local setting = info.setting
+                local hasIt = false
+                if setting ~= nil and partyFrame.HasSetting then
+                    local ok, has = pcall(partyFrame.HasSetting, partyFrame, setting)
+                    hasIt = ok and has and true or false
+                end
+
+                local isCandidate = IsPartySetting(setting)
+
+                local isIgnored = emufs and (
+                    (emufs.UseRaidStylePartyFrames and setting == emufs.UseRaidStylePartyFrames) or
+                    (emufs.ShowPartyFrameBackground and setting == emufs.ShowPartyFrameBackground) or
+                    (emufs.CastBarUnderneath and setting == emufs.CastBarUnderneath) or
+                    (emufs.CastBarOnSide and setting == emufs.CastBarOnSide) or
+                    (emufs.BuffsOnTop and setting == emufs.BuffsOnTop) or
+                    (emufs.ViewRaidSize and setting == emufs.ViewRaidSize) or
+                    (emufs.RaidGroupDisplayType and setting == emufs.RaidGroupDisplayType) or
+                    (emufs.RowSize and setting == emufs.RowSize) or
+                    (emufs.BigDefensiveIconSize and setting == emufs.BigDefensiveIconSize)
+                )
+
+                if (hasIt or isCandidate) and not isIgnored then
+                    order = order + 0.01
+                    local key = 'blizzParty' .. tostring(setting)
+                    if not args[key] then
+                        local NOTES = {
+                            SortPlayersBy = L['PartyFrameNoteSortPlayersBy'],
+                            IconSize = L['PartyFrameNotePreviewNotShown'],
+                            DebuffIconSize = L['PartyFrameNotePreviewNotShown'],
+                            AuraOrganizationType = L['PartyFrameNoteAuraOrganization']
+                        }
+
+                        local note = ''
+                        if emufs then
+                            for nKey, text in pairs(NOTES) do
+                                if emufs[nKey] == setting then note = text end
+                            end
+                        end
+
+                        local optionName = info.name
+                        if emufs then
+                            if emufs.AuraOrganizationType and setting == emufs.AuraOrganizationType then
+                                optionName = L['RaidFrameAuraLayout']
+                            elseif not optionName or optionName == '' or tonumber(optionName) ~= nil then
+                                if emufs.DebuffIconSize and setting == emufs.DebuffIconSize then
+                                    optionName = HUD_EDIT_MODE_SETTING_UNIT_FRAME_AURA_ICON_SIZE or L['RaidFrameAuraIconSize']
+                                elseif emufs.IconSize and setting == emufs.IconSize then
+                                    optionName = HUD_EDIT_MODE_SETTING_UNIT_FRAME_AURA_ICON_SIZE or L['RaidFrameAuraIconSize']
+                                end
+                            end
+                        end
+                        if not optionName or optionName == '' then
+                            optionName = tostring(setting)
+                        end
+
+                        local baseDesc = L['BlizzEditModeSettingDesc']
+                        local option = {
+                            name = optionName,
+                            desc = baseDesc .. note,
+                            order = order,
+                            group = 'headerCompactParty',
+                            editmode = true,
+                            hidden = function() return not IsCompactPartyActive() end
+                        }
+
+                        local function GetStored()
+                            local val = GetBlizzPartyStored(setting)
+                            if val ~= nil then return val end
+                            if info.type == types.Slider then
+                                return info.defaultValue or 100
+                            end
+                            return nil
+                        end
+                        local function SetStored(value) SetBlizzPartyStored(setting, value) end
+
+                        if info.type == types.Checkbox then
+                            option.type = 'toggle'
+                            option.get = function() return (GetStored() or 0) ~= 0 end
+                            option.set = function(_, value) SetStored(value and 1 or 0) end
+                        elseif info.type == types.Slider then
+                            option.type = 'range'
+                            option.min = info.minValue or 0
+                            option.max = info.maxValue or 100
+                            option.bigStep = info.stepSize or 1
+                            option.get = GetStored
+                            option.set = function(_, value) SetStored(value) end
+                        elseif info.type == types.Dropdown then
+                            local copy = {}
+                            for _, entry in ipairs(info.options or {}) do
+                                if entry.value ~= nil and entry.text ~= nil then
+                                    table.insert(copy, {value = entry.value, text = entry.text})
+                                end
+                            end
+                            option.type = 'select'
+                            option.dropdownValues = copy
+                            option.get = GetStored
+                            option.set = function(_, value) SetStored(value) end
+                        end
+
+                        args[key] = option
+                        blizzPartySettings[key] = {
+                            setting = setting,
+                            info = info,
+                            kind = option.type
+                        }
+                        added = added + 1
+                    end
+                end
+            end
+
+            -- Fallback for DebuffIconSize (Symbolgröße) if not enumerated in displayInfo
+            if emufs and emufs.DebuffIconSize then
+                local cand = {
+                    setting = emufs.DebuffIconSize,
+                    name = HUD_EDIT_MODE_SETTING_UNIT_FRAME_AURA_ICON_SIZE or L['RaidFrameAuraIconSize'],
+                    min = 50,
+                    max = 200,
+                    step = 10,
+                    default = 100
+                }
+                local key = 'blizzParty' .. tostring(cand.setting)
+                if not args[key] then
+                    order = order + 0.01
+                    local function GetStored() return GetBlizzPartyStored(cand.setting) or cand.default end
+                    local function SetStored(value) SetBlizzPartyStored(cand.setting, value) end
+
+                    local baseDesc = L['BlizzEditModeSettingDesc']
+                    local previewNote = L['PartyFrameNotePreviewNotShown']
+                    args[key] = {
+                        name = cand.name,
+                        desc = baseDesc .. previewNote,
+                        type = 'range',
+                        min = cand.min,
+                        max = cand.max,
+                        bigStep = cand.step,
+                        get = GetStored,
+                        set = function(_, value) SetStored(value) end,
+                        order = order,
+                        group = 'headerCompactParty',
+                        editmode = true,
+                        hidden = function() return not IsCompactPartyActive() end
+                    }
+                    blizzPartySettings[key] = {
+                        setting = cand.setting,
+                        info = {defaultValue = cand.default, minValue = cand.min, maxValue = cand.max, stepSize = cand.step},
+                        kind = 'range'
+                    }
+                    added = added + 1
+                end
+            end
+
+            addonTable.PartyEditModeOptionCount = added
+            return added
+        end
+
         optionsParty.get = function(info)
             local key = info[1]
             local sub = info[2]
+
+            local blizz = blizzPartySettings[sub]
+            if blizz then
+                local stored = GetBlizzPartyStored(blizz.setting)
+                if blizz.kind == 'toggle' then return (stored or 0) ~= 0 end
+                if blizz.kind == 'range' then return stored or (blizz.info and blizz.info.defaultValue) or 100 end
+                return stored
+            end
 
             if sub == 'useCompactPartyFrames' then
                 return SubModuleMixin.GetRaidStylePartyFrames()
@@ -662,11 +893,69 @@ function SubModuleMixin:SetupOptions()
             local key = info[1]
             local sub = info[2]
 
+            local blizz = blizzPartySettings[sub]
+            if blizz then
+                local stored = value
+                if blizz.kind == 'toggle' then
+                    stored = value and 1 or 0
+                end
+                SetBlizzPartyStored(blizz.setting, stored)
+
+                if blizz.kind ~= 'range' then
+                    if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
+                    local editmode = DF.GetModule and DF:GetModule('Editmode')
+                    if editmode and editmode.RefreshOptionScreens then
+                        pcall(editmode.RefreshOptionScreens, editmode)
+                    end
+                    local f = SubModuleMixin.PreviewParty
+                    if f and f.DFEditModeSelection and f.DFEditModeSelection.RefreshOptionScreen then
+                        pcall(f.DFEditModeSelection.RefreshOptionScreen, f.DFEditModeSelection)
+                    end
+                end
+                return
+            end
+
             if sub == 'useCompactPartyFrames' then
                 SubModuleMixin.SetRaidStylePartyFrames(value)
-            else
-                setOption(info, value)
+                if Module.RefreshOptionScreens then Module:RefreshOptionScreens() end
+                local editmode = DF.GetModule and DF:GetModule('Editmode')
+                if editmode and editmode.RefreshOptionScreens then
+                    pcall(editmode.RefreshOptionScreens, editmode)
+                end
+                local f = SubModuleMixin.PreviewParty
+                if f and f.DFEditModeSelection and f.DFEditModeSelection.RefreshOptionScreen then
+                    pcall(f.DFEditModeSelection.RefreshOptionScreen, f.DFEditModeSelection)
+                end
+                return
             end
+
+            setOption(info, value)
+        end
+
+        self.BuildEditModeArgs = function() return BuildPartyEditModeArgs(optionsParty.args) end
+
+        if self.BuildEditModeArgs() == 0 then
+            local optsWatcher = CreateFrame('Frame')
+            optsWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+            optsWatcher:SetScript('OnEvent', function(watcherSelf)
+                C_Timer.After(0, function()
+                    if self.BuildEditModeArgs() > 0 then
+                        watcherSelf:UnregisterAllEvents()
+                        local f = self.PreviewParty
+                        if f and f.DFEditModeSelection and f.DFEditModeSelection.RegisterOptions then
+                            f.DFEditModeSelection:RegisterOptions({
+                                options = self.Options,
+                                extra = self.OptionsEditmode,
+                                default = function()
+                                    setDefaultSubValues('party')
+                                end,
+                                moduleRef = self.ModuleRef,
+                                previewOnly = true
+                            })
+                        end
+                    end
+                end)
+            end)
         end
     end
     DF.Settings:AddPositionTable(Module, optionsParty, 'party', 'Party', getDefaultStr, frameTable)
@@ -1615,36 +1904,16 @@ function SubModuleMixin:Setup()
         return self.Options.name
     end)
 
+    if self.BuildEditModeArgs then self.BuildEditModeArgs() end
+
     fakeParty.DFEditModeSelection:RegisterOptions({
         options = self.Options,
         extra = self.OptionsEditmode,
-        -- parentExtra = Module.PartyMoveFrame,
         default = function()
             setDefaultSubValues('party')
         end,
         moduleRef = self.ModuleRef,
-        -- fakeParty is a dummy party used to drag the real one into place; it
-        -- must not survive edit mode, or it lingers as a second, made-up
-        -- party next to the real frames.
         previewOnly = true
-        -- showFunction = function()
-        --     --           
-        --     for k = 1, 4 do
-        --         local p = _G['PartyMemberFrame' .. k]
-        --         -- p:SetAlpha(0)
-        --         -- print('p', k)
-        --     end
-        --     -- Module.PartyMoveFrame:Hide()
-        -- end,
-        -- hideFunction = function()
-        --     --            
-        --     for k = 1, 4 do
-        --         local p = _G['PartyMemberFrame' .. k]
-        --         -- p:SetAlpha(0)
-        --         -- print('p', k)
-        --     end
-        --     -- Module.PartyMoveFrame:Show()
-        -- end
     });
 
     -- Modern pooled party setup (Era 1.15.9+, TBC 2.5.6+, MoP 5.5.4+)
@@ -1653,6 +1922,30 @@ function SubModuleMixin:Setup()
     if addonTable and addonTable.SyncRaidStylePartyFrameToBlizzard then
         addonTable:SyncRaidStylePartyFrameToBlizzard(self.GetRaidStylePartyFrames(self))
     end
+
+    local function PushStoredPartySettings()
+        local profile = self.ModuleRef and self.ModuleRef.db and self.ModuleRef.db.profile
+        local saved = profile and profile.party and profile.party.blizzSettings
+        if not saved then return end
+
+        local raidStyle = addonTable.RaidStylePartyFramesShown and addonTable:RaidStylePartyFramesShown()
+        if not raidStyle then return end
+
+        for key, value in pairs(saved) do
+            local setting = tonumber(key)
+            if setting and value ~= nil then
+                addonTable:SetPartyEditModeSettingBySetting(setting, value)
+            end
+        end
+    end
+
+    local partySettingsWatcher = CreateFrame('Frame')
+    partySettingsWatcher:RegisterEvent('PLAYER_ENTERING_WORLD')
+    partySettingsWatcher:SetScript('OnEvent', function(watcher)
+        C_Timer.After(0, function()
+            PushStoredPartySettings()
+        end)
+    end)
 end
 
 function SubModuleMixin:OnEvent(event, ...)

@@ -1189,6 +1189,17 @@ function addonTable:WatchRaidStylePartySetting()
 end
 
 
+-- Blizzard's own description of the unit frame settings, read straight from
+-- EditModeSettingDisplayInfoManager.systemSettingDisplayInfo.
+function addonTable:GetUnitFrameDisplayInfo()
+    if not (Enum and Enum.EditModeSystem) then return nil end
+
+    local mgr = _G['EditModeSettingDisplayInfoManager']
+    if not (mgr and mgr.systemSettingDisplayInfo) then return nil end
+
+    return mgr.systemSettingDisplayInfo[Enum.EditModeSystem.UnitFrame]
+end
+
 -- Which frame did Blizzard register for the raid unit frame system?
 --
 -- OnSystemSettingChange needs it, and it is not the same object as the party one.
@@ -1297,50 +1308,59 @@ end
 --     -> GetSettingValue(Enum.EditModeSystem.UnitFrame, systemIndex, ...FrameWidth)
 --
 -- and groupType is that system index. Writing the same number to the party system is all
--- "show party as raid" needs to follow the raid page.
---
--- Only where the party system admits to having the setting. The raid-only layout ones -
--- raid size, group split, row size - are not in that set, and are skipped rather than
--- forced onto a system that would ignore them anyway.
+-- Deprecated: Party now has its own blizzSettings table in Module.db.profile.party.
 function addonTable:MirrorRaidSettingToParty(setting, value)
-    if setting == nil or value == nil then return false end
-    if not (Enum and Enum.EditModeUnitFrameSystemIndices) then return false end
-
-    -- Every mirrored setting but one is safe, and the exception is worth naming.
-    --
-    -- The appliers this reaches on the party system end in PartyFrame:UpdatePaddingAndLayout
-    -- (EditModeSystemTemplates.lua:1442) or a plain SetAlpha - frame width, height, border,
-    -- template, icon size, opacity all go through
-    -- UpdateCompactRaidFrameContainerSetting, whose party branch never calls TryUpdate.
-    --
-    -- SortPlayersBy is the exception. Its party branch is
-    --
-    --   CompactPartyFrame:SetFlowSortFunction(sortFunc)   -- :1507
-    --
-    -- and CompactPartyFrameMixin:SetFlowSortFunction calls self:RefreshMembers() on its
-    -- second line, which writes optionTable on every compact party member from our
-    -- execution. That field is read on the first line of CompactUnitFrame_UpdateAll, before
-    -- the frame:Hide() the client refuses in combat - the one seed that breaks the party
-    -- frames outright. A sort order is not worth that, so it is skipped.
-    if Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.SortPlayersBy then
-        return false
-    end
-
-    local frame = GetPartySystemFrame()
-    if not (frame and frame.HasSetting) then return false end
-
-    local hasIt, has = pcall(frame.HasSetting, frame, setting)
-    if not (hasIt and has) then return false end
-
-    addonTable:SyncUnitFrameEditModeSetting(Enum.EditModeUnitFrameSystemIndices.Party, setting, value, frame,
-                                            'party frame setting ' .. tostring(setting))
-    return true
+    return false
 end
 
 -- Exposed so the diagnostics can report which settings the party system actually shares
 -- with the raid one, rather than leaving the intersection to guesswork.
 function addonTable:GetPartySystemFrameForOptions()
     return GetPartySystemFrame()
+end
+
+-- One party frame Edit Mode setting, by setting id.
+function addonTable:SetPartyEditModeSettingBySetting(setting, value)
+    if not (Enum and Enum.EditModeUnitFrameSystemIndices) then return false end
+    if setting == nil then return false end
+
+    local frame = GetPartySystemFrame()
+
+    -- SortPlayersBy on PartyFrame calls CompactPartyFrame:SetFlowSortFunction, which
+    -- calls RefreshMembers() and taints optionTable on all compact party members.
+    -- To keep execution clean and combat-safe, save it layout-only so Blizzard applies
+    -- it on reload/login without insecure taint.
+    local layoutOnly = false
+    if Enum.EditModeUnitFrameSetting and setting == Enum.EditModeUnitFrameSetting.SortPlayersBy then
+        layoutOnly = true
+    end
+
+    addonTable:SyncUnitFrameEditModeSetting(Enum.EditModeUnitFrameSystemIndices.Party, setting, value,
+                                            frame, 'party frame setting ' .. tostring(setting), layoutOnly)
+    return true
+end
+
+-- The stored value Blizzard currently holds for the party system, or nil when the
+-- system has no such setting.
+function addonTable:GetPartyEditModeSettingBySetting(setting)
+    if setting == nil then return nil end
+
+    local frame = GetPartySystemFrame()
+    if not (frame and frame.GetSettingValue and frame.HasSetting) then return nil end
+
+    local hasIt, has = pcall(frame.HasSetting, frame, setting)
+    if not (hasIt and has) then return nil end
+
+    local ok, val = pcall(frame.GetSettingValue, frame, setting)
+    if not ok then return nil end
+
+    return val
+end
+
+function addonTable:SetPartyEditModeSetting(settingKey, value)
+    if not (Enum and Enum.EditModeUnitFrameSetting) then return false end
+
+    return addonTable:SetPartyEditModeSettingBySetting(Enum.EditModeUnitFrameSetting[settingKey], value)
 end
 
 -- One raid frame Edit Mode setting, by setting id.
