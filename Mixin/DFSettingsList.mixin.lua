@@ -255,9 +255,17 @@ function DFSettingsListMixin:Display(data, small)
 
     -- first pass ~> categorys
     for k, v in pairs(data.options.args) do
-        --
+        local isHidden = false
+        if v.hidden then
+            if type(v.hidden) == 'function' then
+                local ok, res = pcall(v.hidden)
+                isHidden = ok and res and true or false
+            else
+                isHidden = v.hidden and true or false
+            end
+        end
 
-        if v.type == 'header' then
+        if v.type == 'header' and not isHidden then
             -- print('header', k)
             local elementData = {key = k, order = (v.order or 9999), name = (v.name or ''), args = v, small = small}
             local node = self.DataProvider:Insert(elementData);
@@ -275,10 +283,18 @@ function DFSettingsListMixin:Display(data, small)
 
     -- second pass ~> elements
     for k, v in pairs(data.options.args) do
-        --
+        local isHidden = false
+        if v.hidden then
+            if type(v.hidden) == 'function' then
+                local ok, res = pcall(v.hidden)
+                isHidden = ok and res and true or false
+            else
+                isHidden = v.hidden and true or false
+            end
+        end
 
-        if v.type == 'header' then
-            -- already done
+        if v.type == 'header' or isHidden then
+            -- already done or hidden
         else
             local elementData = {
                 key = k,
