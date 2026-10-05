@@ -542,6 +542,7 @@ function SubModuleMixin:SetupOptions()
                 editmode = true
             },
             classcolor = {
+                hidden = function() return SubModuleMixin.GetRaidStylePartyFrames() end,
                 type = 'toggle',
                 name = L["PartyFrameClassColor"],
                 desc = L["PartyFrameClassColorDesc"] .. getDefaultStr('classcolor', 'party'),
@@ -550,6 +551,7 @@ function SubModuleMixin:SetupOptions()
                 editmode = true
             },
             gradient = {
+                hidden = function() return SubModuleMixin.GetRaidStylePartyFrames() end,
                 type = 'toggle',
                 name = L["PlayerFrameGradientColor"],
                 desc = L["PlayerFrameGradientColorDesc"] .. getDefaultStr('gradient', 'party'),
@@ -559,6 +561,7 @@ function SubModuleMixin:SetupOptions()
                 editmode = true
             },
             breakUpLargeNumbers = {
+                hidden = function() return SubModuleMixin.GetRaidStylePartyFrames() end,
                 type = 'toggle',
                 name = L["PartyFrameBreakUpLargeNumbers"],
                 desc = L["PartyFrameBreakUpLargeNumbersDesc"] .. getDefaultStr('breakUpLargeNumbers', 'party'),
@@ -604,6 +607,7 @@ function SubModuleMixin:SetupOptions()
                 editmode = true
             },
             orientation = {
+                hidden = function() return SubModuleMixin.GetRaidStylePartyFrames() end,
                 type = 'select',
                 name = L["ButtonTableOrientation"],
                 desc = L["ButtonTableOrientationDesc"] .. getDefaultStr('orientation', 'party'),
@@ -613,6 +617,7 @@ function SubModuleMixin:SetupOptions()
                 editmode = true
             },
             disableBuffTooltip = {
+                hidden = function() return SubModuleMixin.GetRaidStylePartyFrames() end,
                 type = 'select',
                 name = L["PartyFrameDisableBuffTooltip"],
                 desc = L["PartyFrameDisableBuffTooltipDesc"] .. getDefaultStr('disableBuffTooltip', 'party'),
@@ -623,6 +628,7 @@ function SubModuleMixin:SetupOptions()
                 new = false
             },
             padding = {
+                hidden = function() return SubModuleMixin.GetRaidStylePartyFrames() end,
                 type = 'range',
                 name = L["ButtonTablePadding"],
                 desc = L["ButtonTablePaddingDesc"] .. getDefaultStr('padding', 'party'),
@@ -657,6 +663,13 @@ function SubModuleMixin:SetupOptions()
             if saved then saved[tostring(setting)] = value end
 
             addonTable:SetPartyEditModeSettingBySetting(setting, value)
+
+            -- Width, height and flow affect placeholder and anchor; refresh again once Blizzard has laid out.
+            local sub = Module.SubParty
+            if sub and sub.Update then
+                sub:Update()
+                C_Timer.After(0.2, function() sub:Update() end)
+            end
         end
 
         self.GetBlizzPartyStored = GetBlizzPartyStored
@@ -741,9 +754,6 @@ function SubModuleMixin:SetupOptions()
                     local key = 'blizzParty' .. tostring(setting)
                     if not args[key] then
                         local NOTES = {
-                            SortPlayersBy = L['PartyFrameNoteSortPlayersBy'],
-                            IconSize = L['PartyFrameNotePreviewNotShown'],
-                            DebuffIconSize = L['PartyFrameNotePreviewNotShown'],
                             AuraOrganizationType = L['PartyFrameNoteAuraOrganization']
                         }
 
@@ -842,10 +852,9 @@ function SubModuleMixin:SetupOptions()
                     local function SetStored(value) SetBlizzPartyStored(cand.setting, value) end
 
                     local baseDesc = L['BlizzEditModeSettingDesc']
-                    local previewNote = L['PartyFrameNotePreviewNotShown']
                     args[key] = {
                         name = cand.name,
-                        desc = baseDesc .. previewNote,
+                        desc = baseDesc,
                         type = 'range',
                         min = cand.min,
                         max = cand.max,
@@ -950,7 +959,9 @@ function SubModuleMixin:SetupOptions()
                                     setDefaultSubValues('party')
                                 end,
                                 moduleRef = self.ModuleRef,
-                                previewOnly = true
+                                previewOnly = true,
+                                dragStartFunction = function() SubModuleMixin.SetPartyDragFollow(self, true) end,
+                                dragStopFunction = function() SubModuleMixin.SetPartyDragFollow(self, false) end
                             })
                         end
                     end
@@ -1913,7 +1924,9 @@ function SubModuleMixin:Setup()
             setDefaultSubValues('party')
         end,
         moduleRef = self.ModuleRef,
-        previewOnly = true
+        previewOnly = true,
+        dragStartFunction = function() SubModuleMixin.SetPartyDragFollow(self, true) end,
+        dragStopFunction = function() SubModuleMixin.SetPartyDragFollow(self, false) end
     });
 
     -- Modern pooled party setup (Era 1.15.9+, TBC 2.5.6+, MoP 5.5.4+)
@@ -1957,6 +1970,56 @@ function SubModuleMixin:OnEvent(event, ...)
     end
 end
 
+-- Parks CompactPartyFrame on the move frame (first member at the holder's top left), out of combat only.
+function SubModuleMixin:AnchorCompactPartyFrame()
+    local holder = self.PartyMoveFrame
+    local compact = _G['CompactPartyFrame']
+    if not (holder and compact) or InCombatLockdown() then return end
+
+    local ok, err = pcall(function()
+        if compact:GetParent() ~= holder then compact:SetParent(holder) end
+
+        local dx, dy = 0, 0
+        local member = _G['CompactPartyFrameMember1']
+        local _, relativeTo = compact:GetPoint(1)
+        -- Only measurable once the container hangs on the holder.
+        if relativeTo == holder and member and member:IsShown() then
+            local cl, ct = compact:GetLeft(), compact:GetTop()
+            local ml, mt = member:GetLeft(), member:GetTop()
+            if cl and ct and ml and mt then dx, dy = ml - cl, ct - mt end
+        end
+
+        compact:ClearAllPoints()
+        compact:SetPoint('TOPLEFT', holder, 'TOPLEFT', -dx, dy)
+    end)
+    if not ok then geterrorhandler()('DFUI compact party anchor: ' .. tostring(err)) end
+
+    if not self.CompactPartyAnchorHooked then
+        self.CompactPartyAnchorHooked = true
+
+        -- Blizzard re-places it from its layout code; put it back afterwards, never during.
+        hooksecurefunc(compact, 'SetPoint', function(_, _, relativeTo)
+            if relativeTo == self.PartyMoveFrame or InCombatLockdown() then return end
+            C_Timer.After(0, function()
+                if self.GetRaidStylePartyFrames(self) then self:AnchorCompactPartyFrame() end
+            end)
+        end)
+
+        -- A second pass once the members have been laid out, so the measured offset is real.
+        compact:HookScript('OnShow', function()
+            C_Timer.After(0.1, function()
+                if self.GetRaidStylePartyFrames(self) then self:AnchorCompactPartyFrame() end
+            end)
+        end)
+    end
+end
+
+-- Lets the holder follow the placeholder while it is dragged; Update re-anchors it on release.
+function SubModuleMixin:SetPartyDragFollow(follow)
+    local preview = self.PreviewParty
+    if preview then preview.DFDragHolder = follow and self.PartyMoveFrame or nil end
+end
+
 function SubModuleMixin:UpdateState(state)
     self.state = state;
     self:Update();
@@ -1968,18 +2031,51 @@ function SubModuleMixin:Update()
     local state = self.state;
     if not state then return end
 
-    local parent = _G[state.anchorFrame] or UIParent
+    -- Same parent resolution as the placeholder, so both end up on the same anchor frame.
+    local parent
+    if DF.Settings.ValidateFrame(state.customAnchorFrame) then
+        parent = _G[state.customAnchorFrame]
+    elseif DF.Settings.ValidateFrame(state.anchorFrame) then
+        parent = _G[state.anchorFrame]
+    end
+    parent = parent or UIParent
+
     self.PartyMoveFrame:ClearAllPoints();
     self.PartyMoveFrame:SetPoint(state.anchor, parent, state.anchorParent, state.x, state.y)
     self.PartyMoveFrame:SetScale(state.scale)
 
-    -- Pooled member frames are 120x53
-    local sizeX, sizeY = 120, 53
+    local raidStyle = self.GetRaidStylePartyFrames(self)
+    local preview = self.PreviewParty
 
-    if state.orientation == 'vertical' then
-        self.PartyMoveFrame:SetSize(sizeX, sizeY * 4 + 3 * state.padding)
+    if raidStyle and preview then
+        -- Same size as the placeholder, or the shared anchor shifts them apart.
+        local w, h = preview:GetSize()
+        if (w or 0) > 2 and (h or 0) > 2 then self.PartyMoveFrame:SetSize(w, h) end
+
+        -- Same scale as the placeholder; Blizzard scales PartyFrame, so the compact frame inherits it from the holder.
+        local sizeId = Enum and Enum.EditModeUnitFrameSetting and Enum.EditModeUnitFrameSetting.FrameSize
+        local sizePct = sizeId ~= nil and self.GetBlizzPartyStored and tonumber(self.GetBlizzPartyStored(sizeId))
+        if sizePct and sizePct > 0 then self.PartyMoveFrame:SetScale((state.scale or 1.0) * sizePct / 100) end
     else
-        self.PartyMoveFrame:SetSize(sizeX * 4 + 3 * state.padding, sizeY)
+        -- Pooled member frames are 120x53
+        local sizeX, sizeY = 120, 53
+
+        if state.orientation == 'vertical' then
+            self.PartyMoveFrame:SetSize(sizeX, sizeY * 4 + 3 * state.padding)
+        else
+            self.PartyMoveFrame:SetSize(sizeX * 4 + 3 * state.padding, sizeY)
+        end
+    end
+
+    if raidStyle then
+        self:AnchorCompactPartyFrame()
+
+        -- Blizzard's Opacity applier only alphas PartyFrame, so apply it to CompactPartyFrame (not protected, fine in combat).
+        local compact = _G['CompactPartyFrame']
+        local opacity = tonumber(self.GetBlizzPartyStored and Enum and Enum.EditModeUnitFrameSetting and
+                                     Enum.EditModeUnitFrameSetting.Opacity ~= nil and
+                                     self.GetBlizzPartyStored(Enum.EditModeUnitFrameSetting.Opacity))
+        if compact and opacity then compact:SetAlpha(math.min(math.max(opacity, 1), 100) / 100) end
     end
 
     if not InCombatLockdown() and PartyFrame and self.PartyMoveFrame then
