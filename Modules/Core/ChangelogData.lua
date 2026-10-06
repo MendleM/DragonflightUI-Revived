@@ -44,6 +44,11 @@ DF.ChangelogData = {
                     'Added an "Other Debuffs Scale" slider (50–100%, default 100%) to shrink other players\' debuffs independently of your own.'
                 }
             }, {
+                title = 'Tooltip',
+                items = {
+                    'Fixed a Lua error that repeated endlessly while hovering certain buffs on the target frame with "Show Spell Icon" enabled.'
+                }
+            }, {
                 title = 'Localization',
                 items = {
                     'Localized the new Nameplate aura options across English, German, Spanish, Russian, and Simplified Chinese.'

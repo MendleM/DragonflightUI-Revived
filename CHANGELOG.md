@@ -14,6 +14,8 @@ Enemy nameplates can now show other players' debuffs next to your own.
 - Other players' debuffs are shown slightly transparent, so your own stand out and a lapsed one is easy to spot.
 - Added a "Maximum Debuffs" slider (1–16, default 8) to control how many of those debuffs a nameplate shows.
 - Added an "Other Debuffs Scale" slider (50–100%, default 100%) to shrink other players' debuffs independently of your own.
+### Tooltip
+- Fixed a Lua error that repeated endlessly while hovering certain buffs on the target frame with "Show Spell Icon" enabled.
 ### Localization
 - Localized the new Nameplate aura options across English, German, Spanish, Russian, and Simplified Chinese.
 
