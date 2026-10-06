@@ -78,7 +78,6 @@ local modulesOptions = {
             name = L["ModuleNameplates"],
             desc = L["ModuleTooltipNameplates"] .. getDefaultStr('Nameplates', 'modules'),
             order = 2.5,
-            new = true,
             group = 'headerModules'
         },
         Castbar = {
@@ -171,7 +170,6 @@ local modulesOptions = {
             name = L["ModuleGroupLoot"],
             desc = L["ModuleTooltipGroupLoot"] .. getDefaultStr('GroupLoot', 'modules'),
             order = 9,
-            new = true,
             group = 'headerModules'
         }
     }

@@ -2,10 +2,22 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.49.0`.
+May 2026). Current builds report version `0.50.0`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.50.0 — Nameplate Debuffs (6 October 2026)
+Enemy nameplates can now show other players' debuffs next to your own.
+### Nameplates
+- Added a "Show all debuffs" option: enemy nameplates list debuffs from other players and NPCs as well, instead of only your own.
+- Other players' debuffs are shown slightly transparent, so your own stand out and a lapsed one is easy to spot.
+- Added a "Maximum Debuffs" slider (1–16, default 8) to control how many of those debuffs a nameplate shows.
+- Added an "Other Debuffs Scale" slider (50–100%, default 100%) to shrink other players' debuffs independently of your own.
+### Tooltip
+- Fixed a Lua error that repeated endlessly while hovering certain buffs on the target frame with "Show Spell Icon" enabled.
+### Localization
+- Localized the new Nameplate aura options across English, German, Spanish, Russian, and Simplified Chinese.
 
 ## 0.49.0 — Raid-Style Party Frame Settings (5 October 2026)
 Raid-style party frames now have their own settings, independent of the Raid Frame, and the Raid Frame gained aura size and layout options.

@@ -413,7 +413,6 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
             bigStep = 0.01,
             order = 70,
             group = 'headerVis',
-            new = true,
             editmode = true
         },
         alphaCombat = {
@@ -425,7 +424,6 @@ function DragonflightUIStateHandlerMixin:AddStateTable(Module, optionTable, sub,
             bigStep = 0.01,
             order = 70.5,
             group = 'headerVis',
-            new = true,
             editmode = true
         },
         showMouseover = {

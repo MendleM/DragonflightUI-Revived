@@ -195,7 +195,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PlayerFrameGradientColorDesc"] .. getDefaultStr('gradient', 'target'),
                 group = 'headerStyling',
                 order = 2.1,
-                new = true,
                 editmode = true
             },
             reactioncolor = {
@@ -218,7 +217,6 @@ function SubModuleMixin:SetupOptions()
                 end),
                 group = 'headerStyling',
                 order = 4,
-                new = true
             },
             customPowerBarTexture = {
                 type = 'select',
@@ -231,7 +229,6 @@ function SubModuleMixin:SetupOptions()
                 end),
                 group = 'headerStyling',
                 order = 5,
-                new = true
             },
             classicon = {
                 type = 'toggle',
@@ -274,7 +271,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PlayerFrameHidePVPDesc"] .. getDefaultStr('hidePVP', 'target'),
                 group = 'headerStyling',
                 order = 11.5,
-                new = true,
                 editmode = true
             },
             comboPointsOnPlayerFrame = {
@@ -385,7 +381,6 @@ function SubModuleMixin:SetupOptions()
                 bigStep = 1,
                 group = 'headerBuffs',
                 order = 4,
-                new = true,
                 editmode = true
             }
             moreOptions['auraSizeLarge'] = {
@@ -397,7 +392,6 @@ function SubModuleMixin:SetupOptions()
                 bigStep = 1,
                 group = 'headerBuffs',
                 order = 2,
-                new = true,
                 editmode = true
             }
             moreOptions['noDebuffFilter'] = {
@@ -406,7 +400,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["TargetFrameNoDebuffFilterDesc"] .. getDefaultStr('noDebuffFilter', 'target'),
                 group = 'headerBuffs',
                 order = 1,
-                new = true,
                 editmode = true
             }
             moreOptions['dynamicBuffSize'] = {
@@ -415,7 +408,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["TargetFrameDynamicBuffSizeDesc"] .. getDefaultStr('dynamicBuffSize', 'target'),
                 group = 'headerBuffs',
                 order = 3,
-                new = true,
                 editmode = true
             }
             -- advanced
@@ -436,7 +428,6 @@ function SubModuleMixin:SetupOptions()
                 bigStep = 0.25,
                 group = 'headerBuffsAdvanced',
                 order = 10,
-                new = true,
                 editmode = true
             }
             moreOptions['auraRowWidth'] = {
@@ -448,7 +439,6 @@ function SubModuleMixin:SetupOptions()
                 bigStep = 1,
                 group = 'headerBuffsAdvanced',
                 order = 11,
-                new = true,
                 editmode = true
             }
             moreOptions['totAuraRowWidth'] = {
@@ -460,7 +450,6 @@ function SubModuleMixin:SetupOptions()
                 bigStep = 1,
                 group = 'headerBuffsAdvanced',
                 order = 12,
-                new = true,
                 editmode = true
             }
             moreOptions['numTotAuraRows'] = {
@@ -472,7 +461,6 @@ function SubModuleMixin:SetupOptions()
                 bigStep = 1,
                 group = 'headerBuffsAdvanced',
                 order = 13,
-                new = true,
                 editmode = true
             }
         end

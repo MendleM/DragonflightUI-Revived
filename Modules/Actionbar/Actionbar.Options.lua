@@ -891,7 +891,6 @@ local function AddButtonTable(optionTable, sub)
             desc = L["MoreOptionsIconRangeColorDesc"] .. getDefaultStr('range', sub),
             group = 'headerStyling',
             order = 51.1,
-            new = true,
             editmode = true
         },
         hideMacro = {
@@ -1085,7 +1084,6 @@ local function GetBarOption(n)
                 group = 'headerStyling',
                 order = 50.2,
                 editmode = true,
-                new = true
             }
         }
         for k, v in pairs(moreOptions) do opt.args[k] = v end
@@ -1997,7 +1995,7 @@ function Module:RegisterSettings()
     register('fps', {order = 17, name = fpsOptions.name, descr = 'desc', isNew = false})
 
     register('vehicleLeave', {order = 18, name = self.SubVehicleLeave.Options.name, descr = 'desc', isNew = false})
-    register('actionbarRange', {order = 8.5, name = self.SubActionbarRange.Options.name, descr = 'desc', isNew = true})
+    register('actionbarRange', {order = 8.5, name = self.SubActionbarRange.Options.name, descr = 'desc', isNew = false})
 
     if DF.Cata then
         register('totembar', {order = 14, name = totemOptions.name, descr = 'desc', isNew = false})

@@ -265,7 +265,7 @@ function Module:RegisterSettings()
         DF.ConfigModule:RegisterSettingsElement(name, cat, data, true)
     end
 
-    register('roll', {order = 18, name = rollOptions.name, descr = 'desc', isNew = true})
+    register('roll', {order = 18, name = rollOptions.name, descr = 'desc', isNew = false})
 end
 
 function Module:RegisterOptionScreens()

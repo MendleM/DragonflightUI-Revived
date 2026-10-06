@@ -88,6 +88,16 @@ do
         "Muestra solo el nombre para jugadores amistosos, sin barra de salud."
     L["NameplatesOptionForceShowNames"] = "Mostrar siempre nombres"
     L["NameplatesOptionForceShowNamesDesc"] = "Mantiene visibles los nombres de las unidades sin placa."
+    L["NameplatesHeaderAuras"] = "Auras / Perjuicios"
+    L["NameplatesOptionShowAllDebuffs"] = "Mostrar todos los perjuicios"
+    L["NameplatesOptionShowAllDebuffsDesc"] =
+        "Muestra todos los perjuicios en placas de enemigos, incluidos los de otros jugadores y PNJ, en lugar de solo los propios."
+    L["NameplatesOptionMaxDebuffs"] = "Perjuicios máximos"
+    L["NameplatesOptionMaxDebuffsDesc"] =
+        "Número máximo de perjuicios de otros jugadores por placa de nombre."
+    L["NameplatesOptionOtherDebuffScale"] = "Escala de perjuicios ajenos"
+    L["NameplatesOptionOtherDebuffScaleDesc"] =
+        "Tamaño de los perjuicios de otros jugadores en porcentaje del tamaño de tus propios perjuicios (100 % = mismo tamaño)."
 end
 
 -- config 

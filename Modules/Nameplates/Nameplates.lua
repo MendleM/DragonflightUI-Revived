@@ -14,7 +14,17 @@ Mixin(Module, DragonflightUIModulesMixin)
 --   'CLASSIC' - the classic Era look (border ring + level box)
 --   'BLIZZARD'- do not touch the CVar at all; whatever you set in
 --               Blizzard's options sticks across reloads
-local defaults = {profile = {classColors = true, modernStyle = true, style = 'THIN', styleTexture = true}}
+local defaults = {
+    profile = {
+        classColors = true,
+        modernStyle = true,
+        style = 'THIN',
+        styleTexture = true,
+        showAllDebuffs = false,
+        maxDebuffs = 8,
+        otherDebuffScale = 100
+    }
+}
 Module:SetDefaults(defaults)
 
 local function getDefaultStr(key, sub)
@@ -208,6 +218,43 @@ do
               L["NameplatesOptionFriendlyNameOnlyDesc"], 24, 'headerVisibility')
     addToggle('forceShowNames', L["NameplatesOptionForceShowNames"], L["NameplatesOptionForceShowNamesDesc"], 25,
               'headerVisibility')
+
+    -- only clients with Blizzard's nameplate auras and the aura API have anything to extend
+    if NamePlateAurasMixin and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+        args.headerAuras = {type = 'header', name = L["NameplatesHeaderAuras"], desc = '', order = 30, isExpanded = true}
+        args.showAllDebuffs = {
+            type = 'toggle',
+            name = L["NameplatesOptionShowAllDebuffs"],
+            desc = L["NameplatesOptionShowAllDebuffsDesc"] .. getDefaultStr('showAllDebuffs'),
+            order = 31,
+            group = 'headerAuras',
+            new = true
+        }
+        args.maxDebuffs = {
+            type = 'range',
+            name = L["NameplatesOptionMaxDebuffs"],
+            desc = L["NameplatesOptionMaxDebuffsDesc"] .. getDefaultStr('maxDebuffs'),
+            min = 1,
+            max = 16,
+            step = 1,
+            bigStep = 1,
+            order = 32,
+            group = 'headerAuras',
+            new = true
+        }
+        args.otherDebuffScale = {
+            type = 'range',
+            name = L["NameplatesOptionOtherDebuffScale"],
+            desc = L["NameplatesOptionOtherDebuffScaleDesc"] .. getDefaultStr('otherDebuffScale'),
+            min = 50,
+            max = 100,
+            step = 5,
+            bigStep = 5,
+            order = 33,
+            group = 'headerAuras',
+            new = true
+        }
+    end
 end
 
 function Module:OnInitialize()
@@ -402,8 +449,151 @@ function Module:ApplyStyleCVar()
     if wanted ~= nil then WriteCVar('nameplateStyle', wanted) end
 end
 
+-- Blizzard's AurasFrame only lists the player's own debuffs on enemies, and we cannot widen that without tainting its
+-- layout. So Blizzard keeps its list untouched and we add a row of our own frames above it for everyone else's.
+local OTHER_DEBUFF_SIZE = 25 -- NamePlateConstants.AURA_ITEM_HEIGHT
+local OTHER_DEBUFF_SPACING = 2
+local OTHER_DEBUFF_ALPHA = 0.6
+local OTHER_DEBUFFS_PER_ROW = 8
+local MAX_OTHER_DEBUFFS = 16
+local MAX_AURA_SCAN = 40
+
+local function CreateOtherDebuffButton(parent)
+    local button = CreateFrame('Frame', nil, parent)
+
+    button.icon = button:CreateTexture(nil, 'ARTWORK')
+    button.icon:SetAllPoints()
+    button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    button.border = button:CreateTexture(nil, 'OVERLAY')
+    button.border:SetTexture('Interface\\Buttons\\UI-Debuff-Overlays')
+    button.border:SetTexCoord(0.296875, 0.5703125, 0, 0.515625)
+    button.border:SetPoint('TOPLEFT', -1, 1)
+    button.border:SetPoint('BOTTOMRIGHT', 1, -1)
+
+    button.cooldown = CreateFrame('Cooldown', nil, button, 'CooldownFrameTemplate')
+    button.cooldown:SetAllPoints()
+    button.cooldown:SetReverse(true)
+
+    button.count = button:CreateFontString(nil, 'OVERLAY', 'NumberFontNormalSmall')
+    button.count:SetPoint('BOTTOMRIGHT', 3, -2)
+
+    return button
+end
+
+-- the plate's AurasFrame is the parent so our row follows its visibility (name-only plates, simplified plates)
+local function GetOtherDebuffContainer(auras)
+    local container = auras.DFOtherDebuffs
+    if container then return container end
+
+    container = CreateFrame('Frame', nil, auras)
+    container:SetSize(1, 1)
+    container:SetPoint('BOTTOMLEFT', auras.DebuffListFrame, 'TOPLEFT', 0, OTHER_DEBUFF_SPACING)
+    container.buttons = {}
+    auras.DFOtherDebuffs = container
+    return container
+end
+
+local function IsOwnAura(aura)
+    return aura.sourceUnit and UnitIsUnit('player', aura.sourceUnit)
+end
+
+-- Blizzard already lists a debuff when it is the player's own and flagged for nameplates (or the CVar lifts the flag
+-- requirement), or crowd control on an NPC
+local function BlizzardListsAura(aura, isPlayerUnit)
+    if IsOwnAura(aura) and (aura.nameplateShowPersonal or ReadToggle('nameplateShowAllPersonalAuras')) then
+        return true
+    end
+    return not isPlayerUnit and aura.spellId and C_Spell and C_Spell.IsSpellCrowdControl and
+               C_Spell.IsSpellCrowdControl(aura.spellId)
+end
+
+local function SetupOtherDebuffButton(button, aura, size)
+    button:SetSize(size, size)
+    button.icon:SetTexture(aura.icon)
+
+    -- other players' debuffs are dimmed so the player's own stand out and a lapsed one is easy to spot
+    button:SetAlpha(IsOwnAura(aura) and 1 or OTHER_DEBUFF_ALPHA)
+
+    local color = DebuffTypeColor and DebuffTypeColor[aura.dispelName or 'none']
+    if color then button.border:SetVertexColor(color.r, color.g, color.b) end
+
+    if aura.applications and aura.applications > 1 then
+        button.count:SetText(aura.applications)
+        button.count:Show()
+    else
+        button.count:Hide()
+    end
+
+    if aura.duration and aura.duration > 0 then
+        button.cooldown:SetCooldown(aura.expirationTime - aura.duration, aura.duration)
+        button.cooldown:SetHideCountdownNumbers(aura.duration > 60)
+        button.cooldown:Show()
+    else
+        button.cooldown:Hide()
+    end
+
+    button:Show()
+end
+
+local function UpdateOtherDebuffs(plate, eventUnit)
+    local uf = plate and plate.UnitFrame
+    if not uf or (uf.IsForbidden and uf:IsForbidden()) then return end
+
+    local auras = uf.AurasFrame
+    if not auras then return end
+
+    -- the event's token first: the plate's own fields may not be filled yet when we run
+    local unit = eventUnit or auras.unitToken or plate.namePlateUnitToken
+    local profile = Module.db and Module.db.profile
+    local wanted = profile and profile.showAllDebuffs and unit and UnitCanAttack('player', unit)
+
+    local container = auras.DFOtherDebuffs
+    if not wanted and not container then return end
+    container = container or GetOtherDebuffContainer(auras)
+
+    local count = 0
+    if wanted then
+        local limit = math.min(profile.maxDebuffs or 8, MAX_OTHER_DEBUFFS)
+        local size = OTHER_DEBUFF_SIZE * (auras.auraItemScale or 1) * math.min(profile.otherDebuffScale or 100, 100) / 100
+        local isPlayerUnit = UnitIsPlayer(unit)
+
+        for index = 1, MAX_AURA_SCAN do
+            local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, 'HARMFUL')
+            if not aura then break end
+
+            if not BlizzardListsAura(aura, isPlayerUnit) then
+                count = count + 1
+                local button = container.buttons[count] or CreateOtherDebuffButton(container)
+                container.buttons[count] = button
+                SetupOtherDebuffButton(button, aura, size)
+                if count >= limit then break end
+            end
+        end
+
+        -- left-aligned like Blizzard's own list, rows stack upwards
+        local step = size + OTHER_DEBUFF_SPACING
+        for i = 1, count do
+            local row = math.floor((i - 1) / OTHER_DEBUFFS_PER_ROW)
+            local col = (i - 1) % OTHER_DEBUFFS_PER_ROW
+            local button = container.buttons[i]
+            button:ClearAllPoints()
+            button:SetPoint('BOTTOMLEFT', container, 'BOTTOMLEFT', col * step, row * step)
+        end
+    end
+
+    for i = count + 1, #container.buttons do container.buttons[i]:Hide() end
+end
+
+function Module:UpdateAllOtherDebuffs()
+    if not (C_NamePlate and C_NamePlate.GetNamePlates) then return end
+
+    for _, plate in ipairs(C_NamePlate.GetNamePlates()) do UpdateOtherDebuffs(plate) end
+end
+
 function Module:ApplySettings(sub, key)
     self:ApplyStyleCVar()
+    self:UpdateAllOtherDebuffs()
     -- force: the styling toggle and the style itself both change what the
     -- plates should look like right now
     self:RestyleAll(true)
@@ -429,8 +619,27 @@ function Module:OnEnable()
     local frame = CreateFrame('Frame')
     self.Frame = frame
     frame:RegisterEvent('NAME_PLATE_UNIT_ADDED')
-    frame:SetScript('OnEvent', function(_, _, unit)
-        StylePlate(unit)
+    frame:RegisterEvent('NAME_PLATE_UNIT_REMOVED')
+    frame:RegisterEvent('UNIT_AURA')
+    frame:SetScript('OnEvent', function(_, event, unit)
+        if event == 'UNIT_AURA' then
+            -- fires for every unit; only nameplate tokens matter
+            if not (unit and unit:find('^nameplate')) then return end
+        elseif event == 'NAME_PLATE_UNIT_ADDED' then
+            StylePlate(unit)
+        end
+
+        local plate = C_NamePlate.GetNamePlateForUnit(unit)
+        if event == 'NAME_PLATE_UNIT_REMOVED' then
+            -- the pooled plate keeps its row until it is reused
+            local auras = plate and plate.UnitFrame and plate.UnitFrame.AurasFrame
+            local container = auras and auras.DFOtherDebuffs
+            if container then
+                for _, button in ipairs(container.buttons) do button:Hide() end
+            end
+        else
+            UpdateOtherDebuffs(plate, unit)
+        end
     end)
 
     -- Blizzard's driver rebuilds every plate when a nameplate CVar it watches
@@ -476,6 +685,7 @@ function Module:OnEnable()
 
     -- Style anything already on screen (enable happens post-login).
     self:RestyleAll(true)
+    self:UpdateAllOtherDebuffs()
 
     DF.ConfigModule:RegisterSettingsData('nameplates', 'misc',
                                          {name = L["ModuleNameplates"], options = options, default = setDefaultValues})

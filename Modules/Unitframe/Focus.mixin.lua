@@ -169,7 +169,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PlayerFrameGradientColorDesc"] .. getDefaultStr('gradient', 'focus'),
                 group = 'headerStyling',
                 order = 2.1,
-                new = true,
                 editmode = true
             },
             reactioncolor = {
@@ -192,7 +191,6 @@ function SubModuleMixin:SetupOptions()
                 end),
                 group = 'headerStyling',
                 order = 4,
-                new = true
             },
             customPowerBarTexture = {
                 type = 'select',
@@ -205,7 +203,6 @@ function SubModuleMixin:SetupOptions()
                 end),
                 group = 'headerStyling',
                 order = 5,
-                new = true
             },
             classicon = {
                 type = 'toggle',
@@ -261,7 +258,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PlayerFrameHidePVPDesc"] .. getDefaultStr('hidePVP', 'focus'),
                 group = 'headerStyling',
                 order = 11.5,
-                new = true,
                 editmode = true
             }
         }

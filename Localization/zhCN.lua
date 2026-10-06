@@ -95,6 +95,16 @@ do
         "友方玩家仅显示名字，不显示生命条。"
     L["NameplatesOptionForceShowNames"] = "始终显示名字"
     L["NameplatesOptionForceShowNamesDesc"] = "即使没有姓名板也始终保持单位名字可见。"
+    L["NameplatesHeaderAuras"] = "光环 / 减益"
+    L["NameplatesOptionShowAllDebuffs"] = "显示所有减益效果"
+    L["NameplatesOptionShowAllDebuffsDesc"] =
+        "在敌方姓名板上显示所有减益效果（包括来自其他玩家和NPC的），而不仅显示自己的。"
+    L["NameplatesOptionMaxDebuffs"] = "最大减益数量"
+    L["NameplatesOptionMaxDebuffsDesc"] =
+        "每个姓名板上显示的其他玩家减益的最大数量。"
+    L["NameplatesOptionOtherDebuffScale"] = "他人减益缩放"
+    L["NameplatesOptionOtherDebuffScaleDesc"] =
+        "其他玩家减益图标的大小，以你自己减益图标大小的百分比表示（100% = 相同大小）。"
 end
 
 -- config 

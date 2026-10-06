@@ -98,6 +98,16 @@ do
         "Show only the name for friendly players, without a health bar."
     L["NameplatesOptionForceShowNames"] = "Always show names"
     L["NameplatesOptionForceShowNamesDesc"] = "Keep unit names visible without a nameplate."
+    L["NameplatesHeaderAuras"] = "Auras / Debuffs"
+    L["NameplatesOptionShowAllDebuffs"] = "Show all debuffs"
+    L["NameplatesOptionShowAllDebuffsDesc"] =
+        "Display all debuffs on enemy nameplates, including those from other players and NPCs, instead of only your own."
+    L["NameplatesOptionMaxDebuffs"] = "Maximum Debuffs"
+    L["NameplatesOptionMaxDebuffsDesc"] =
+        "Maximum number of other players' debuffs shown per nameplate."
+    L["NameplatesOptionOtherDebuffScale"] = "Other Debuffs Scale"
+    L["NameplatesOptionOtherDebuffScaleDesc"] =
+        "Size of other players' debuffs in percent of your own debuffs' size (100% = same size)."
 end
 
 -- config 

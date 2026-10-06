@@ -181,7 +181,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PlayerFrameGradientColorDesc"] .. getDefaultStr('gradient', 'player'),
                 group = 'headerStyling',
                 order = 2.1,
-                new = true,
                 editmode = true
             },
             classicon = {
@@ -263,7 +262,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PlayerFrameHidePVPDesc"] .. getDefaultStr('hidePVP', 'player'),
                 group = 'headerStyling',
                 order = 14,
-                new = true,
                 editmode = true
             }
         }
@@ -374,7 +372,6 @@ function SubModuleMixin:SetupOptions()
             end),
             group = 'headerStyling',
             order = 4,
-            new = true
         }
         optionsPlayer.args['customPowerBarTexture'] = {
             type = 'select',
@@ -387,7 +384,6 @@ function SubModuleMixin:SetupOptions()
             end),
             group = 'headerStyling',
             order = 5,
-            new = true
         }
     end
 

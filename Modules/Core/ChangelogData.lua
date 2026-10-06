@@ -24,6 +24,39 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.50.0',
+        title = 'Nameplate Debuffs',
+        date = '6 October 2026',
+        intro = "Enemy nameplates can now show other players' debuffs next to your own.",
+        sections = {
+            {
+                title = 'Highlights',
+                items = {
+                    'New "Show all debuffs" option for enemy nameplates.',
+                    'New "Maximum Debuffs" slider to control how many debuffs a nameplate shows.'
+                }
+            }, {
+                title = 'Nameplates',
+                items = {
+                    'Added a "Show all debuffs" option: enemy nameplates list debuffs from other players and NPCs as well, instead of only your own.',
+                    "Other players' debuffs are shown slightly transparent, so your own stand out and a lapsed one is easy to spot.",
+                    'Added a "Maximum Debuffs" slider (1–16, default 8) to control how many of those debuffs a nameplate shows.',
+                    'Added an "Other Debuffs Scale" slider (50–100%, default 100%) to shrink other players\' debuffs independently of your own.'
+                }
+            }, {
+                title = 'Tooltip',
+                items = {
+                    'Fixed a Lua error that repeated endlessly while hovering certain buffs on the target frame with "Show Spell Icon" enabled.'
+                }
+            }, {
+                title = 'Localization',
+                items = {
+                    'Localized the new Nameplate aura options across English, German, Spanish, Russian, and Simplified Chinese.'
+                }
+            }
+        }
+    },
+    {
         version = '0.49.0',
         title = 'Raid-Style Party Frame Settings',
         date = '5 October 2026',

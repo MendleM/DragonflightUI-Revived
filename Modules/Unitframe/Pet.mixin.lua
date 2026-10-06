@@ -193,7 +193,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PetFrameHideDebuffsDesc"] .. getDefaultStr('hideDebuffs', 'pet'),
                 group = 'headerStyling',
                 order = 12,
-                new = true,
                 editmode = true
             },
             customHealthBarTexture = {
@@ -207,7 +206,6 @@ function SubModuleMixin:SetupOptions()
                 end),
                 group = 'headerStyling',
                 order = 41,
-                new = true
             },
             customPowerBarTexture = {
                 type = 'select',
@@ -220,7 +218,6 @@ function SubModuleMixin:SetupOptions()
                 end),
                 group = 'headerStyling',
                 order = 41,
-                new = true
             }
         }
     }

@@ -119,6 +119,17 @@ local GetItemQualityColor = (C_Item and C_Item.GetItemQualityColor) and C_Item.G
 local sourceColor = "|cffffc000%s|r"
 local whiteColor = "|cffffffff%s|r"
 
+-- GetSpellTexture is nil for uncached and NPC-only spells, and SetFormattedText throws on a nil argument - on an aura
+-- tooltip that fires every update. Fall back to the icon the caller already has, and skip the icon if there is none.
+local function prependSpellIcon(tooltip, spellId, fallbackIcon)
+    local texture = GetSpellTexture(spellId) or fallbackIcon
+    local line = _G[tooltip:GetName() .. 'TextLeft1']
+    local text = line and line:GetText()
+    if not (texture and text) then return end
+
+    line:SetFormattedText('|T%s:16:16:0:0:32:32:2:30:2:30|t %s', texture, text)
+end
+
 local youText = format(">>%s<<", strupper(YOU))
 local afkText = "|cff909090 <AFK>"
 local dndText = "|cff909090 <DND>"
@@ -339,7 +350,6 @@ local generalOptions = {
             desc = L["TooltipBackdropColorDesc"] .. getDefaultStr('backdropColor', 'general', '#'),
             group = 'headerBackdrop',
             order = 1,
-            new = true,
             editmode = true
         },
         backdropAlpha = {
@@ -351,7 +361,6 @@ local generalOptions = {
             bigStep = 0.01,
             order = 2,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         insetLeft = {
@@ -363,7 +372,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         insetRight = {
@@ -375,7 +383,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5.1,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         insetTop = {
@@ -387,7 +394,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5.2,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         insetBottom = {
@@ -399,7 +405,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5.3,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         -- Border
@@ -419,7 +424,6 @@ local generalOptions = {
             group = 'headerBorder',
             order = 1,
             editmode = true,
-            new = true
         },
         backdropBorderAlpha = {
             type = 'range',
@@ -430,7 +434,6 @@ local generalOptions = {
             bigStep = 0.01,
             order = 2,
             group = 'headerBorder',
-            new = true,
             editmode = true
         },
         borderEdgeSize = {
@@ -442,7 +445,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5,
             group = 'headerBorder',
-            new = true,
             editmode = true
         },
         -- Statusbar
@@ -472,7 +474,6 @@ local generalOptions = {
             bigStep = 1,
             order = 2,
             group = 'headerStatusBar',
-            new = true,
             editmode = true
         },
         unitHealthbarText = {
@@ -612,7 +613,6 @@ generalOptions.args['customHealthBarTexture'] = {
     end),
     group = 'headerStatusBar',
     order = 4,
-    new = true,
     editmode = true
 }
 generalOptions.args['customBackdropTexture'] = {
@@ -626,7 +626,6 @@ generalOptions.args['customBackdropTexture'] = {
     end, LSM.MediaType.BACKGROUND),
     group = 'headerBackdrop',
     order = 4,
-    new = true,
     editmode = true
 }
 generalOptions.args['customBackdropBorderTexture'] = {
@@ -640,7 +639,6 @@ generalOptions.args['customBackdropBorderTexture'] = {
     end, LSM.MediaType.BORDER),
     group = 'headerBorder',
     order = 4,
-    new = true,
     editmode = true
 }
 DF.Settings:AddPositionTable(Module, generalOptions, 'general', 'GameTooltip', getDefaultStr, frameTable)
@@ -1230,14 +1228,7 @@ function Module:OnTooltipSetSpell(self)
     -- end
 
     local name, rank, icon, castTime, minRange, maxRange, spellID, originalIcon = GetSpellInfo(spellId)
-    if state.showSpellIcon then
-        local texture = GetSpellTexture(spellId)
-
-        local line = _G[self:GetName() .. 'TextLeft1']
-        local text = line:GetText()
-
-        line:SetFormattedText('|T%s:16:16:0:0:32:32:2:30:2:30|t %s', texture, text)
-    end
+    if state.showSpellIcon then prependSpellIcon(self, spellId, icon) end
 
     if state.showSpellIconID then
         local iconStr = string.format(whiteColor, "Icon ID: ") .. string.format(sourceColor, icon);
@@ -1775,14 +1766,7 @@ function Module:HookSpellTooltip()
             table.insert(strTable, sourceStr);
         end
 
-        if state.showSpellIcon then
-            local texture = GetSpellTexture(spellId)
-
-            local line = _G[self:GetName() .. 'TextLeft1']
-            local text = line:GetText()
-
-            line:SetFormattedText('|T%s:16:16:0:0:32:32:2:30:2:30|t %s', texture, text)
-        end
+        if state.showSpellIcon then prependSpellIcon(self, spellId, icon) end
 
         if state.showSpellIconID and icon then
             local iconStr = string.format(whiteColor, "Icon ID: ") .. string.format(sourceColor, icon);
