@@ -89,6 +89,16 @@ do
         "Zeigt für befreundete Spieler nur den Namen ohne Gesundheitsbalken an."
     L["NameplatesOptionForceShowNames"] = "Namen immer anzeigen"
     L["NameplatesOptionForceShowNamesDesc"] = "Hält Einheitennamen auch ohne Namensplakette sichtbar."
+    L["NameplatesHeaderAuras"] = "Auren / Schwächungszauber"
+    L["NameplatesOptionShowAllDebuffs"] = "Alle Debuffs anzeigen"
+    L["NameplatesOptionShowAllDebuffsDesc"] =
+        "Zeigt alle Debuffs auf feindlichen Namensplaketten an (auch von anderen Spielern und NSCs), anstatt nur die eigenen."
+    L["NameplatesOptionMaxDebuffs"] = "Maximale Anzahl an Debuffs"
+    L["NameplatesOptionMaxDebuffsDesc"] =
+        "Maximale Anzahl an Debuffs anderer Spieler pro Namensplakette."
+    L["NameplatesOptionOtherDebuffScale"] = "Skalierung fremder Debuffs"
+    L["NameplatesOptionOtherDebuffScaleDesc"] =
+        "Größe der Debuffs anderer Spieler in Prozent der Größe deiner eigenen Debuffs (100 % = gleich groß)."
 end
 
 -- config

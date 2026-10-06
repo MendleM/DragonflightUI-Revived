@@ -95,6 +95,16 @@ do
         "Отображать только имя для союзников, без полосы здоровья."
     L["NameplatesOptionForceShowNames"] = "Всегда отображать имена"
     L["NameplatesOptionForceShowNamesDesc"] = "Отображать имена юнитов даже без индикаторов здоровья."
+    L["NameplatesHeaderAuras"] = "Ауры / Отрицательные эффекты"
+    L["NameplatesOptionShowAllDebuffs"] = "Показывать все отрицательные эффекты"
+    L["NameplatesOptionShowAllDebuffsDesc"] =
+        "Отображать все дебаффы на индикаторах врагов, включая эффекты других игроков и NPC, а не только свои."
+    L["NameplatesOptionMaxDebuffs"] = "Максимум отрицательных эффектов"
+    L["NameplatesOptionMaxDebuffsDesc"] =
+        "Максимальное количество дебаффов других игроков на одном индикаторе."
+    L["NameplatesOptionOtherDebuffScale"] = "Масштаб чужих дебаффов"
+    L["NameplatesOptionOtherDebuffScaleDesc"] =
+        "Размер дебаффов других игроков в процентах от размера ваших дебаффов (100% = одинаковый размер)."
 end
 
 -- config 
