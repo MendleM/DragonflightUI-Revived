@@ -8,7 +8,7 @@
 ## X-Curse-Project-ID: 1602557
 ## X-Donate: https://ko-fi.com/rakstar91
 ## X-Ko-fi: https://ko-fi.com/rakstar91
-## Version: 0.49.0
+## Version: 0.50.0
 ## IconTexture: Interface\Icons\INV_Misc_Head_Dragon_01
 ## X-Date: @project-date-integer@
 ## Category: UI Overhaul
