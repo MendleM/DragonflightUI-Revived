@@ -69,7 +69,6 @@ local utilityOptions = {
                 'This client already gives shamans a blue of their own, so there is nothing here to correct.',
             disabled = (not shamanIsPink) or nil,
             order = 21,
-            new = true
         }
     }
 }

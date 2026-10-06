@@ -189,7 +189,7 @@ function Module:RegisterSettings()
     register('playerSecondaryRes',
              {order = 0, name = self.SubPlayerSecondaryRes.Options.name, descr = 'players', isNew = false})
     register('playerTotemFrame',
-             {order = 0, name = self.SubPlayerTotemFrame.Options.name, descr = 'players', isNew = true})
+             {order = 0, name = self.SubPlayerTotemFrame.Options.name, descr = 'players', isNew = false})
     register('raid', {order = 0, name = self.SubRaid.Options.name, descr = 'Raidss', isNew = false})
     register('target', {order = 0, name = self.SubTarget.Options.name, descr = 'Targetss', isNew = false})
     register('targetoftarget',

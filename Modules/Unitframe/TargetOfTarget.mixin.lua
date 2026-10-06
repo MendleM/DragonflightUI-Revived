@@ -145,7 +145,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PlayerFrameGradientColorDesc"] .. getDefaultStr('gradient', 'tot'),
                 group = 'headerStyling',
                 order = 2.1,
-                new = true,
                 editmode = true
             },
             reactioncolor = {
@@ -199,7 +198,6 @@ function SubModuleMixin:SetupOptions()
                 end),
                 group = 'headerStyling',
                 order = 4,
-                new = true
             },
             customPowerBarTexture = {
                 type = 'select',
@@ -212,7 +210,6 @@ function SubModuleMixin:SetupOptions()
                 end),
                 group = 'headerStyling',
                 order = 5,
-                new = true
             }
         }
     }

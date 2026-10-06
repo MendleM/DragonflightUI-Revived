@@ -1170,7 +1170,6 @@ function DragonflightUIActionbarMixin:AddTargetStateTable(Module, opt, getDefaul
             desc = L['ActionbarTargetDriverUseMouseoverDesc'] .. getDefaultStr('useMouseover', sub),
             order = 110.1,
             group = 'headerTargetDriver',
-            new = true,
             editmode = true
         },
         mouseoverModifier = {
@@ -1180,7 +1179,6 @@ function DragonflightUIActionbarMixin:AddTargetStateTable(Module, opt, getDefaul
             dropdownValues = DF.Settings.ModifierTable,
             order = 110.15,
             group = 'headerTargetDriver',
-            new = true,
             editmode = true
         },
         useAutoAssist = {
@@ -1189,7 +1187,6 @@ function DragonflightUIActionbarMixin:AddTargetStateTable(Module, opt, getDefaul
             desc = L['ActionbarTargetDriverUseAutoAssistDesc'] .. getDefaultStr('useAutoAssist', sub),
             order = 115,
             group = 'headerTargetDriver',
-            new = true,
             editmode = true
         },
         focusCast = {
@@ -1198,7 +1195,6 @@ function DragonflightUIActionbarMixin:AddTargetStateTable(Module, opt, getDefaul
             desc = L['ActionbarTargetDriverFocusCastDesc'] .. getDefaultStr('focusCast', sub),
             order = 105.3,
             group = 'headerTargetDriver',
-            new = true,
             editmode = true
         },
         focusCastModifier = {
@@ -1217,7 +1213,6 @@ function DragonflightUIActionbarMixin:AddTargetStateTable(Module, opt, getDefaul
             desc = L['ActionbarTargetDriverSelfCastDesc'] .. getDefaultStr('selfCast', sub),
             order = 100.4,
             group = 'headerTargetDriver',
-            new = true,
             editmode = true
         },
         selfCastModifier = {

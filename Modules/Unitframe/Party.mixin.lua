@@ -557,7 +557,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["PlayerFrameGradientColorDesc"] .. getDefaultStr('gradient', 'party'),
                 group = 'headerStyling',
                 order = 2.1,
-                new = true,
                 editmode = true
             },
             breakUpLargeNumbers = {

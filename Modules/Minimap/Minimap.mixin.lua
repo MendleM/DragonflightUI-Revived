@@ -202,7 +202,6 @@ function SubModuleMixin:SetupOptions()
                 dropdownValues = shapeTable,
                 order = 1,
                 group = 'headerStyling',
-                new = true,
                 editmode = true
             },
             zonePanelPosition = {
@@ -212,7 +211,6 @@ function SubModuleMixin:SetupOptions()
                 dropdownValues = DF.Settings.DropdownTopBottomAnchorTable,
                 order = 10,
                 group = 'headerStyling',
-                new = true,
                 editmode = true
             },
             hideHeader = {
@@ -221,7 +219,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["MinimapHideHeaderDesc"] .. getDefaultStr('hideHeader', 'minimap'),
                 group = 'headerStyling',
                 order = 10.1,
-                new = true,
                 editmode = true
             },
             hideZoneText = {
@@ -230,7 +227,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["MinimapHideZoneTextDesc"] .. getDefaultStr('hideZoneText', 'minimap'),
                 group = 'headerStyling',
                 order = 10.2,
-                new = true,
                 editmode = true
             },
             hideClock = {
@@ -239,7 +235,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["MinimapHideClockDesc"] .. getDefaultStr('hideClock', 'minimap'),
                 group = 'headerStyling',
                 order = 10.3,
-                new = true,
                 editmode = true
             },
             hideCalendar = {
@@ -282,7 +277,6 @@ function SubModuleMixin:SetupOptions()
                 desc = L["MinimapSkinMinimapHideButtonsDesc"] .. getDefaultStr('hideButtons', 'minimap'),
                 group = 'headerStyling',
                 order = 15.1,
-                new = true,
                 editmode = true
             }
             -- skinButtons = {

@@ -133,7 +133,6 @@ local compatOptions = {
             name = L["CompatQuestie"],
             desc = L["CompatQuestieDesc"] .. getDefaultStr('questie', 'general'),
             order = 21,
-            new = true
         },
         ranker = {
             type = 'toggle',

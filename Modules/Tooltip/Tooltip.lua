@@ -339,7 +339,6 @@ local generalOptions = {
             desc = L["TooltipBackdropColorDesc"] .. getDefaultStr('backdropColor', 'general', '#'),
             group = 'headerBackdrop',
             order = 1,
-            new = true,
             editmode = true
         },
         backdropAlpha = {
@@ -351,7 +350,6 @@ local generalOptions = {
             bigStep = 0.01,
             order = 2,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         insetLeft = {
@@ -363,7 +361,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         insetRight = {
@@ -375,7 +372,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5.1,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         insetTop = {
@@ -387,7 +383,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5.2,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         insetBottom = {
@@ -399,7 +394,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5.3,
             group = 'headerBackdrop',
-            new = true,
             editmode = true
         },
         -- Border
@@ -419,7 +413,6 @@ local generalOptions = {
             group = 'headerBorder',
             order = 1,
             editmode = true,
-            new = true
         },
         backdropBorderAlpha = {
             type = 'range',
@@ -430,7 +423,6 @@ local generalOptions = {
             bigStep = 0.01,
             order = 2,
             group = 'headerBorder',
-            new = true,
             editmode = true
         },
         borderEdgeSize = {
@@ -442,7 +434,6 @@ local generalOptions = {
             bigStep = 1,
             order = 5,
             group = 'headerBorder',
-            new = true,
             editmode = true
         },
         -- Statusbar
@@ -472,7 +463,6 @@ local generalOptions = {
             bigStep = 1,
             order = 2,
             group = 'headerStatusBar',
-            new = true,
             editmode = true
         },
         unitHealthbarText = {
@@ -612,7 +602,6 @@ generalOptions.args['customHealthBarTexture'] = {
     end),
     group = 'headerStatusBar',
     order = 4,
-    new = true,
     editmode = true
 }
 generalOptions.args['customBackdropTexture'] = {
@@ -626,7 +615,6 @@ generalOptions.args['customBackdropTexture'] = {
     end, LSM.MediaType.BACKGROUND),
     group = 'headerBackdrop',
     order = 4,
-    new = true,
     editmode = true
 }
 generalOptions.args['customBackdropBorderTexture'] = {
@@ -640,7 +628,6 @@ generalOptions.args['customBackdropBorderTexture'] = {
     end, LSM.MediaType.BORDER),
     group = 'headerBorder',
     order = 4,
-    new = true,
     editmode = true
 }
 DF.Settings:AddPositionTable(Module, generalOptions, 'general', 'GameTooltip', getDefaultStr, frameTable)

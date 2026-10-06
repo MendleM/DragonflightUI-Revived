@@ -149,7 +149,6 @@ local function AddCastbarTable(optionTable, sub)
             desc = L["CastbarTableAutoAdjustDesc"] .. getDefaultStr('autoAdjust', sub),
             group = 'headerPosition',
             order = 10,
-            new = true,
             editmode = true
         },
         headerStyling = {
@@ -304,7 +303,6 @@ local function AddAutoAdjustTable(optionTable, sub)
             desc = L["CastbarTableAutoAdjustDesc"] .. getDefaultStr('autoAdjust', sub),
             group = 'headerAutoAdjust',
             order = 1,
-            new = true,
             editmode = true
         },
         autoAdjustX = {
@@ -316,7 +314,6 @@ local function AddAutoAdjustTable(optionTable, sub)
             bigStep = 0.25,
             group = 'headerAutoAdjust',
             order = 2,
-            new = true,
             editmode = true
         },
         autoAdjustY = {
@@ -328,7 +325,6 @@ local function AddAutoAdjustTable(optionTable, sub)
             bigStep = 0.25,
             group = 'headerAutoAdjust',
             order = 3,
-            new = true,
             editmode = true
         }
     }
@@ -653,7 +649,7 @@ function Module:RegisterSettings()
     end
 
     register('player', {order = 1, name = optionsPlayer.name, descr = 'Player Cast Bar', isNew = false})
-    register('mirrorTimer', {order = 1.5, name = self.SubMirrorTimer.Options.name, descr = 'Focusss', isNew = true})
+    register('mirrorTimer', {order = 1.5, name = self.SubMirrorTimer.Options.name, descr = 'Focusss', isNew = false})
     register('target', {order = 2, name = optionsTarget.name, descr = 'Target Cast Bar', isNew = false})
 
     if DF.Caps.HasFocus then
