@@ -675,7 +675,7 @@ function DFProfessionMixin:UpdateHeader()
         self.RankFrame.DFStatusTexture = base .. prof.profData.bar
     end
 
-    if prof.profData and prof.profData.noRank then
+    if self.minimized or (prof.profData and prof.profData.noRank) then
         self.RankFrame:Hide()
     else
         self.RankFrame:Show()
