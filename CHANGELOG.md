@@ -2,10 +2,15 @@
 
 DragonflightUI Revived — the community-maintained continuation of
 DragonflightUI Classic, picking up after upstream's last release (v0.40.3,
-May 2026). Current builds report version `0.50.0`.
+May 2026). Current builds report version `0.50.1`.
 
 Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
+
+## 0.50.1 — Profession Window Fix (7 October 2026)
+A small fix for the minimized profession window.
+### Professions
+- Fixed the skill bar reappearing after crafting an item while the profession window is minimized.
 
 ## 0.50.0 — Nameplate Debuffs (6 October 2026)
 Enemy nameplates can now show other players' debuffs next to your own.

@@ -24,6 +24,20 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.50.1',
+        title = 'Profession Window Fix',
+        date = '7 October 2026',
+        intro = 'A small fix for the minimized profession window.',
+        sections = {
+            {
+                title = 'Professions',
+                items = {
+                    'Fixed the skill bar reappearing after crafting an item while the profession window is minimized.'
+                }
+            }
+        }
+    },
+    {
         version = '0.50.0',
         title = 'Nameplate Debuffs',
         date = '6 October 2026',
