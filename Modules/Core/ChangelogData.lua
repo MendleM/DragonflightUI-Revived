@@ -27,12 +27,17 @@ DF.ChangelogData = {
         version = '0.50.1',
         title = 'Profession Window Fix',
         date = '7 October 2026',
-        intro = 'A small fix for the minimized profession window.',
+        intro = 'Small fixes for the minimized profession window and the guild news tab.',
         sections = {
             {
                 title = 'Professions',
                 items = {
                     'Fixed the skill bar reappearing after crafting an item while the profession window is minimized.'
+                }
+            }, {
+                title = 'Guild',
+                items = {
+                    'Fixed a Lua error when opening the guild news tab on Classic clients.'
                 }
             }
         }

@@ -8,9 +8,11 @@ Everything before v0.40.3 is in
 [upstream's releases](https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI/releases).
 
 ## 0.50.1 — Profession Window Fix (7 October 2026)
-A small fix for the minimized profession window.
+Small fixes for the minimized profession window and the guild news tab.
 ### Professions
 - Fixed the skill bar reappearing after crafting an item while the profession window is minimized.
+### Guild
+- Fixed a Lua error when opening the guild news tab on Classic clients.
 
 ## 0.50.0 — Nameplate Debuffs (6 October 2026)
 Enemy nameplates can now show other players' debuffs next to your own.
