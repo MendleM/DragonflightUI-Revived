@@ -451,8 +451,24 @@ function Module:ApplySettingsInternal(sub, key)
     Module:UpdateWidgetBelowState(db.widgetBelow)
 end
 
+-- Blizzard_Communities ships the retail guild news tab, whose boss kill entries
+-- (GuildNewsButton_SetNews) format their text with GUILD_NEWS_DUNGEON_ENCOUNTER_*.
+-- Those globals do not exist on the Classic clients, so opening the tab threw
+-- "attempt to index local 'formatString' (a nil value)" in GuildUtil.lua.
+function Module:EnsureGuildNewsStrings()
+    if not GUILD_NEWS_DUNGEON_ENCOUNTER_NORMAL then GUILD_NEWS_DUNGEON_ENCOUNTER_NORMAL = '%s' end
+    if not GUILD_NEWS_DUNGEON_ENCOUNTER_HEROIC then
+        GUILD_NEWS_DUNGEON_ENCOUNTER_HEROIC = '%s (' .. (PLAYER_DIFFICULTY2 or 'Heroic') .. ')'
+    end
+    if not GUILD_NEWS_DUNGEON_ENCOUNTER_MYTHIC then
+        GUILD_NEWS_DUNGEON_ENCOUNTER_MYTHIC = '%s (' .. (PLAYER_DIFFICULTY6 or 'Mythic') .. ')'
+    end
+end
+
 function Module:ChangeFrames()
     -- DragonflightUIMixin:UIPanelCloseButton(_G['DragonflightUIConfigFrame'].ClosePanelButton)
+
+    Module:EnsureGuildNewsStrings()
 
     -- Dragonflight Config
     do
