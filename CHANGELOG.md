@@ -11,6 +11,8 @@ Everything before v0.40.3 is in
 Small fixes for the minimized profession window and the guild news tab.
 ### Professions
 - Fixed the skill bar reappearing after crafting an item while the profession window is minimized.
+### Minimap
+- Fixed "Hide Minimap Buttons" not applying to buttons that register after login, so they stayed visible after a reload or relog.
 ### Guild
 - Fixed a Lua error when opening the guild news tab on Classic clients.
 

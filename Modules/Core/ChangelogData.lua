@@ -35,6 +35,11 @@ DF.ChangelogData = {
                     'Fixed the skill bar reappearing after crafting an item while the profession window is minimized.'
                 }
             }, {
+                title = 'Minimap',
+                items = {
+                    'Fixed "Hide Minimap Buttons" not applying to buttons that register after login, so they stayed visible after a reload or relog.'
+                }
+            }, {
                 title = 'Guild',
                 items = {
                     'Fixed a Lua error when opening the guild news tab on Classic clients.'
