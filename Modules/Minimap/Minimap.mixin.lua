@@ -1179,7 +1179,7 @@ function SubModuleMixin:ChangeMinimapButtons()
         if btn then
             --
             self:UpdateButton(btn)
-            libIcon:ShowOnEnter(v, self.ModuleRef.db.profile.minimap.hideButtons)
+            libIcon:ShowOnEnter(name, self.ModuleRef.db.profile.minimap.hideButtons)
         end
     end)
 
