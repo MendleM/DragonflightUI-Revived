@@ -620,7 +620,7 @@ function DFProfessionMixin:SetCurrentProfession()
     end
 
     local isLink, playerName = IsTradeSkillLinked()
-    if DF.InterfaceVersion >= DF.Expansions.WotLK and isLink and playerName and playerName ~= '' then
+    if DF.API.Version.IsAtLeast(DF.Expansions.WotLK) and isLink and playerName and playerName ~= '' then
         local tradeskillName, currentLevel, maxLevel, skillLineModifier = GetTradeSkillLine()
         local skillID = DragonflightUILocalizationData:GetSkillIDFromProfessionName(tradeskillName)
 

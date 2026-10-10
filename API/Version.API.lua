@@ -47,6 +47,9 @@ DF.Wrath = Version.IsWotlk
 DF.Cata = Version.IsCata
 DF.MoP = Version.IsMoP
 
+-- Each expansion owns a block of 10000 interface versions (`50000` - `59999` is MoP)
+local EXPANSION_STEP = 10000
+
 Version.Expansions = {
     Classic = 10000,
     TBC     = 20000,
@@ -57,6 +60,29 @@ Version.Expansions = {
     MoP     = 50000,
 }
 DF.Expansions = Version.Expansions
+
+--- True on the given expansion and every later one, e.g. `Version.IsAtLeast(Version.Expansions.WotLK)`
+--- @param expansion number One of `Version.Expansions`
+--- @return boolean
+function Version.IsAtLeast(expansion)
+    return interfaceVersion >= expansion
+end
+
+--- True on every expansion before the given one, e.g. `Version.IsBefore(Version.Expansions.WotLK)` for Era and TBC
+--- @param expansion number One of `Version.Expansions`
+--- @return boolean
+function Version.IsBefore(expansion)
+    return interfaceVersion < expansion
+end
+
+--- True from the first expansion up to and including the last, e.g. `Version.IsFromTo(WotLK, MoP)`
+--- The last expansion counts completely, so every build of it (`50503`, ...) matches, not just its base `50000`.
+--- @param first number One of `Version.Expansions`
+--- @param last number One of `Version.Expansions`
+--- @return boolean
+function Version.IsFromTo(first, last)
+    return interfaceVersion >= first and interfaceVersion < last + EXPANSION_STEP
+end
 
 -- Auto-mirror all Caps to Version table
 for k, v in pairs(DF.Caps) do
