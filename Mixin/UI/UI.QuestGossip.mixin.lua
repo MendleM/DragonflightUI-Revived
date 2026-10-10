@@ -915,7 +915,8 @@ function DragonflightUIMixin:AddQuestLevel()
         end
     end)
 
-    if DF.API.Version.IsMoP then
+    if DF.API.Version.IsAtLeast(DF.Expansions.WotLK) then
+        -- Wrath+: HybridScrollFrame quest log, titles are resized via QuestLogTitleButton_Resize
         hooksecurefunc('QuestLogTitleButton_Resize', function(questLogTitle)
             local questNormalText = questLogTitle.normalText;
             local questIndex = questLogTitle:GetID()
@@ -954,20 +955,8 @@ function DragonflightUIMixin:AddQuestLevel()
             local questNormalTextWidth = questNormalText:GetWidth() - max(questNormalText:GetRight() - (rightEdge or 0), 0);
             questNormalText:SetWidth(questNormalTextWidth);
         end)
-    elseif DF.Cata then
-        hooksecurefunc('QuestLogTitleButton_Resize', function(btn)
-            local questIndex = btn:GetID()
-            local title, level, suggestedGroup, isHeader, suffix = questInfo(questIndex)
-
-            if title and level and not isHeader then
-                local padding = (level > 0 and level < 10) and '0' or ''
-                local questLogText = ' [' .. padding .. level .. suffix .. '] ' .. title
-
-                local normal = btn.normalText
-                if normal then normal:SetText(questLogText) end
-            end
-        end)
-    elseif DF.Era then
+    else
+        -- Era/TBC: fixed QuestLogTitle1..N buttons, updated via QuestLog_Update
         hooksecurefunc('QuestLog_Update', function()
             local numEntries, numQuests = GetNumQuestLogEntries();
             if numEntries == 0 then return end
