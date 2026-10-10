@@ -24,6 +24,35 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- just the one after it.
 DF.ChangelogData = {
     {
+        version = '0.50.1',
+        title = 'Profession Window Fix',
+        date = '7 October 2026',
+        intro = 'Small fixes for the minimized profession window and the guild news tab.',
+        sections = {
+            {
+                title = 'Professions',
+                items = {
+                    'Fixed the skill bar reappearing after crafting an item while the profession window is minimized.'
+                }
+            }, {
+                title = 'Minimap',
+                items = {
+                    'Fixed "Hide Minimap Buttons" not applying to buttons that register after login, so they stayed visible after a reload or relog.'
+                }
+            }, {
+                title = 'Quests',
+                items = {
+                    'Fixed the "Show Questlevel" option not showing quest levels in the quest log on TBC Classic and Wrath Classic.'
+                }
+            }, {
+                title = 'Guild',
+                items = {
+                    'Fixed a Lua error when opening the guild news tab on Classic clients.'
+                }
+            }
+        }
+    },
+    {
         version = '0.50.0',
         title = 'Nameplate Debuffs',
         date = '6 October 2026',

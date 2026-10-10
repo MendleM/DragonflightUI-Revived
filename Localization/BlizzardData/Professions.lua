@@ -291,7 +291,7 @@ ProfessionNamesToSkillID[DF_PROFESSIONS_FISHING] = 356
 ProfessionNamesToSkillID[DF_PROFESSIONS_POISON] = 666 -- custom
 ProfessionNamesToSkillID[DF_PROFESSIONS_BEAST] = 667 -- custom
 
-if DF.InterfaceVersion >= DF.Expansions.WotLK then
+if DF.API.Version.IsAtLeast(DF.Expansions.WotLK) then
     local name = GetSpellInfo(53428)
     if name then
         DF_PROFESSIONS_RUNEFORGING = name;

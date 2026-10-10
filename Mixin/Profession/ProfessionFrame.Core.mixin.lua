@@ -799,7 +799,7 @@ function DFProfessionMixin:UpdateProfessionData()
     local skillTable = {}
     -- Cataclysm (4.0.1+) and later (MoP, etc.) use GetProfessions();
     -- older versions (Era, TBC, Wrath) use legacy GetNumSkillLines()
-    if DF.InterfaceVersion >= DF.Expansions.Cata then
+    if DF.API.Version.IsAtLeast(DF.Expansions.Cata) then
         local prof1, prof2, archaeology, fishing, cooking, firstaid = GetProfessions()
 
         if prof1 then
