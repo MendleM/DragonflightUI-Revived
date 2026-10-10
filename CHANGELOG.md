@@ -13,6 +13,8 @@ Small fixes for the minimized profession window and the guild news tab.
 - Fixed the skill bar reappearing after crafting an item while the profession window is minimized.
 ### Minimap
 - Fixed "Hide Minimap Buttons" not applying to buttons that register after login, so they stayed visible after a reload or relog.
+### Quests
+- Fixed the "Show Questlevel" option not showing quest levels in the quest log on TBC Classic and Wrath Classic.
 ### Guild
 - Fixed a Lua error when opening the guild news tab on Classic clients.
 
